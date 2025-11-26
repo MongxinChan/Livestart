@@ -1,0 +1,21 @@
+server:
+    port: 8002
+    #注意空格
+
+spring:
+    application:
+        name: live-start-admin
+    data:
+        redis:
+            host: 127.0.0.1
+            port: 6379
+            password: 123456
+        cloud:
+            nacos:
+                discovery:
+                    server-addr: 127.0.0.1:8848
+
+mybatis-plus:
+    configuration:
+        map-underscore-to-camel-case: false
+        #关闭驼峰转下划线
