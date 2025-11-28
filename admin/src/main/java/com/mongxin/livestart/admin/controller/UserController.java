@@ -31,7 +31,7 @@ public class UserController {
     /**
      * 根据用户名查询用户信息
      */
-    @GetMapping("/api/saas-short-link/admin/v1/user/{username}")
+    @GetMapping("/api/live-start/admin/v1/user/{username}")
     public Result<UserRespDTO> getUserByUsername(@PathVariable("username") String username) {
         return Results.success(userService.getUserByUsername(username));
     }
@@ -39,7 +39,7 @@ public class UserController {
     /**
      * 根据用户名查询无脱敏用户信息
      */
-    @GetMapping("/api/saas-short-link/admin/v1/actual/{username}")
+    @GetMapping("/api/live-start/admin/v1/actual/{username}")
     public Result<UserActualRespDTO> getActualUserByUserName(
             @PathVariable("username") String username) {
         return Results.success(
@@ -49,7 +49,7 @@ public class UserController {
     /**
      * 查询用户名是否存在
      */
-    @GetMapping("/api/saas-short-link/admin/v1/has-username/{username}")
+    @GetMapping("/api/live-start/admin/v1/has-username/{username}")
     public Result<Boolean> availableUserName(@PathVariable("username") String username) {
         return Results.success(userService.availableUserName(username));
     }
@@ -57,7 +57,7 @@ public class UserController {
     /**
      * 注册用户
      */
-    @PostMapping("/api/saas-short-link/admin/v1/user")
+    @PostMapping("/api/live-start/admin/v1/user")
     public Result<Void> register(@RequestBody UserRegisterReqDTO requestParam) {
         userService.register(requestParam);
         return Results.success();
@@ -66,7 +66,7 @@ public class UserController {
     /**
      * 修改用户
      */
-    @PutMapping("/api/saas-short-link/admin/v1/user")
+    @PutMapping("/api/live-start/admin/v1/user")
     public Result<Void> update(@RequestBody UserUpdateReqDTO requestParam) {
         userService.update(requestParam);
         return Results.success();
@@ -75,7 +75,7 @@ public class UserController {
     /**
      * 用户登录
      */
-    @PostMapping("/api/saas-short-link/admin/v1/user/login")
+    @PostMapping("/api/live-start/admin/v1/user/login")
     public Result<UserLoginRespDTO> login(@RequestBody UserLoginReqDTO requestParam) {
         /* log.error("【Controller】接收 username={}", requestParam.getUsername()); */
         return Results.success(userService.login(requestParam));
@@ -85,7 +85,7 @@ public class UserController {
     /**
      * 检查用户是否登录
      */
-    @GetMapping("/api/saas-short-link/admin/v1/user/check-login")
+    @GetMapping("/api/live-start/admin/v1/user/check-login")
     public Result<Boolean> checkLogin(@RequestParam("username") String username,
                                       @RequestParam("token") String token) {
         return Results.success(userService.checkLogin(username, token));
@@ -97,7 +97,7 @@ public class UserController {
      * @param username
      * @return
      */
-    @DeleteMapping("/api/saas-short-link/admin/v1/user/logout")
+    @DeleteMapping("/api/live-start/admin/v1/user/logout")
     public Result<Void> logout(@RequestParam("username") String username,
                                @RequestParam("token") String token) {
         userService.logout(username, token);
