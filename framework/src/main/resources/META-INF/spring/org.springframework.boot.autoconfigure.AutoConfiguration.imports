@@ -1,0 +1,3 @@
+com.mongxin.livestart.framework.config.WebAutoConfiguration
+com.mongxin.livestart.framework.config.IdempotentConfiguration
+com.mongxin.livestart.framework.config.CacheConfiguration
