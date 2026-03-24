@@ -10,7 +10,9 @@
     <packaging>pom</packaging>
     <modules>
         <module>admin</module>
-        <module>project</module>
+        <module>engine</module>
+        <module>gateway</module>
+        <module>merchant-admin</module>
     </modules>
 
     <properties>
