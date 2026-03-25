@@ -9,14 +9,14 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <modules>
-        <module>admin</module>
-        <module>distribution</module>
-        <module>engine</module>
-        <module>framework</module>
-        <module>gateway</module>
-        <module>merchant-admin</module>
-        <module>search</module>
-        <module>settlement</module>
+        <module>services/admin</module>
+        <module>services/distribution</module>
+        <module>services/engine</module>
+        <module>common/framework</module>
+        <module>apis/gateway</module>
+        <module>services/merchant-admin</module>
+        <module>services/search</module>
+        <module>services/settlement</module>
     </modules>
 
     <properties>
@@ -41,7 +41,6 @@
         <jjwt.version>0.9.1</jjwt.version>
         <mybatis-plus.version>3.5.3.1</mybatis-plus.version>
         <mybatis-spring-boot-starter.version>3.0.2</mybatis-spring-boot-starter.version>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
     <dependencies>
@@ -49,6 +48,11 @@
             <artifactId>lombok</artifactId>
             <groupId>org.projectlombok</groupId>
             <version>1.18.36</version>
+        </dependency>
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>1.9.22.1</version>
         </dependency>
     </dependencies>
     <dependencyManagement>
@@ -132,5 +136,24 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <executions>
+                        <execution>
+                            <goals>
+                                <goal>repackage</goal>
+                            </goals>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
 
 </project>

@@ -27,7 +27,7 @@ public final class NoDuplicateSubmitAspect {
     /**
      * 增强方法标记 {@link NoDuplicateSubmit} 注解逻辑
      */
-    @Around("@annotation(com.nageoffer.onecoupon.framework.idempotent.NoDuplicateSubmit)")
+    @Around("@annotation(com.mongxin.livestart.framework.idempotent.NoDuplicateSubmit)")
     public Object noDuplicateSubmit(ProceedingJoinPoint joinPoint) throws Throwable {
         NoDuplicateSubmit noDuplicateSubmit = getNoDuplicateSubmitAnnotation(joinPoint);
         // 获取分布式锁标识
