@@ -35,7 +35,7 @@ public final class NoMQDuplicateConsumeAspect {
     /**
      * 增强方法标记 {@link NoMQDuplicateConsume} 注解逻辑
      */
-    @Around("@annotation(com.nageoffer.onecoupon.framework.idempotent.NoMQDuplicateConsume)")
+    @Around("@annotation(com.mongxin.livestart.framework.idempotent.NoMQDuplicateConsume)")
     public Object noMQRepeatConsume(ProceedingJoinPoint joinPoint) throws Throwable {
         NoMQDuplicateConsume noMQDuplicateConsume = getNoMQDuplicateConsumeAnnotation(joinPoint);
         String uniqueKey = noMQDuplicateConsume.keyPrefix() + SpELUtil.parseKey(noMQDuplicateConsume.key(), ((MethodSignature) joinPoint.getSignature()).getMethod(), joinPoint.getArgs());
