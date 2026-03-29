@@ -66,10 +66,15 @@ public final class NoDuplicateSubmitAspect {
 
     /**
      * @return 当前操作用户 ID
+     * 从网关透传的 Header 中动态读取，保证锁的粒度是用户级别
      */
     private String getCurrentUserId() {
-        // 用户属于非核心功能，这里先通过模拟的形式代替。后续如果需要后管展示，会重构该代码
-        return "1810518709471555585";
+        ServletRequestAttributes sra = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (sra == null) {
+            return "anonymous";
+        }
+        String userId = sra.getRequest().getHeader("userId");
+        return (userId != null && !userId.isBlank()) ? userId : "anonymous";
     }
 
     /**
