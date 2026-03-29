@@ -2,6 +2,7 @@ package com.mongxin.livestart.admin.dto.resp;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
 import com.mongxin.livestart.admin.common.serialize.PhoneDesensitizationSerializer;
+import com.mongxin.livestart.admin.common.serialize.IdCardDesensitizationSerializer;
 import lombok.Data;
 
 import java.util.Date;
@@ -44,6 +45,7 @@ public class UserRespDTO {
     /**
      * 身份证号
      */
+    @JsonSerialize(using = IdCardDesensitizationSerializer.class)
     private String idCard;
 
     /**
