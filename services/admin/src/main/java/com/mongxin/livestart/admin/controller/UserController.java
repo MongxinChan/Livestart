@@ -1,13 +1,11 @@
 package com.mongxin.livestart.admin.controller;
 
 
-import cn.hutool.core.bean.BeanUtil;
 import com.mongxin.livestart.admin.common.convention.result.Result;
 import com.mongxin.livestart.admin.common.convention.result.Results;
 import com.mongxin.livestart.admin.dto.req.UserLoginReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserRegisterReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
-import com.mongxin.livestart.admin.dto.resp.UserActualRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
 import com.mongxin.livestart.admin.service.UserService;
@@ -40,10 +38,10 @@ public class UserController {
      * 根据用户名查询无脱敏用户信息
      */
     @GetMapping("/api/live-start/admin/v1/actual/{username}")
-    public Result<UserActualRespDTO> getActualUserByUserName(
+    public Result<UserRespDTO> getActualUserByUserName(
             @PathVariable("username") String username) {
-        return Results.success(
-                BeanUtil.toBean(userService.getUserByUsername(username), UserActualRespDTO.class));
+        // 由于现已统一为 UserRespDTO，若要实现真正脱敏，后续请结合 AOP 或新的字段来隔离
+        return Results.success(userService.getUserByUsername(username));
     }
 
     /**
