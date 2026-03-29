@@ -27,6 +27,11 @@ public class UserInfoDTO {
     private String username;
 
     /**
+     * 手机号
+     */
+    private String phone;
+
+    /**
      * 真实姓名
      */
     private String realName;

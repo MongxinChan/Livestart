@@ -83,11 +83,11 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Override
     public void register(UserRegisterReqDTO requestParam) {
         if (!availablePhone(requestParam.getPhone())) {
-            throw new ClientException("改手机号已被注册");
+            throw new ClientException(UserErrorCodeEnum.PHONE_EXIST);
         }
         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getPhone());
         if (!lock.tryLock()) {
-            throw new ClientException(USER_NAME_EXIST);
+            throw new ClientException(PHONE_EXIST);
             // 这儿的逻辑是如果获取不到锁就抛用户名存在，有先者A先行，其大概率不会出错，而后者B,C如果刚好别人在获取锁，
             // 而且还没获取到，就证明比别人慢，避免其在此阻塞，直接抛异常
         }

@@ -41,6 +41,16 @@ public final class UserContext {
     }
 
     /**
+     * 获取上下文中手机号
+     *
+     * @return 手机号
+     */
+    public static String getPhone() {
+        UserInfoDTO userInfoDTO = USER_THREAD_LOCAL.get();
+        return Optional.ofNullable(userInfoDTO).map(UserInfoDTO::getPhone).orElse(null);
+    }
+
+    /**
      * 获取上下文中用户真实姓名
      *
      * @return 用户真实姓名

@@ -14,6 +14,7 @@ public class OpenFeignConfiguration {
             template.header("username", UserContext.getUsername());
             template.header("userId", UserContext.getUserId());
             template.header("realName", UserContext.getRealName());
+            template.header("phone", UserContext.getPhone());
         };
     }
 }

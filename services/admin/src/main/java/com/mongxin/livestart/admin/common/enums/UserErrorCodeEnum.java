@@ -12,8 +12,7 @@ public enum UserErrorCodeEnum implements IErrorCode {
 
     USER_EXIST("B002002", "用户记录已存在"),
 
-
-    USER_NAME_EXIST("B002001", "用户名已存在"),
+    PHONE_EXIST("B002001", "该手机号已被注册"),
 
     USER_NULL("B000200", "用户记录不存在"),
     //枚举类型用,分割
