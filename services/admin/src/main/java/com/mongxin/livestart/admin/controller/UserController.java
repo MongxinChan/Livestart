@@ -11,6 +11,7 @@ import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
 import com.mongxin.livestart.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -27,36 +28,36 @@ public class UserController {
 
 
     /**
-     * 根据用户名查询用户信息
+     * 根据手机号查询用户信息
      */
-    @GetMapping("/api/live-start/admin/v1/user/{username}")
-    public Result<UserRespDTO> getUserByUsername(@PathVariable("username") String username) {
-        return Results.success(userService.getUserByUsername(username));
+    @GetMapping("/api/live-start/admin/v1/user/{phone}")
+    public Result<UserRespDTO> getUserByPhone(@PathVariable("phone") String phone) {
+        return Results.success(userService.getUserByPhone(phone));
     }
 
     /**
-     * 根据用户名查询无脱敏用户信息
+     * 根据手机号查询无脱敏用户信息
      */
-    @GetMapping("/api/live-start/admin/v1/actual/{username}")
-    public Result<UserRespDTO> getActualUserByUserName(
-            @PathVariable("username") String username) {
+    @GetMapping("/api/live-start/admin/v1/actual/{phone}")
+    public Result<UserRespDTO> getActualUserByPhone(
+            @PathVariable("phone") String phone) {
         // 由于现已统一为 UserRespDTO，若要实现真正脱敏，后续请结合 AOP 或新的字段来隔离
-        return Results.success(userService.getUserByUsername(username));
+        return Results.success(userService.getUserByPhone(phone));
     }
 
     /**
-     * 查询用户名是否存在
+     * 查询手机号是否存在
      */
-    @GetMapping("/api/live-start/admin/v1/has-username/{username}")
-    public Result<Boolean> availableUserName(@PathVariable("username") String username) {
-        return Results.success(userService.availableUserName(username));
+    @GetMapping("/api/live-start/admin/v1/has-phone/{phone}")
+    public Result<Boolean> availablePhone(@PathVariable("phone") String phone) {
+        return Results.success(userService.availablePhone(phone));
     }
 
     /**
      * 注册用户
      */
     @PostMapping("/api/live-start/admin/v1/user")
-    public Result<Void> register(@RequestBody UserRegisterReqDTO requestParam) {
+    public Result<Void> register(@RequestBody @Validated UserRegisterReqDTO requestParam) {
         userService.register(requestParam);
         return Results.success();
     }
@@ -65,7 +66,7 @@ public class UserController {
      * 修改用户
      */
     @PutMapping("/api/live-start/admin/v1/user")
-    public Result<Void> update(@RequestBody UserUpdateReqDTO requestParam) {
+    public Result<Void> update(@RequestBody @Validated UserUpdateReqDTO requestParam) {
         userService.update(requestParam);
         return Results.success();
     }
@@ -74,7 +75,7 @@ public class UserController {
      * 用户登录
      */
     @PostMapping("/api/live-start/admin/v1/user/login")
-    public Result<UserLoginRespDTO> login(@RequestBody UserLoginReqDTO requestParam) {
+    public Result<UserLoginRespDTO> login(@RequestBody @Validated UserLoginReqDTO requestParam) {
         /* log.error("【Controller】接收 username={}", requestParam.getUsername()); */
         return Results.success(userService.login(requestParam));
     }
@@ -84,21 +85,21 @@ public class UserController {
      * 检查用户是否登录
      */
     @GetMapping("/api/live-start/admin/v1/user/check-login")
-    public Result<Boolean> checkLogin(@RequestParam("username") String username,
+    public Result<Boolean> checkLogin(@RequestParam("phone") String phone,
                                       @RequestParam("token") String token) {
-        return Results.success(userService.checkLogin(username, token));
+        return Results.success(userService.checkLogin(phone, token));
     }
 
     /**
      * 用户退出登录
      *
-     * @param username
+     * @param phone
      * @return
      */
     @DeleteMapping("/api/live-start/admin/v1/user/logout")
-    public Result<Void> logout(@RequestParam("username") String username,
+    public Result<Void> logout(@RequestParam("phone") String phone,
                                @RequestParam("token") String token) {
-        userService.logout(username, token);
+        userService.logout(phone, token);
         return Results.success();
     }
 }
