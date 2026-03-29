@@ -1,8 +1,6 @@
 package com.mongxin.livestart.admin.dao.entity;
 
-import com.baomidou.mybatisplus.annotation.FieldFill;
-import com.baomidou.mybatisplus.annotation.TableField;
-import com.baomidou.mybatisplus.annotation.TableName;
+import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
 
 import java.util.Date;
@@ -15,8 +13,9 @@ import java.util.Date;
 public class UserDO {
 
     /**
-     * ID
+     * ID - 使用雪花算法生成分布式唯一ID
      */
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
@@ -25,7 +24,7 @@ public class UserDO {
     private String username;
 
     /**
-     * 密码
+     * 密码 （BCrypt）
      */
     private String password;
 
@@ -34,19 +33,9 @@ public class UserDO {
      */
     private String phone;
 
-    /**
-     * 邮箱
-     */
-    private String mail;
-
     /*
      新增字段：实名认证相关 (票务系统核心)
      */
-
-    /**
-     * 真实姓名 (实名认证后写入)
-     */
-    private String realName;
 
     /**
      * 身份证号
@@ -62,16 +51,6 @@ public class UserDO {
     /*
      新增字段：社交与资料 (类秀动APP属性)
      */
-
-    /**
-     * 用户头像URL
-     */
-    private String avatar;
-
-    /**
-     * 性别 0:保密 1:男 2:女
-     */
-    private Integer gender;
 
     /**
      * 个性签名
@@ -109,7 +88,7 @@ public class UserDO {
     private Date updateTime;
 
     /**
-     * 注销/删除时间
+     * 注销时间 (法律合规及审计用)
      */
     private Date deleteTime;
 
