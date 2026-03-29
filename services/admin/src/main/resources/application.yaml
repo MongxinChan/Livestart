@@ -19,3 +19,13 @@ mybatis-plus:
     configuration:
         map-underscore-to-camel-case: false
         #关闭驼峰转下划线
+
+# Livestart 用户流量风控配置
+livestart:
+    flow-limit:
+        # 是否开启用户请求流量风控 (true=开启)
+        enable: false
+        # 时间窗口内最大访问次数
+        max-access-count: 10
+        # 时间窗口大小，单位：秒
+        time-window: "1"

@@ -30,7 +30,7 @@ public class UserConfiguration {
      * 用户操作流量风控过滤器
      */
     @Bean
-    @ConditionalOnProperty(name = "short-link.flow-limit.enable", havingValue = "true")
+    @ConditionalOnProperty(name = "livestart.flow-limit.enable", havingValue = "true")
     public FilterRegistrationBean<UserFlowRiskControlFilter> globalUserFlowRiskControlFilter(
             StringRedisTemplate stringRedisTemplate,
             UserFlowRiskControlConfiguration userFlowRiskControlConfiguration) {
