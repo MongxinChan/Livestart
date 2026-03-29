@@ -6,7 +6,7 @@ import org.springframework.stereotype.Component;
 
 @Data
 @Component
-@ConfigurationProperties(prefix = "short-link.flow-limit")
+@ConfigurationProperties(prefix = "livestart.flow-limit")
 public class UserFlowRiskControlConfiguration {
 
     /**
