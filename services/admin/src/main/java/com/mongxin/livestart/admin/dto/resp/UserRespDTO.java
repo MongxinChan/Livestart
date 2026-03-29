@@ -7,12 +7,18 @@ import lombok.Data;
 import java.util.Date;
 
 /**
- * 统一用户详情显示视图对象 (聚合UserDO与UserProfileDO)
+ * 统一用户详情显示视图对象 (聚合 UserDO 与 UserProfileDO)
  * 
+ * 架构命名解释与注释留痕：
+ * 按照标准的业务架构分层，这个类包含了脱敏字段并且最终直接推向前端界面，它本质上是一个 VO（View Object）。
+ * 但为了遵循当前工程中 "入参必须以 ReqDTO 结尾，出参必须以 RespDTO 结尾" 的严格对称性规范（Symmetry Naming），
+ * 防止破坏项目接口层面整齐划一的画风，故在此将其定名为 UserRespDTO。
+ * 虽然它叫 DTO，但在这个层面它 100% 承担了视图对象（VO）的聚合展示职能。
+ *
  * @author Mongxin
  */
 @Data
-public class UserVO {
+public class UserRespDTO {
 
     /**
      * 用户ID

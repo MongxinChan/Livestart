@@ -7,7 +7,7 @@ import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 
 @SpringBootApplication
 @EnableDiscoveryClient
-//@EnableFeignClients("com.mongxin.harmony.admin.remote")
+//@EnableFeignClients("com.mongxin.livestart.admin.remote")
 @MapperScan("com.mongxin.livestart.admin.dao.mapper")
 public class LiveStartAdminApplication {
 
