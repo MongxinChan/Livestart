@@ -6,7 +6,7 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
-import com.mongxin.livestart.admin.common.biz.user.UserContext;
+
 import com.mongxin.livestart.admin.common.convention.exception.ClientException;
 import com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum;
 import com.mongxin.livestart.admin.dao.entity.UserDO;
@@ -35,7 +35,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Map;
-import java.util.Objects;
+
 import java.util.concurrent.TimeUnit;
 
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;

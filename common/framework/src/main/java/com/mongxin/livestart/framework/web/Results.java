@@ -40,7 +40,7 @@ public final class Results {
     /**
      * 通过 {@link AbstractException} 构建失败响应
      */
-    protected static Result<Void> failure(AbstractException abstractException) {
+    public static Result<Void> failure(AbstractException abstractException) {
         String errorCode = Optional.ofNullable(abstractException.getErrorCode())
                 .orElse(BaseErrorCode.SERVICE_ERROR.code());
         String errorMessage = Optional.ofNullable(abstractException.getErrorMessage())
@@ -53,7 +53,7 @@ public final class Results {
     /**
      * 通过 errorCode、errorMessage 构建失败响应
      */
-    protected static Result<Void> failure(String errorCode, String errorMessage) {
+    public static Result<Void> failure(String errorCode, String errorMessage) {
         return new Result<Void>()
                 .setCode(errorCode)
                 .setMessage(errorMessage);
