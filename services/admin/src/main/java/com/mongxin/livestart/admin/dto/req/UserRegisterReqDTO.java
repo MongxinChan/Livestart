@@ -34,4 +34,9 @@ public class UserRegisterReqDTO {
      * 邮箱
      */
     private String mail;
+
+    /**
+     * 身份证号
+     */
+    private String idCard;
 }

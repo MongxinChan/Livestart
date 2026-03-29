@@ -2,6 +2,8 @@ package com.mongxin.livestart.admin.dto.req;
 
 import lombok.Data;
 
+import java.util.Date;
+
 /**
  * @author Mongxin
  */
@@ -32,4 +34,24 @@ public class UserUpdateReqDTO {
      * 邮箱
      */
     private String mail;
+
+    /**
+     * 用户头像URL
+     */
+    private String avatar;
+
+    /**
+     * 性别 0:保密 1:男 2:女
+     */
+    private Integer gender;
+
+    /**
+     * 生日
+     */
+    private Date birthday;
+
+    /**
+     * 个性签名
+     */
+    private String signature;
 }

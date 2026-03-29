@@ -34,7 +34,7 @@ public class UserDO {
     private String phone;
 
     /*
-     新增字段：实名认证相关 (票务系统核心)
+     * 新增字段：实名认证相关 (票务系统核心)
      */
 
     /**
@@ -49,16 +49,16 @@ public class UserDO {
     private Integer isVerified;
 
     /*
-     新增字段：社交与资料 (类秀动APP属性)
+     * 新增字段：社交与资料 (类秀动APP属性)
      */
 
     /**
-     * 个性签名
+     * 真实姓名(实名认证后写入)
      */
-    private String signature;
+    private String realName;
 
     /*
-     新增字段：账号状态与权限
+     * 新增字段：账号状态与权限
      */
 
     /**
@@ -72,7 +72,7 @@ public class UserDO {
     private Integer userType;
 
     /*
-     审计字段
+     * 审计字段
      */
 
     /**
