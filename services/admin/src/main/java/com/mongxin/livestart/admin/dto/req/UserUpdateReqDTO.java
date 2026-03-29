@@ -1,6 +1,6 @@
 package com.mongxin.livestart.admin.dto.req;
-
 import lombok.Data;
+import jakarta.validation.constraints.NotBlank;
 
 import java.util.Date;
 
@@ -11,7 +11,7 @@ import java.util.Date;
 public class UserUpdateReqDTO {
 
     /**
-     * 用户名
+     * 用户昵称 (解禁，此时作为允许被修改的普通对象值)
      */
     private String username;
 
@@ -26,8 +26,9 @@ public class UserUpdateReqDTO {
     private String realName;
 
     /**
-     * 手机
+     * 手机号 (升格为定位标识定海神针，必填！)
      */
+    @NotBlank(message = "用来定位修改目标的手机号不能为空")
     private String phone;
 
     /**

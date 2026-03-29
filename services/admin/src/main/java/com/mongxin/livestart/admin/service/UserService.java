@@ -16,20 +16,20 @@ import com.baomidou.mybatisplus.extension.service.IService;
 public interface UserService extends IService<UserDO> {
 
     /**
-     * 根据用户名查询用户信息
+     * 根据手机号查询用户信息
      *
-     * @param username 用户名
+     * @param phone 手机号
      * @return 用户返回实体
      */
-    UserRespDTO getUserByUsername(String username);
+    UserRespDTO getUserByPhone(String phone);
 
     /**
-     * 查询用户名是否存在
+     * 查询手机号是否存在
      *
-     * @param username 用户名
-     * @return 用户名存在返回 True,反之 False
+     * @param phone 手机号
+     * @return 存在返回 True,反之 False
      */
-    Boolean availableUserName(String username);
+    Boolean availablePhone(String phone);
 
     /**
      * 注册用户
@@ -59,7 +59,7 @@ public interface UserService extends IService<UserDO> {
      * @param token
      * @return
      */
-    Boolean checkLogin(String token, String username);
+    Boolean checkLogin(String token, String phone);
 
-    void logout(String username, String token);
+    void logout(String phone, String token);
 }
