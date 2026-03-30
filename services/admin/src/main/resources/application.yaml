@@ -29,3 +29,7 @@ livestart:
         max-access-count: 10
         # 时间窗口大小，单位：秒
         time-window: "1"
+    visitor:
+        # 观演人证件号 AES 加密密钥（必须 16 位）
+        # 生产环境务必通过环境变量或配置中心注入，版本库中仅暴露本地测试用的默认值
+        aes-key: ${VISITOR_AES_KEY:DevKey1234567890}
