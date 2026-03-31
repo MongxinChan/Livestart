@@ -17,9 +17,14 @@ import java.util.List;
 @Service
 public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implements VenueService {
 
+    /**
+     * 创建场馆
+     *
+     * @param requestParam 场馆创建请求参数
+     */
     @Override
     public void createVenue(VenueDO requestParam) {
-        // 名称 + 城市防重：同城同名场馆不允许重复录入
+        // 名称 + 城市去重锁：严防同一城市录入重复的场馆，保障数据地基稳健
         LambdaQueryWrapper<VenueDO> queryWrapper = Wrappers.lambdaQuery(VenueDO.class)
                 .eq(VenueDO::getName, requestParam.getName())
                 .eq(VenueDO::getCity, requestParam.getCity());
@@ -29,16 +34,31 @@ public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implemen
         save(requestParam);
     }
 
+    /**
+     * 获取所有场馆列表
+     *
+     * @return 场馆列表
+     */
     @Override
     public List<VenueDO> listAllVenues() {
         return list();
     }
 
+    /**
+     * 更新场馆信息
+     *
+     * @param requestParam 场馆更新请求参数
+     */
     @Override
     public void updateVenue(VenueDO requestParam) {
         updateById(requestParam);
     }
 
+    /**
+     * 删除场馆
+     *
+     * @param id 场馆ID
+     */
     @Override
     public void deleteVenue(Long id) {
         removeById(id);

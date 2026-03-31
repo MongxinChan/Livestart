@@ -12,12 +12,25 @@ import org.springframework.stereotype.Service;
 @Service
 public class EventConfigServiceImpl extends ServiceImpl<EventConfigMapper, EventConfigDO> implements EventConfigService {
 
+    /**
+     * 保存或更新演出配置
+     * 采用共享主键策略，简化关联查询逻辑。
+     *
+     * @param requestParam 配置参数
+     */
     @Override
     public void saveOrUpdateConfig(EventConfigDO requestParam) {
-        // 共享主键：eventId 即为主键，存在则更新，不存在则新建
+        // 关键设计：eventId 直接作为 config 表的主键 (Shared Primary Key)
+        // 存在则更新，不存在则录入，保障演出与其配置的高内聚性
         saveOrUpdate(requestParam);
     }
 
+    /**
+     * 根据演出ID获取配置
+     *
+     * @param eventId 演出ID
+     * @return 演出配置实体
+     */
     @Override
     public EventConfigDO getByEventId(Long eventId) {
         return getById(eventId);

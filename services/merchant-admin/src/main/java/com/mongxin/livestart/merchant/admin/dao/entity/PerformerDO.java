@@ -9,10 +9,17 @@ import lombok.Data;
 
 import java.util.Date;
 
+/**
+ * 艺人/表演者持久层实体
+ * 对应表：t_performer
+ */
 @Data
 @TableName("t_performer")
 public class PerformerDO {
 
+    /**
+     * ID（AUTO_INCREMENT）
+     */
     @TableId(type = IdType.AUTO)
     private Long id;
 
