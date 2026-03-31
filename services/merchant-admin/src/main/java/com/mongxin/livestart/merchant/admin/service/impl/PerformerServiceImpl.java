@@ -17,9 +17,14 @@ import java.util.List;
 @Service
 public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, PerformerDO> implements PerformerService {
 
+    /**
+     * 创建艺人/乐队
+     *
+     * @param requestParam 艺人创建请求参数
+     */
     @Override
     public void createPerformer(PerformerDO requestParam) {
-        // 名称防重：艺人/乐队名称全局唯一
+        // 全局唯一性锁：确保艺人/乐队名称在系统中不冲突，为品牌IP护航
         LambdaQueryWrapper<PerformerDO> queryWrapper = Wrappers.lambdaQuery(PerformerDO.class)
                 .eq(PerformerDO::getName, requestParam.getName());
         if (baseMapper.selectCount(queryWrapper) > 0) {
@@ -28,16 +33,31 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
         save(requestParam);
     }
 
+    /**
+     * 获取所有艺人列表
+     *
+     * @return 艺人列表
+     */
     @Override
     public List<PerformerDO> listAllPerformers() {
         return list();
     }
 
+    /**
+     * 更新艺人信息
+     *
+     * @param requestParam 艺人更新请求参数
+     */
     @Override
     public void updatePerformer(PerformerDO requestParam) {
         updateById(requestParam);
     }
 
+    /**
+     * 删除艺人
+     *
+     * @param id 艺人ID
+     */
     @Override
     public void deletePerformer(Long id) {
         removeById(id);

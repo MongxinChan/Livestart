@@ -8,10 +8,17 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
+/**
+ * 票种/档位持久层实体
+ * 对应表：ticket_skus
+ */
 @Data
 @TableName("ticket_skus")
 public class TicketSkuDO {
 
+    /**
+     * ID（AUTO_INCREMENT）
+     */
     @TableId(type = IdType.AUTO)
     private Long id;
 

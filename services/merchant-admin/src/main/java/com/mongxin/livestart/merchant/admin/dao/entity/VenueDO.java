@@ -5,6 +5,10 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+/**
+ * 场馆持久层实体
+ * 对应表：t_venue
+ */
 @Data
 @TableName("t_venue")
 public class VenueDO {

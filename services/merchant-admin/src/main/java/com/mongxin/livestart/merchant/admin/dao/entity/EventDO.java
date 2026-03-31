@@ -7,10 +7,17 @@ import lombok.Data;
 
 import java.util.Date;
 
+/**
+ * 演出持久层实体
+ * 对应表：t_event
+ */
 @Data
 @TableName("t_event")
 public class EventDO {
 
+    /**
+     * ID（AUTO_INCREMENT）
+     */
     @TableId(type = IdType.AUTO)
     private Long id;
 

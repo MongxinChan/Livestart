@@ -7,6 +7,10 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 
+/**
+ * 演出配置持久层实体
+ * 对应表：t_event_config
+ */
 @Data
 @TableName("t_event_config")
 public class EventConfigDO {

@@ -16,13 +16,26 @@ import java.util.List;
 @Service
 public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSkuDO> implements TicketSkuService {
 
+    /**
+     * 创建票种（档位）
+     * 自动初始化库存状态，确保数据的完整性。
+     *
+     * @param requestParam 票种创建请求参数
+     */
     @Override
     public void createTicketSku(TicketSkuDO requestParam) {
-        // 关键：初始化剩余库存 = 总库存，确保首次录入状态一致
+        // 关键初始化：将剩余库存 (RemainingStock) 置为总库存 (TotalStock)
+        // 这是系统库存扣减逻辑的起点，严丝合缝才能保障不超卖
         requestParam.setRemainingStock(requestParam.getTotalStock());
         save(requestParam);
     }
 
+    /**
+     * 根据演出ID查询所有关联票种
+     *
+     * @param eventId 演出ID
+     * @return 票种列表
+     */
     @Override
     public List<TicketSkuDO> listByEventId(Long eventId) {
         LambdaQueryWrapper<TicketSkuDO> queryWrapper = Wrappers.lambdaQuery(TicketSkuDO.class)
@@ -30,6 +43,11 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         return list(queryWrapper);
     }
 
+    /**
+     * 删除票种
+     *
+     * @param id 票种ID
+     */
     @Override
     public void deleteTicketSku(Long id) {
         removeById(id);

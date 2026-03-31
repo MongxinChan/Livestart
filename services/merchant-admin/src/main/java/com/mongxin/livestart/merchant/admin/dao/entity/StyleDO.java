@@ -9,10 +9,17 @@ import lombok.Data;
 
 import java.util.Date;
 
+/**
+ * 音乐风格持久层实体
+ * 对应表：t_style
+ */
 @Data
 @TableName("t_style")
 public class StyleDO {
 
+    /**
+     * ID（AUTO_INCREMENT）
+     */
     @TableId(type = IdType.AUTO)
     private Long id;
 
