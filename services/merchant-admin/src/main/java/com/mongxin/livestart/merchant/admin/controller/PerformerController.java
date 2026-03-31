@@ -18,18 +18,24 @@ public class PerformerController {
 
     @PostMapping("/create")
     public Result<Void> createPerformer(@RequestBody PerformerDO requestParam) {
-        performerService.save(requestParam);
+        performerService.createPerformer(requestParam);
         return Results.success();
     }
 
     @GetMapping("/list")
     public Result<List<PerformerDO>> listPerformers() {
-        return Results.success(performerService.list());
+        return Results.success(performerService.listAllPerformers());
+    }
+
+    @PutMapping("/update")
+    public Result<Void> updatePerformer(@RequestBody PerformerDO requestParam) {
+        performerService.updatePerformer(requestParam);
+        return Results.success();
     }
 
     @DeleteMapping("/delete/{id}")
     public Result<Void> deletePerformer(@PathVariable("id") Long id) {
-        performerService.removeById(id);
+        performerService.deletePerformer(id);
         return Results.success();
     }
 }
