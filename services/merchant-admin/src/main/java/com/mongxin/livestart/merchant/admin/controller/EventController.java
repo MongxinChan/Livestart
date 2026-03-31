@@ -18,18 +18,24 @@ public class EventController {
 
     @PostMapping("/create")
     public Result<Void> createEvent(@RequestBody EventDO requestParam) {
-        eventService.save(requestParam);
+        eventService.createEvent(requestParam);
         return Results.success();
     }
 
     @GetMapping("/list")
     public Result<List<EventDO>> listEvents() {
-        return Results.success(eventService.list());
+        return Results.success(eventService.listAllEvents());
+    }
+
+    @PutMapping("/update")
+    public Result<Void> updateEvent(@RequestBody EventDO requestParam) {
+        eventService.updateEvent(requestParam);
+        return Results.success();
     }
 
     @DeleteMapping("/delete/{id}")
     public Result<Void> deleteEvent(@PathVariable("id") Long id) {
-        eventService.removeById(id);
+        eventService.deleteEvent(id);
         return Results.success();
     }
 }

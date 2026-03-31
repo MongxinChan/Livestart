@@ -18,18 +18,24 @@ public class StyleController {
 
     @PostMapping("/create")
     public Result<Void> createStyle(@RequestBody StyleDO requestParam) {
-        styleService.save(requestParam);
+        styleService.createStyle(requestParam);
         return Results.success();
     }
 
     @GetMapping("/list")
     public Result<List<StyleDO>> listStyles() {
-        return Results.success(styleService.list());
+        return Results.success(styleService.listAllStyles());
+    }
+
+    @PutMapping("/update")
+    public Result<Void> updateStyle(@RequestBody StyleDO requestParam) {
+        styleService.updateStyle(requestParam);
+        return Results.success();
     }
 
     @DeleteMapping("/delete/{id}")
     public Result<Void> deleteStyle(@PathVariable("id") Long id) {
-        styleService.removeById(id);
+        styleService.deleteStyle(id);
         return Results.success();
     }
 }
