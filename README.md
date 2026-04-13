@@ -21,3 +21,5 @@ LiveStart 是专门为演唱会、Livehouse 演出设计的在线抢票引擎。
 
 **原子化***：尽量一次提交只处理一件事情。
 **清晰描述**：<description> 建议简明扼要地概括改动点，例如：feat: 增加了票务核销功能
+
+详细的设计条例请参考[飞书文档](https://jcncb5q6awco.feishu.cn/wiki/CvpdwtartiehGVky8gKc3s73nXf)
