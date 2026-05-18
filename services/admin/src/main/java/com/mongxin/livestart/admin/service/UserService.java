@@ -62,4 +62,13 @@ public interface UserService extends IService<UserDO> {
     Boolean checkLogin(String token, String phone);
 
     void logout(String phone, String token);
+
+    /**
+     * 上传用户头像至 OSS，返回云端访问 URL
+     *
+     * @param inputStream      文件输入流
+     * @param originalFilename 原始文件名
+     * @return 头像云端 URL
+     */
+    String uploadAvatar(java.io.InputStream inputStream, String originalFilename);
 }

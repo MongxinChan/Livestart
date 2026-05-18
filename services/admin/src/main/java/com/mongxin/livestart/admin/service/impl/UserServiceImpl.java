@@ -18,6 +18,7 @@ import com.mongxin.livestart.admin.dto.req.UserRegisterReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
+import com.mongxin.livestart.admin.config.OssUtil;
 import com.mongxin.livestart.admin.service.UserService;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -33,6 +34,8 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.io.InputStream;
 
 import java.util.Map;
 
@@ -54,6 +57,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     private final StringRedisTemplate stringRedisTemplate;
     // 注入 Profile 以开启双表连通
     private final UserProfileMapper userProfileMapper;
+    private final OssUtil ossUtil;
 
     @Override
     public UserRespDTO getUserByPhone(String phone) {
@@ -189,5 +193,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             return;
         }
         throw new ClientException("用户的缓存登录态存在异常或已下线");
+    }
+
+    @Override
+    public String uploadAvatar(InputStream inputStream, String originalFilename) {
+        if (inputStream == null) {
+            throw new ClientException("文件不能为空");
+        }
+        return ossUtil.upload(inputStream, originalFilename);
     }
 }
