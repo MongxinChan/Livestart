@@ -1,6 +1,5 @@
 package com.mongxin.livestart.admin.controller;
 
-
 import com.mongxin.livestart.admin.common.convention.result.Result;
 import com.mongxin.livestart.admin.common.convention.result.Results;
 import com.mongxin.livestart.admin.dto.req.UserLoginReqDTO;
@@ -13,19 +12,19 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * @author Mongxin
  */
 @RestController
-@RequiredArgsConstructor //通过构造器方式注入
+@RequiredArgsConstructor // 通过构造器方式注入
 @Slf4j
 public class UserController {
 
-//  @Autowired
+    // @Autowired
 
     private final UserService userService;
-
 
     /**
      * 根据手机号查询用户信息
@@ -80,13 +79,12 @@ public class UserController {
         return Results.success(userService.login(requestParam));
     }
 
-
     /**
      * 检查用户是否登录
      */
     @GetMapping("/api/live-start/admin/v1/user/check-login")
     public Result<Boolean> checkLogin(@RequestParam("phone") String phone,
-                                      @RequestParam("token") String token) {
+            @RequestParam("token") String token) {
         return Results.success(userService.checkLogin(phone, token));
     }
 
@@ -98,8 +96,16 @@ public class UserController {
      */
     @DeleteMapping("/api/live-start/admin/v1/user/logout")
     public Result<Void> logout(@RequestParam("phone") String phone,
-                               @RequestParam("token") String token) {
+            @RequestParam("token") String token) {
         userService.logout(phone, token);
         return Results.success();
+    }
+
+    /**
+     * 上传用户头像
+     */
+    @PostMapping("/api/live-start/admin/v1/user/avatar")
+    public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file) throws Exception {
+        return Results.success(userService.uploadAvatar(file.getInputStream(), file.getOriginalFilename()));
     }
 }
