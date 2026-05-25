@@ -40,7 +40,7 @@ public class UserController {
     @GetMapping("/api/live-start/admin/v1/actual/{phone}")
     public Result<UserRespDTO> getActualUserByPhone(
             @PathVariable("phone") String phone) {
-        // 由于现已统一为 UserRespDTO，若要实现真正脱敏，后续请结合 AOP 或新的字段来隔离
+        // TODO:由于现已统一为 UserRespDTO，若要实现真正脱敏，后续请结合 AOP 或新的字段来隔离
         return Results.success(userService.getUserByPhone(phone));
     }
 
@@ -90,9 +90,6 @@ public class UserController {
 
     /**
      * 用户退出登录
-     *
-     * @param phone
-     * @return
      */
     @DeleteMapping("/api/live-start/admin/v1/user/logout")
     public Result<Void> logout(@RequestParam("phone") String phone,
@@ -107,5 +104,13 @@ public class UserController {
     @PostMapping("/api/live-start/admin/v1/user/avatar")
     public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file) throws Exception {
         return Results.success(userService.uploadAvatar(file.getInputStream(), file.getOriginalFilename()));
+    }
+
+    /**
+     * 上传用户头像(Minio)
+     */
+    @PostMapping("/api/live-start/admin/v1/user/MinioAvatar")
+    public Result<String> uploadAvatarByMinio(@RequestParam("file") MultipartFile file) throws Exception {
+        return Results.success(userService.uploadAvatarByMinio(file));
     }
 }

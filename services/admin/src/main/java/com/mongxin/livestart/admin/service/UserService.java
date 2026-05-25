@@ -7,6 +7,9 @@ import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
 import com.baomidou.mybatisplus.extension.service.IService;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.io.InputStream;
 
 /**
  * 用户接口层
@@ -64,11 +67,16 @@ public interface UserService extends IService<UserDO> {
     void logout(String phone, String token);
 
     /**
-     * 上传用户头像至 OSS，返回云端访问 URL
-     *
-     * @param inputStream      文件输入流
+     * 上传用户头像（阿里云 OSS）
+     * * @param inputStream      文件输入流
      * @param originalFilename 原始文件名
-     * @return 头像云端 URL
+     * @return 文件的网络绝对访问路径 URL
      */
-    String uploadAvatar(java.io.InputStream inputStream, String originalFilename);
+    String uploadAvatar(InputStream inputStream, String originalFilename) throws Exception;
+
+    /**
+     * 上传用户头像（本地 MinIO）
+     * @return 文件的网络绝对访问路径 URL
+     */
+    String uploadAvatarByMinio(MultipartFile file) throws Exception;
 }
