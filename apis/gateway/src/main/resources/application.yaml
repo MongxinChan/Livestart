@@ -1,0 +1,88 @@
+server:
+  port: 8888
+
+spring:
+  application:
+    name: livestart-gateway
+
+  # Redis 配置（与 admin 服务共用同一 Redis 实例校验 token）
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      password: 123456
+
+  cloud:
+    # Nacos 注册中心（开发阶段使用固定 URI，接入 Nacos 后启用）
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        enabled: false
+
+    gateway:
+      # 关闭与 MVC 的冲突（Gateway 基于 WebFlux，不能与 spring-mvc 共存）
+      discovery:
+        locator:
+          enabled: false
+
+      routes:
+        # ----------------------------------------------------------------
+        # C端用户服务 (admin)
+        # 端口: 8002
+        # 包含：用户注册/登录（白名单放行）、用户信息管理、观演人管理
+        # ----------------------------------------------------------------
+        - id: livestart-admin
+          uri: http://localhost:8002
+          predicates:
+            - Path=/api/live-start/admin/**
+
+        # ----------------------------------------------------------------
+        # 商户后台管理服务 (merchant-admin)
+        # 端口: 8003 | 包含：场馆/演出/票种/演出人员 CRUD
+        # ----------------------------------------------------------------
+        - id: livestart-merchant-admin
+          uri: http://localhost:8003
+          predicates:
+            - Path=/api/live-start/merchant-admin/**
+
+        # ----------------------------------------------------------------
+        # 购票引擎服务 (engine)
+        # 端口: 8004 | 包含：购票下单、库存扣减、订单状态机
+        # ----------------------------------------------------------------
+        - id: livestart-engine
+          uri: http://localhost:8004
+          predicates:
+            - Path=/api/live-start/engine/**
+
+        # ----------------------------------------------------------------
+        # 分发/推广服务 (distribution)
+        # 端口: 8005 | 包含：优惠券/邀请码/分销提成
+        # ----------------------------------------------------------------
+        - id: livestart-distribution
+          uri: http://localhost:8005
+          predicates:
+            - Path=/api/live-start/distribution/**
+
+        # ----------------------------------------------------------------
+        # 演出搜索服务 (search)
+        # 端口: 8006 | 包含：Elasticsearch 关键词/分类/城市搜索
+        # ----------------------------------------------------------------
+        - id: livestart-search
+          uri: http://localhost:8006
+          predicates:
+            - Path=/api/live-start/search/**
+
+        # ----------------------------------------------------------------
+        # 结算服务 (settlement)
+        # 端口: 8007 | 包含：商户账单、结算单生成、退款核算
+        # ----------------------------------------------------------------
+        - id: livestart-settlement
+          uri: http://localhost:8007
+          predicates:
+            - Path=/api/live-start/settlement/**
+
+# 日志配置
+logging:
+  level:
+    com.mongxin.livestart.gateway: DEBUG
+    org.springframework.cloud.gateway: INFO
