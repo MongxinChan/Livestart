@@ -1,8 +1,9 @@
-package com.mongxin.livestart.admin.config;
+package com.mongxin.livestart.admin.toolkit;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
-import com.seig.config.OssConfig;
+
+import com.mongxin.livestart.admin.config.OssConfig;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import java.io.InputStream;
