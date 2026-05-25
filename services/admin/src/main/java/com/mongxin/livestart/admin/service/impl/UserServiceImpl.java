@@ -19,6 +19,7 @@ import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
 import com.mongxin.livestart.admin.service.UserService;
+import com.mongxin.livestart.admin.toolkit.MinioUtil;
 import com.mongxin.livestart.admin.toolkit.OssUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -26,6 +27,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -34,6 +36,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 
@@ -50,6 +53,7 @@ import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.*;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
 
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
@@ -58,6 +62,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     // 注入 Profile 以开启双表连通
     private final UserProfileMapper userProfileMapper;
     private final OssUtil ossUtil;
+    private final MinioUtil minioUtil;
 
     @Override
     public UserRespDTO getUserByPhone(String phone) {
@@ -201,5 +206,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             throw new ClientException("文件不能为空");
         }
         return ossUtil.upload(inputStream, originalFilename);
+    }
+
+    @Override
+    public String uploadAvatarByMinio(MultipartFile file) throws Exception {
+        // 修正：将原先误写的 log.finalize 改为标准的日志输出
+        log.info("【用户服务】开始通过本地 MinIO 上传用户头像, 文件名: {}", file.getOriginalFilename());
+
+        // 1. 严谨的防御式判空，防止空文件进入业务流
+        if (file == null || file.isEmpty()) {
+            throw new ClientException("上传的头像文件不能为空");
+        }
+
+        // 2. 无需任何包装，直接把原生的 file 对象转发给底层工具类
+        return minioUtil.upload(file);
     }
 }
