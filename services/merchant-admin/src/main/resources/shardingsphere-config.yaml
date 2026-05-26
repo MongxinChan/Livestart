@@ -1,0 +1,81 @@
+# Livestart 商户端分库分表核心配置文件 (ShardingSphere-JDBC 规范)
+# 提供商户端专用的分数据源和广播同步规则
+
+# =========================================================================
+# 1. 物理数据源集合（需要与 livestart_all_sharding.sql 中的 7 个分库保持一致）
+# =========================================================================
+dataSources:
+  # 公共与元数据中心
+  ds_common:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_common?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: &db_user ${SPRING_DATASOURCE_USERNAME:root}
+    password: &db_pass ${SPRING_DATASOURCE_PASSWORD:123456}
+  
+  # 用户物理库
+  ds_user_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_user_0?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+  ds_user_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_user_1?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+
+  # 订单物理库
+  ds_order_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order_0?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+  ds_order_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order_1?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+
+  # 座位物理库
+  ds_seat_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_seat_0?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+  ds_seat_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_seat_1?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+
+# =========================================================================
+# 2. 商户后台路由及双写复制规则
+# =========================================================================
+rules:
+  - !SHARDING
+    tables:
+      # 商户后台涉及到的都是单表管理，但需要强力配置广播同步：
+      # 当商家创建演出、配置、上架票档库存时，ShardingSphere 自动双写广播到所有的 7 个物理库中！
+      
+    # 广播表声明
+    broadcastTables:
+      - t_event
+      - t_event_config
+      - ticket_skus
+      - t_refund_policy
+
+    # 默认数据源：商户后台管理的元数据表（如 场馆表、艺人表、风格表等）一律默认安全路由落入公共配置库 ds_common
+    defaultDataSourceName: ds_common
+
+# =========================================================================
+# 3. 全局基础属性配置
+# =========================================================================
+props:
+  sql-show: true

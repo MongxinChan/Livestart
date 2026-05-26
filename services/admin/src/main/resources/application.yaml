@@ -5,6 +5,11 @@ server:
 spring:
     application:
         name: live-start-admin
+    # 采用极简的 JDBC 驱动加载模式，通过独立的 shardingsphere-config.yaml 驱动分库分表
+    datasource:
+        driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+        url: jdbc:shardingsphere:classpath:shardingsphere-config.yaml
+
     data:
         redis:
             host: 127.0.0.1

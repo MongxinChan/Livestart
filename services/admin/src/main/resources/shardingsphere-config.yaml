@@ -1,0 +1,148 @@
+# Livestart 数据库分库分表核心配置文件 (ShardingSphere-JDBC 规范)
+# 结合标准微服务高并发架构进行设计，通过 JDBC 驱动直接挂载
+
+# =========================================================================
+# 1. 物理数据源定义集合 (支持 HikariCP 连接池)
+# =========================================================================
+dataSources:
+  # 1.1 公共配置与元数据库
+  ds_common:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_common?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: &db_user ${SPRING_DATASOURCE_USERNAME:root}
+    password: &db_pass ${SPRING_DATASOURCE_PASSWORD:123456}
+  
+  # 1.2 用户分库 0
+  ds_user_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_user_0?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+
+  # 1.3 用户分库 1
+  ds_user_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_user_1?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: *db_user
+    password: *db_pass
+
+# =========================================================================
+# 2. 分片及数据路由规则定义
+# =========================================================================
+rules:
+  - !SHARDING
+    tables:
+      # 2.1 用户主表 t_user (分2库8表，按 id 分片)
+      t_user:
+        actualDataNodes: ds_user_${0..1}.t_user_${0..7}
+        databaseStrategy:
+          standard:
+            shardingColumn: id
+            shardingAlgorithmName: user_db_inline
+        tableStrategy:
+          standard:
+            shardingColumn: id
+            shardingAlgorithmName: user_tbl_inline
+        # 主键生成策略 (雪花算法)
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+      # 2.2 用户社交资料表 t_user_profile (分2库8表，按 user_id 分片)
+      t_user_profile:
+        actualDataNodes: ds_user_${0..1}.t_user_profile_${0..7}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user_profile_db_inline
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user_profile_tbl_inline
+
+      # 2.3 常用观演人表 t_user_visitor (分2库8表，按 user_id 分片)
+      t_user_visitor:
+        actualDataNodes: ds_user_${0..1}.t_user_visitor_${0..7}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user_visitor_db_inline
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user_visitor_tbl_inline
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+
+    # 绑定表 (Binding Tables) 关系定义：保证库内本地关联 Join
+    bindingTables:
+      - t_user,t_user_profile,t_user_visitor
+
+    # 广播表副本定义 (自动同步更新)
+    broadcastTables:
+      - t_event
+      - t_event_config
+
+    # 默认落库数据源：所有未匹配分片逻辑表的表（如手机号映射路由表 t_user_phone_mapping 等）默认全部落 ds_common 库
+    defaultDataSourceName: ds_common
+
+    # =========================================================================
+    # 3. 分片算法具体配置
+    # =========================================================================
+    shardingAlgorithms:
+      # 方式 A：采用极简高吞吐的 INLINE (行内内联表达式) 算法（默认启用）
+      user_db_inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_user_${id % 2}
+      
+      user_tbl_inline:
+        type: INLINE
+        props:
+          algorithm-expression: t_user_${id % 8}
+      
+      user_profile_db_inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_user_${user_id % 2}
+      
+      user_profile_tbl_inline:
+        type: INLINE
+        props:
+          algorithm-expression: t_user_profile_${user_id % 8}
+      
+      user_visitor_db_inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_user_${user_id % 2}
+      
+      user_visitor_tbl_inline:
+        type: INLINE
+        props:
+          algorithm-expression: t_user_visitor_${user_id % 8}
+
+      # 方式 B：如需使用基于自定义类的 HashMod 算法，可切换为如下 CLASS_BASED 配置：
+      # (切换前，需在项目中实现对应的 com.mongxin.livestart.admin.sharding.DBHashModShardingAlgorithm 类)
+      # user_db_class:
+      #   type: CLASS_BASED
+      #   props:
+      #     algorithmClassName: com.mongxin.livestart.admin.sharding.DBHashModShardingAlgorithm
+      #     sharding-count: 16
+      #     strategy: standard
+
+    # =========================================================================
+    # 4. 主键生成器定义
+    # =========================================================================
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+
+# =========================================================================
+# 5. 全局基础属性配置
+# =========================================================================
+props:
+  sql-show: true
