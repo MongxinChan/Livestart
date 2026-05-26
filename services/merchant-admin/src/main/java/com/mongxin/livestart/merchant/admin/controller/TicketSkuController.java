@@ -1,81 +1,68 @@
 package com.mongxin.livestart.merchant.admin.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mongxin.livestart.framework.idempotent.NoDuplicateSubmit;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
-import com.mongxin.livestart.merchant.admin.dao.entity.TicketSkuDO;
+import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuIncreaseStockReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuPageQueryReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuPageQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.TicketSkuService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * 票种/档位管理控制层
+ */
 @RestController
 @RequestMapping("/api/merchant-admin/ticket-sku")
 @RequiredArgsConstructor
+@Tag(name = "票种/档位管理")
 public class TicketSkuController {
 
     private final TicketSkuService ticketSkuService;
 
+    @Operation(summary = "创建票种")
     @NoDuplicateSubmit(message = "请勿短时间内重复创建票种")
     @PostMapping("/create")
-    public Result<Void> createTicketSku(@RequestBody TicketSkuDO requestParam) {
+    public Result<Void> createTicketSku(@RequestBody TicketSkuSaveReqDTO requestParam) {
         ticketSkuService.createTicketSku(requestParam);
         return Results.success();
     }
 
-    /**
-     * 按演出ID查询票种列表
-     */
+    @Operation(summary = "按演出ID查询票种列表")
     @GetMapping("/list/{eventId}")
-    public Result<List<TicketSkuDO>> listTicketSkus(@PathVariable("eventId") Long eventId) {
+    public Result<List<TicketSkuQueryRespDTO>> listTicketSkus(@PathVariable("eventId") Long eventId) {
         return Results.success(ticketSkuService.listByEventId(eventId));
     }
 
-    /**
-     * 分页查询票种列表
-     *
-     * @param current 当前页码（默认1）
-     * @param size    每页数量（默认10）
-     * @param eventId 按演出ID筛选（可选）
-     */
+    @Operation(summary = "分页查询票种列表")
     @GetMapping("/page")
-    public Result<IPage<TicketSkuDO>> pageQueryTicketSkus(
-            @RequestParam(defaultValue = "1") Long current,
-            @RequestParam(defaultValue = "10") Long size,
-            @RequestParam(required = false) Long eventId) {
-        return Results.success(ticketSkuService.pageQueryTicketSkus(new Page<>(current, size), eventId));
+    public Result<IPage<TicketSkuPageQueryRespDTO>> pageQueryTicketSkus(TicketSkuPageQueryReqDTO requestParam) {
+        return Results.success(ticketSkuService.pageQueryTicketSkus(requestParam));
     }
 
-    /**
-     * 根据 ID 查询票种详情
-     */
+    @Operation(summary = "查询票种详情")
     @GetMapping("/{id}")
-    public Result<TicketSkuDO> getTicketSku(@PathVariable("id") Long id) {
+    public Result<TicketSkuQueryRespDTO> getTicketSku(@PathVariable("id") Long id) {
         return Results.success(ticketSkuService.getTicketSkuById(id));
     }
 
-    @PutMapping("/update")
-    public Result<Void> updateTicketSku(@RequestBody TicketSkuDO requestParam) {
-        ticketSkuService.updateById(requestParam);
-        return Results.success();
-    }
-
-    /**
-     * 增发票种库存
-     *
-     * @param skuId 票种ID
-     * @param count 增发数量
-     */
+    @Operation(summary = "增发票种库存")
     @NoDuplicateSubmit(message = "请勿短时间内重复增发库存")
     @PostMapping("/increase-stock")
-    public Result<Void> increaseStock(@RequestParam Long skuId, @RequestParam Integer count) {
-        ticketSkuService.increaseStock(skuId, count);
+    public Result<Void> increaseStock(@RequestBody TicketSkuIncreaseStockReqDTO requestParam) {
+        ticketSkuService.increaseStock(requestParam);
         return Results.success();
     }
 
+    @Operation(summary = "删除票种")
     @DeleteMapping("/delete/{id}")
     public Result<Void> deleteTicketSku(@PathVariable("id") Long id) {
         ticketSkuService.deleteTicketSku(id);

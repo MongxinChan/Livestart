@@ -1,38 +1,37 @@
 package com.mongxin.livestart.merchant.admin.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.mongxin.livestart.merchant.admin.dao.entity.StyleDO;
+import com.mongxin.livestart.merchant.admin.dto.req.StylePageQueryReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.StyleSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.StylePageQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.StyleQueryRespDTO;
 
-import java.util.List;
-
+/**
+ * 音乐风格业务逻辑层
+ */
 public interface StyleService extends IService<StyleDO> {
 
     /**
      * 创建风格（code 防重）
      */
-    void createStyle(StyleDO requestParam);
-
-    /**
-     * 查询全部风格
-     */
-    List<StyleDO> listAllStyles();
+    void createStyle(StyleSaveReqDTO requestParam);
 
     /**
      * 分页查询风格（支持按名称模糊搜索）
      */
-    IPage<StyleDO> pageQueryStyles(Page<StyleDO> page, String name);
+    IPage<StylePageQueryRespDTO> pageQueryStyles(StylePageQueryReqDTO requestParam);
 
     /**
      * 根据 ID 查询风格详情
      */
-    StyleDO getStyleById(Long id);
+    StyleQueryRespDTO getStyleById(Long id);
 
     /**
-     * 修改风格信息（名称、code、描述）
+     * 修改风格信息
      */
-    void updateStyle(StyleDO requestParam);
+    void updateStyle(StyleSaveReqDTO requestParam);
 
     /**
      * 删除风格

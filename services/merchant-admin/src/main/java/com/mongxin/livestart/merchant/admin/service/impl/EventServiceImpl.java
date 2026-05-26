@@ -1,17 +1,25 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ClientException;
+import com.mongxin.livestart.merchant.admin.common.constant.MerchantAdminRedisConstant;
+import com.mongxin.livestart.merchant.admin.common.enums.EventStatusEnum;
 import com.mongxin.livestart.merchant.admin.dao.entity.EventConfigDO;
 import com.mongxin.livestart.merchant.admin.dao.entity.EventDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.EventMapper;
+import com.mongxin.livestart.merchant.admin.dto.req.EventPageQueryReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.EventSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.EventUpdateReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.EventPageQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.EventQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.EventConfigService;
 import com.mongxin.livestart.merchant.admin.service.EventService;
+import com.mongxin.livestart.merchant.admin.service.basics.chain.MerchantAdminChainContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -24,6 +32,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.mongxin.livestart.merchant.admin.common.enums.ChainBizMarkEnum.MERCHANT_ADMIN_CREATE_EVENT_KEY;
+
 /**
  * 演出服务实现层
  */
@@ -34,27 +44,22 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
     private final EventConfigService eventConfigService;
     private final StringRedisTemplate stringRedisTemplate;
-
-    private static final String EVENT_CACHE_KEY_PREFIX = "livestart:event:detail:%d";
-
-    /** 演出状态：0-下架 1-预售 2-在售 3-售罄 */
-    private static final int STATUS_OFF_SHELF = 0;
-    private static final int STATUS_PRESALE = 1;
-    private static final int STATUS_ON_SALE = 2;
+    private final MerchantAdminChainContext merchantAdminChainContext;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public void createEvent(EventDO requestParam) {
-        if (requestParam == null || requestParam.getVenueId() == null || requestParam.getStartTime() == null) {
-            throw new ClientException("创建演出核心属性(startTime/venueId)不能为空");
-        }
+    public void createEvent(EventSaveReqDTO requestParam) {
+        // 通过责任链验证请求参数是否正确
+        merchantAdminChainContext.handler(MERCHANT_ADMIN_CREATE_EVENT_KEY.name(), requestParam);
 
         // 保存演出主记录
-        save(requestParam);
+        EventDO eventDO = BeanUtil.toBean(requestParam, EventDO.class);
+        eventDO.setStatus(EventStatusEnum.PRESALE.getStatus());
+        save(eventDO);
 
         // 级联初始化默认演出配置
         EventConfigDO defaultConfig = new EventConfigDO();
-        defaultConfig.setEventId(requestParam.getId());
+        defaultConfig.setEventId(eventDO.getId());
         defaultConfig.setSelectionMode(0);
         defaultConfig.setIsVerifyRequired(0);
         defaultConfig.setMaxTicketsPerUser(4);
@@ -65,31 +70,29 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         eventConfigService.save(defaultConfig);
 
         // 缓存预热
-        warmUpEventCache(requestParam, defaultConfig);
+        warmUpEventCache(eventDO, defaultConfig);
     }
 
     @Override
-    public List<EventDO> listAllEvents() {
-        return list();
-    }
-
-    @Override
-    public IPage<EventDO> pageQueryEvents(Page<EventDO> page, Integer status) {
+    public IPage<EventPageQueryRespDTO> pageQueryEvents(EventPageQueryReqDTO requestParam) {
         LambdaQueryWrapper<EventDO> queryWrapper = Wrappers.lambdaQuery(EventDO.class)
-                .eq(status != null, EventDO::getStatus, status)
+                .eq(requestParam.getStatus() != null, EventDO::getStatus, requestParam.getStatus())
                 .orderByDesc(EventDO::getId);
-        return baseMapper.selectPage(page, queryWrapper);
+        IPage<EventDO> selectPage = baseMapper.selectPage(requestParam, queryWrapper);
+        return selectPage.convert(each -> BeanUtil.toBean(each, EventPageQueryRespDTO.class));
     }
 
     @Override
-    public EventDO getEventById(Long id) {
-        return getById(id);
+    public EventQueryRespDTO getEventById(Long id) {
+        EventDO eventDO = getById(id);
+        return BeanUtil.toBean(eventDO, EventQueryRespDTO.class);
     }
 
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public void updateEvent(EventDO requestParam) {
-        updateById(requestParam);
+    public void updateEvent(EventUpdateReqDTO requestParam) {
+        EventDO eventDO = BeanUtil.toBean(requestParam, EventDO.class);
+        updateById(eventDO);
 
         // 重新捞取最新全量数据刷新缓存
         EventDO latestEvent = getById(requestParam.getId());
@@ -110,7 +113,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         // 同步清除 Redis 缓存
         try {
-            stringRedisTemplate.delete(String.format(EVENT_CACHE_KEY_PREFIX, id));
+            stringRedisTemplate.delete(String.format(MerchantAdminRedisConstant.EVENT_DETAIL_KEY, id));
             log.info("演出删除完成 & 缓存已清除 | eventId={}", id);
         } catch (Exception e) {
             log.error("演出缓存清除失败（非阻塞） | eventId={}", id, e);
@@ -123,17 +126,16 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         if (event == null) {
             throw new ClientException("演出不存在");
         }
-        if (ObjectUtil.notEqual(event.getStatus(), STATUS_PRESALE)) {
+        if (ObjectUtil.notEqual(event.getStatus(), EventStatusEnum.PRESALE.getStatus())) {
             throw new ClientException("仅预售状态的演出可以上架开售");
         }
 
         EventDO update = new EventDO();
         update.setId(id);
-        update.setStatus(STATUS_ON_SALE);
+        update.setStatus(EventStatusEnum.ON_SALE.getStatus());
         updateById(update);
 
-        // 同步刷新缓存中的 status 字段
-        syncCacheField(id, "status", String.valueOf(STATUS_ON_SALE));
+        syncCacheField(id, "status", String.valueOf(EventStatusEnum.ON_SALE.getStatus()));
         log.info("演出已上架开售 | eventId={}", id);
     }
 
@@ -143,16 +145,16 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         if (event == null) {
             throw new ClientException("演出不存在");
         }
-        if (ObjectUtil.notEqual(event.getStatus(), STATUS_ON_SALE)) {
+        if (ObjectUtil.notEqual(event.getStatus(), EventStatusEnum.ON_SALE.getStatus())) {
             throw new ClientException("仅在售状态的演出可以下架");
         }
 
         EventDO update = new EventDO();
         update.setId(id);
-        update.setStatus(STATUS_OFF_SHELF);
+        update.setStatus(EventStatusEnum.OFF_SHELF.getStatus());
         updateById(update);
 
-        syncCacheField(id, "status", String.valueOf(STATUS_OFF_SHELF));
+        syncCacheField(id, "status", String.valueOf(EventStatusEnum.OFF_SHELF.getStatus()));
         log.info("演出已下架 | eventId={}", id);
     }
 
@@ -162,25 +164,25 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         if (event == null) {
             throw new ClientException("演出不存在");
         }
-        if (ObjectUtil.equal(event.getStatus(), STATUS_OFF_SHELF)) {
+        if (ObjectUtil.equal(event.getStatus(), EventStatusEnum.OFF_SHELF.getStatus())) {
             throw new ClientException("演出已处于下架状态，无需终止");
         }
 
         EventDO update = new EventDO();
         update.setId(id);
-        update.setStatus(STATUS_OFF_SHELF);
+        update.setStatus(EventStatusEnum.OFF_SHELF.getStatus());
         updateById(update);
 
-        syncCacheField(id, "status", String.valueOf(STATUS_OFF_SHELF));
+        syncCacheField(id, "status", String.valueOf(EventStatusEnum.OFF_SHELF.getStatus()));
         log.info("演出已终止售票 | eventId={}", id);
     }
 
     /**
-     * 同步刷新 Redis Hash 中的单个字段（轻量级，学习 terminateCouponTemplate 的简约路线）
+     * 同步刷新 Redis Hash 中的单个字段
      */
     private void syncCacheField(Long eventId, String field, String value) {
         try {
-            String cacheKey = String.format(EVENT_CACHE_KEY_PREFIX, eventId);
+            String cacheKey = String.format(MerchantAdminRedisConstant.EVENT_DETAIL_KEY, eventId);
             stringRedisTemplate.opsForHash().put(cacheKey, field, value);
         } catch (Exception e) {
             log.error("演出缓存字段同步失败（非阻塞） | eventId={} field={}", eventId, field, e);
@@ -192,7 +194,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
      */
     private void warmUpEventCache(EventDO event, EventConfigDO config) {
         try {
-            String eventCacheKey = String.format(EVENT_CACHE_KEY_PREFIX, event.getId());
+            String eventCacheKey = String.format(MerchantAdminRedisConstant.EVENT_DETAIL_KEY, event.getId());
             Map<String, String> cacheMap = new HashMap<>();
             cacheMap.put("id", String.valueOf(event.getId()));
             cacheMap.put("title", event.getTitle() != null ? event.getTitle() : "");

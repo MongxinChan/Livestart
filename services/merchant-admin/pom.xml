@@ -48,6 +48,13 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
+        <!-- 接口文档 Knife4j (OpenAPI3 + Jakarta) -->
+        <dependency>
+            <groupId>com.github.xiaoymin</groupId>
+            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <version>4.5.0</version>
+        </dependency>
+
         <!-- 内部基础架构核心组件 (包含 Result, 幂等及全局异常兜底) -->
         <dependency>
             <groupId>com.mongxin.livestart</groupId>
