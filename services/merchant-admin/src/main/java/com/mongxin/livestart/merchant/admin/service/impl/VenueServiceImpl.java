@@ -1,18 +1,20 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
+import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.merchant.admin.dao.entity.VenueDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.VenueMapper;
+import com.mongxin.livestart.merchant.admin.dto.req.VenuePageQueryReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.VenueSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.VenuePageQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.VenueQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.VenueService;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 /**
  * 场馆服务实现层
@@ -21,37 +23,36 @@ import java.util.List;
 public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implements VenueService {
 
     @Override
-    public void createVenue(VenueDO requestParam) {
+    public void createVenue(VenueSaveReqDTO requestParam) {
         LambdaQueryWrapper<VenueDO> queryWrapper = Wrappers.lambdaQuery(VenueDO.class)
                 .eq(VenueDO::getName, requestParam.getName())
                 .eq(VenueDO::getCity, requestParam.getCity());
         if (baseMapper.selectCount(queryWrapper) > 0) {
             throw new ServiceException("该城市下已存在同名场馆，请勿重复录入");
         }
-        save(requestParam);
+        VenueDO venueDO = BeanUtil.toBean(requestParam, VenueDO.class);
+        save(venueDO);
     }
 
     @Override
-    public List<VenueDO> listAllVenues() {
-        return list();
-    }
-
-    @Override
-    public IPage<VenueDO> pageQueryVenues(Page<VenueDO> page, String city) {
+    public IPage<VenuePageQueryRespDTO> pageQueryVenues(VenuePageQueryReqDTO requestParam) {
         LambdaQueryWrapper<VenueDO> queryWrapper = Wrappers.lambdaQuery(VenueDO.class)
-                .eq(StrUtil.isNotBlank(city), VenueDO::getCity, city)
+                .eq(StrUtil.isNotBlank(requestParam.getCity()), VenueDO::getCity, requestParam.getCity())
                 .orderByDesc(VenueDO::getId);
-        return baseMapper.selectPage(page, queryWrapper);
+        IPage<VenueDO> selectPage = baseMapper.selectPage(requestParam, queryWrapper);
+        return selectPage.convert(each -> BeanUtil.toBean(each, VenuePageQueryRespDTO.class));
     }
 
     @Override
-    public VenueDO getVenueById(Long id) {
-        return getById(id);
+    public VenueQueryRespDTO getVenueById(Long id) {
+        VenueDO venueDO = getById(id);
+        return BeanUtil.toBean(venueDO, VenueQueryRespDTO.class);
     }
 
     @Override
-    public void updateVenue(VenueDO requestParam) {
-        updateById(requestParam);
+    public void updateVenue(VenueSaveReqDTO requestParam) {
+        VenueDO venueDO = BeanUtil.toBean(requestParam, VenueDO.class);
+        updateById(venueDO);
     }
 
     @Override

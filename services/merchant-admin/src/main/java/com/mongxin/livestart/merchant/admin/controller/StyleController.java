@@ -1,63 +1,56 @@
 package com.mongxin.livestart.merchant.admin.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
-import com.mongxin.livestart.merchant.admin.dao.entity.StyleDO;
+import com.mongxin.livestart.merchant.admin.dto.req.StylePageQueryReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.StyleSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.StylePageQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.StyleQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.StyleService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
+/**
+ * 演出风格管理控制层
+ */
 @RestController
 @RequestMapping("/api/merchant-admin/style")
 @RequiredArgsConstructor
+@Tag(name = "演出风格管理")
 public class StyleController {
 
     private final StyleService styleService;
 
+    @Operation(summary = "创建风格")
     @PostMapping("/create")
-    public Result<Void> createStyle(@RequestBody StyleDO requestParam) {
+    public Result<Void> createStyle(@RequestBody StyleSaveReqDTO requestParam) {
         styleService.createStyle(requestParam);
         return Results.success();
     }
 
-    @GetMapping("/list")
-    public Result<List<StyleDO>> listStyles() {
-        return Results.success(styleService.listAllStyles());
-    }
-
-    /**
-     * 分页查询风格列表
-     *
-     * @param current 当前页码
-     * @param size    每页数量
-     * @param name    按风格名称模糊搜索（可选）
-     */
+    @Operation(summary = "分页查询风格列表")
     @GetMapping("/page")
-    public Result<IPage<StyleDO>> pageQueryStyles(
-            @RequestParam(defaultValue = "1") Long current,
-            @RequestParam(defaultValue = "10") Long size,
-            @RequestParam(required = false) String name) {
-        return Results.success(styleService.pageQueryStyles(new Page<>(current, size), name));
+    public Result<IPage<StylePageQueryRespDTO>> pageQueryStyles(StylePageQueryReqDTO requestParam) {
+        return Results.success(styleService.pageQueryStyles(requestParam));
     }
 
-    /**
-     * 根据 ID 查询风格详情
-     */
+    @Operation(summary = "查询风格详情")
     @GetMapping("/{id}")
-    public Result<StyleDO> getStyle(@PathVariable("id") Long id) {
+    public Result<StyleQueryRespDTO> getStyle(@PathVariable("id") Long id) {
         return Results.success(styleService.getStyleById(id));
     }
 
+    @Operation(summary = "修改风格信息")
     @PutMapping("/update")
-    public Result<Void> updateStyle(@RequestBody StyleDO requestParam) {
+    public Result<Void> updateStyle(@RequestBody StyleSaveReqDTO requestParam) {
         styleService.updateStyle(requestParam);
         return Results.success();
     }
 
+    @Operation(summary = "删除风格")
     @DeleteMapping("/delete/{id}")
     public Result<Void> deleteStyle(@PathVariable("id") Long id) {
         styleService.deleteStyle(id);

@@ -1,63 +1,56 @@
 package com.mongxin.livestart.merchant.admin.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
-import com.mongxin.livestart.merchant.admin.dao.entity.PerformerDO;
+import com.mongxin.livestart.merchant.admin.dto.req.PerformerPageQueryReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.PerformerSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.PerformerPageQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.PerformerQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.PerformerService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
+/**
+ * 艺人/乐队管理控制层
+ */
 @RestController
 @RequestMapping("/api/merchant-admin/performer")
 @RequiredArgsConstructor
+@Tag(name = "艺人/乐队管理")
 public class PerformerController {
 
     private final PerformerService performerService;
 
+    @Operation(summary = "创建艺人/乐队")
     @PostMapping("/create")
-    public Result<Void> createPerformer(@RequestBody PerformerDO requestParam) {
+    public Result<Void> createPerformer(@RequestBody PerformerSaveReqDTO requestParam) {
         performerService.createPerformer(requestParam);
         return Results.success();
     }
 
-    @GetMapping("/list")
-    public Result<List<PerformerDO>> listPerformers() {
-        return Results.success(performerService.listAllPerformers());
-    }
-
-    /**
-     * 分页查询艺人列表
-     *
-     * @param current 当前页码
-     * @param size    每页数量
-     * @param name    按名称模糊搜索（可选）
-     */
+    @Operation(summary = "分页查询艺人列表")
     @GetMapping("/page")
-    public Result<IPage<PerformerDO>> pageQueryPerformers(
-            @RequestParam(defaultValue = "1") Long current,
-            @RequestParam(defaultValue = "10") Long size,
-            @RequestParam(required = false) String name) {
-        return Results.success(performerService.pageQueryPerformers(new Page<>(current, size), name));
+    public Result<IPage<PerformerPageQueryRespDTO>> pageQueryPerformers(PerformerPageQueryReqDTO requestParam) {
+        return Results.success(performerService.pageQueryPerformers(requestParam));
     }
 
-    /**
-     * 根据 ID 查询艺人详情
-     */
+    @Operation(summary = "查询艺人详情")
     @GetMapping("/{id}")
-    public Result<PerformerDO> getPerformer(@PathVariable("id") Long id) {
+    public Result<PerformerQueryRespDTO> getPerformer(@PathVariable("id") Long id) {
         return Results.success(performerService.getPerformerById(id));
     }
 
+    @Operation(summary = "修改艺人信息")
     @PutMapping("/update")
-    public Result<Void> updatePerformer(@RequestBody PerformerDO requestParam) {
+    public Result<Void> updatePerformer(@RequestBody PerformerSaveReqDTO requestParam) {
         performerService.updatePerformer(requestParam);
         return Results.success();
     }
 
+    @Operation(summary = "删除艺人/乐队")
     @DeleteMapping("/delete/{id}")
     public Result<Void> deletePerformer(@PathVariable("id") Long id) {
         performerService.deletePerformer(id);
