@@ -1,0 +1,55 @@
+######################################
+# ShardingSphere 分片配置 (Distribution 服务)
+#   - t_user_ticket_{0..15} 按 user_id hash 分 16 表，存储在 ds_order 库
+#   - t_order_{0..15}       只读，按 user_id hash 分 16 表，存储在 ds_order 库
+#   - 其他表均无分片，直接存储在公共库 ds_common (live_start)
+######################################
+
+mode:
+  type: Standalone
+
+dataSources:
+  ds_order:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+  ds_common:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+
+rules:
+  - !SHARDING
+    tables:
+      t_user_ticket:
+        actualDataNodes: ds_order.t_user_ticket_${0..15}
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user_ticket_table_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+      t_order:
+        actualDataNodes: ds_order.t_order_${0..15}
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: user_ticket_table_hash_mod
+    defaultDataSourceName: ds_common
+    shardingAlgorithms:
+      user_ticket_table_hash_mod:
+        type: CLASS_BASED
+        props:
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.distribution.dao.sharding.UserTicketTableHashModShardingAlgorithm
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+
+props:
+  sql-show: true
