@@ -1,7 +1,10 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.merchant.admin.dao.entity.StyleDO;
@@ -17,14 +20,8 @@ import java.util.List;
 @Service
 public class StyleServiceImpl extends ServiceImpl<StyleMapper, StyleDO> implements StyleService {
 
-    /**
-     * 创建音乐风格
-     *
-     * @param requestParam 风格创建请求参数
-     */
     @Override
     public void createStyle(StyleDO requestParam) {
-        // 标识符唯一性校验：如 ROCK, FOLK 等代码在系统中必须唯一，确保分类系统不紊乱
         LambdaQueryWrapper<StyleDO> queryWrapper = Wrappers.lambdaQuery(StyleDO.class)
                 .eq(StyleDO::getCode, requestParam.getCode());
         if (baseMapper.selectCount(queryWrapper) > 0) {
@@ -33,31 +30,29 @@ public class StyleServiceImpl extends ServiceImpl<StyleMapper, StyleDO> implemen
         save(requestParam);
     }
 
-    /**
-     * 获取所有风格列表
-     *
-     * @return 风格列表
-     */
     @Override
     public List<StyleDO> listAllStyles() {
         return list();
     }
 
-    /**
-     * 更新风格信息
-     *
-     * @param requestParam 风格更新请求参数
-     */
+    @Override
+    public IPage<StyleDO> pageQueryStyles(Page<StyleDO> page, String name) {
+        LambdaQueryWrapper<StyleDO> queryWrapper = Wrappers.lambdaQuery(StyleDO.class)
+                .like(StrUtil.isNotBlank(name), StyleDO::getName, name)
+                .orderByDesc(StyleDO::getId);
+        return baseMapper.selectPage(page, queryWrapper);
+    }
+
+    @Override
+    public StyleDO getStyleById(Long id) {
+        return getById(id);
+    }
+
     @Override
     public void updateStyle(StyleDO requestParam) {
         updateById(requestParam);
     }
 
-    /**
-     * 删除风格
-     *
-     * @param id 风格ID
-     */
     @Override
     public void deleteStyle(Long id) {
         removeById(id);
