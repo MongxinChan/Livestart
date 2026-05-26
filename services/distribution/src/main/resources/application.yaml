@@ -1,0 +1,57 @@
+server:
+  port: 8005
+
+spring:
+  application:
+    name: Livestart-distribution
+  datasource:
+    # ShardingSphere 接管数据源
+    driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
+    url: jdbc:shardingsphere:classpath:shardingsphere-config.yaml
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        enabled: false
+      password: nacos
+      username: nacos
+  data:
+    redis:
+      host: 127.0.0.1
+      port: 6379
+      # password: 123456
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      logic-delete-field: delFlag
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+springdoc:
+  default-flat-param-object: true
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: alpha
+  api-docs:
+    path: /v3/api-docs
+  group-configs:
+    - group: 'default'
+      paths-to-match: '/**'
+      packages-to-scan: com.mongxin.livestart.distribution
+
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+
+rocketmq:
+  name-server: 127.0.0.1:9876
+  producer:
+    group: Livestart_distribution-service_common-message-execute_pg
+    send-message-timeout: 2000
+    retry-times-when-send-failed: 1
+    retry-times-when-send-async-failed: 1
