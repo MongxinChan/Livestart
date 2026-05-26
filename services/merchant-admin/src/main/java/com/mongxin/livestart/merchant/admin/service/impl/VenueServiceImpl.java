@@ -1,7 +1,10 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
+import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.merchant.admin.dao.entity.VenueDO;
@@ -17,14 +20,8 @@ import java.util.List;
 @Service
 public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implements VenueService {
 
-    /**
-     * 创建场馆
-     *
-     * @param requestParam 场馆创建请求参数
-     */
     @Override
     public void createVenue(VenueDO requestParam) {
-        // 名称 + 城市去重锁：严防同一城市录入重复的场馆，保障数据地基稳健
         LambdaQueryWrapper<VenueDO> queryWrapper = Wrappers.lambdaQuery(VenueDO.class)
                 .eq(VenueDO::getName, requestParam.getName())
                 .eq(VenueDO::getCity, requestParam.getCity());
@@ -34,31 +31,29 @@ public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implemen
         save(requestParam);
     }
 
-    /**
-     * 获取所有场馆列表
-     *
-     * @return 场馆列表
-     */
     @Override
     public List<VenueDO> listAllVenues() {
         return list();
     }
 
-    /**
-     * 更新场馆信息
-     *
-     * @param requestParam 场馆更新请求参数
-     */
+    @Override
+    public IPage<VenueDO> pageQueryVenues(Page<VenueDO> page, String city) {
+        LambdaQueryWrapper<VenueDO> queryWrapper = Wrappers.lambdaQuery(VenueDO.class)
+                .eq(StrUtil.isNotBlank(city), VenueDO::getCity, city)
+                .orderByDesc(VenueDO::getId);
+        return baseMapper.selectPage(page, queryWrapper);
+    }
+
+    @Override
+    public VenueDO getVenueById(Long id) {
+        return getById(id);
+    }
+
     @Override
     public void updateVenue(VenueDO requestParam) {
         updateById(requestParam);
     }
 
-    /**
-     * 删除场馆
-     *
-     * @param id 场馆ID
-     */
     @Override
     public void deleteVenue(Long id) {
         removeById(id);
