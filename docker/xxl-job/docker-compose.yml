@@ -1,0 +1,20 @@
+version: '3.8'
+
+services:
+  xxl-job-admin:
+    image: xuxueli/xxl-job-admin:2.4.2
+    container_name: xxl-job-admin
+    ports:
+      - "8080:8080"
+    environment:
+      # PARAMS 会被 xxl-job-admin 镜像作为 Spring Boot 启动参数读取
+      # 注意：如果您的本地 MySQL 密码不是 123456，请在下方修改密码
+      # host.docker.internal 代表宿主机（您的 Windows 主机），能完美解决容器连不上宿主机数据库的问题
+      PARAMS: >
+        --spring.datasource.url=jdbc:mysql://host.docker.internal:3306/xxl_job?useUnicode=true&characterEncoding=UTF-8&autoReconnect=true&serverTimezone=Asia/Shanghai
+        --spring.datasource.username=root
+        --spring.datasource.password=123456
+        --xxl.job.accessToken=default_token
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
