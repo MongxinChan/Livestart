@@ -1,6 +1,7 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -18,6 +19,8 @@ import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.TicketSkuService;
 import com.mongxin.livestart.merchant.admin.service.basics.chain.MerchantAdminChainContext;
+import com.mzt.logapi.context.LogRecordContext;
+import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -39,6 +42,18 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
     private final StringRedisTemplate stringRedisTemplate;
     private final MerchantAdminChainContext merchantAdminChainContext;
 
+    @LogRecord(
+            success = """
+                    创建票种：{{#requestParam.title}}，\
+                    关联演出ID：{{#requestParam.eventId}}，\
+                    售价：{{#requestParam.sellingPrice}}，\
+                    总库存：{{#requestParam.totalStock}}，\
+                    单人限购：{{#requestParam.limitNum}};
+                    """,
+            type = "TicketSku",
+            bizNo = "{{#bizNo}}",
+            extra = "{{#requestParam.toString()}}"
+    )
     @Override
     public void createTicketSku(TicketSkuSaveReqDTO requestParam) {
         // 通过责任链验证请求参数
@@ -56,6 +71,9 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         } catch (Exception e) {
             log.error("票种库存缓存预热失败 | skuId={}", ticketSkuDO.getId(), e);
         }
+
+        // 将运行时生成的票种ID放入日志上下文
+        LogRecordContext.putVariable("bizNo", ticketSkuDO.getId());
     }
 
     @Override
@@ -83,6 +101,11 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         return BeanUtil.toBean(ticketSkuDO, TicketSkuQueryRespDTO.class);
     }
 
+    @LogRecord(
+            success = "票种库存增发：票种ID {{#requestParam.skuId}}，增发数量 +{{#requestParam.count}}",
+            type = "TicketSku",
+            bizNo = "{{#requestParam.skuId}}"
+    )
     @Override
     public void increaseStock(TicketSkuIncreaseStockReqDTO requestParam) {
         if (requestParam.getCount() == null || requestParam.getCount() <= 0) {
@@ -93,6 +116,9 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         if (sku == null) {
             throw new ClientException("票种不存在");
         }
+
+        // 保存增发前的原始数据到日志上下文
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(sku));
 
         // 数据库原子增发
         int affected = baseMapper.increaseStock(requestParam.getSkuId(), requestParam.getCount());
@@ -111,8 +137,19 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         }
     }
 
+    @LogRecord(
+            success = "删除票种：票种ID {{#id}}",
+            type = "TicketSku",
+            bizNo = "{{#id}}"
+    )
     @Override
     public void deleteTicketSku(Long id) {
+        // 保存删除前的原始数据到日志上下文
+        TicketSkuDO originalSku = getById(id);
+        if (originalSku != null) {
+            LogRecordContext.putVariable("originalData", JSON.toJSONString(originalSku));
+        }
+
         removeById(id);
 
         try {

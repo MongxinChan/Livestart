@@ -80,6 +80,20 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+
+        <!-- mzt-biz-log 操作日志优雅记录框架 (美团开源) -->
+        <dependency>
+            <groupId>io.github.mouzt</groupId>
+            <artifactId>bizlog-sdk</artifactId>
+            <version>3.0.6</version>
+        </dependency>
+
+        <!-- Fastjson2 序列化 (操作日志 extra 数据) -->
+        <dependency>
+            <groupId>com.alibaba.fastjson2</groupId>
+            <artifactId>fastjson2</artifactId>
+            <version>2.0.43</version>
+        </dependency>
     </dependencies>
 
     <build>

@@ -2,6 +2,7 @@ package com.mongxin.livestart.merchant.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.ObjectUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -20,6 +21,8 @@ import com.mongxin.livestart.merchant.admin.dto.resp.EventQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.EventConfigService;
 import com.mongxin.livestart.merchant.admin.service.EventService;
 import com.mongxin.livestart.merchant.admin.service.basics.chain.MerchantAdminChainContext;
+import com.mzt.logapi.context.LogRecordContext;
+import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -46,6 +49,17 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
     private final StringRedisTemplate stringRedisTemplate;
     private final MerchantAdminChainContext merchantAdminChainContext;
 
+    @LogRecord(
+            success = """
+                    创建演出：{{#requestParam.title}}，\
+                    演出类型：{{#requestParam.eventType == 0 ? 'Livehouse(站票)' : '演唱会(选座)' }}，\
+                    关联场馆ID：{{#requestParam.venueId}}，\
+                    演出时间：{{#requestParam.startTime}};
+                    """,
+            type = "Event",
+            bizNo = "{{#bizNo}}",
+            extra = "{{#requestParam.toString()}}"
+    )
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void createEvent(EventSaveReqDTO requestParam) {
@@ -71,6 +85,9 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         // 缓存预热
         warmUpEventCache(eventDO, defaultConfig);
+
+        // 将运行时生成的演出ID放入日志上下文，供 @LogRecord 注解解析 bizNo
+        LogRecordContext.putVariable("bizNo", eventDO.getId());
     }
 
     @Override
@@ -88,9 +105,21 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         return BeanUtil.toBean(eventDO, EventQueryRespDTO.class);
     }
 
+    @LogRecord(
+            success = "修改演出信息：演出ID {{#requestParam.id}}",
+            type = "Event",
+            bizNo = "{{#requestParam.id}}",
+            extra = "{{#requestParam.toString()}}"
+    )
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void updateEvent(EventUpdateReqDTO requestParam) {
+        // 保存修改前的原始数据到日志上下文
+        EventDO originalEvent = getById(requestParam.getId());
+        if (originalEvent != null) {
+            LogRecordContext.putVariable("originalData", JSON.toJSONString(originalEvent));
+        }
+
         EventDO eventDO = BeanUtil.toBean(requestParam, EventDO.class);
         updateById(eventDO);
 
@@ -103,9 +132,20 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         }
     }
 
+    @LogRecord(
+            success = "删除演出：演出ID {{#id}}",
+            type = "Event",
+            bizNo = "{{#id}}"
+    )
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void deleteEvent(Long id) {
+        // 保存删除前的原始数据到日志上下文
+        EventDO originalEvent = getById(id);
+        if (originalEvent != null) {
+            LogRecordContext.putVariable("originalData", JSON.toJSONString(originalEvent));
+        }
+
         LambdaQueryWrapper<EventConfigDO> configQuery = Wrappers.lambdaQuery(EventConfigDO.class)
                 .eq(EventConfigDO::getEventId, id);
         eventConfigService.remove(configQuery);
@@ -120,6 +160,11 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         }
     }
 
+    @LogRecord(
+            success = "演出上架开售：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_2'}}",
+            type = "Event",
+            bizNo = "{{#id}}"
+    )
     @Override
     public void publishEvent(Long id) {
         EventDO event = getById(id);
@@ -139,6 +184,11 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         log.info("演出已上架开售 | eventId={}", id);
     }
 
+    @LogRecord(
+            success = "演出下架：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_0'}}",
+            type = "Event",
+            bizNo = "{{#id}}"
+    )
     @Override
     public void shelveEvent(Long id) {
         EventDO event = getById(id);
@@ -158,6 +208,11 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         log.info("演出已下架 | eventId={}", id);
     }
 
+    @LogRecord(
+            success = "终止演出售票：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_0'}}",
+            type = "Event",
+            bizNo = "{{#id}}"
+    )
     @Override
     public void terminateEvent(Long id) {
         EventDO event = getById(id);
