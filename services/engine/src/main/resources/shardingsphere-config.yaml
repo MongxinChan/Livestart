@@ -1,0 +1,66 @@
+######################################
+# ShardingSphere 分片配置
+# 订单库：单库（ds_order）16分表
+#   - t_order_{0..15}       按 user_id hash
+#   - t_order_item_{0..15}  按 user_id hash（Binding Table）
+# 公共库：ds_common（t_event, t_ticket_sku, t_event_config 等）
+######################################
+
+mode:
+  type: Standalone
+
+dataSources:
+  ds_order:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+  ds_common:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: root
+    password: root
+
+rules:
+  - !SHARDING
+    tables:
+      t_order:
+        actualDataNodes: ds_order.t_order_${0..15}
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_table_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+      t_order_item:
+        actualDataNodes: ds_order.t_order_item_${0..15}
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_item_table_hash_mod
+        keyGenerateStrategy:
+          column: id
+          keyGeneratorName: snowflake
+    bindingTables:
+      - t_order,t_order_item
+    defaultDataSourceName: ds_common
+    shardingAlgorithms:
+      order_table_hash_mod:
+        type: CLASS_BASED
+        props:
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.engine.dao.sharding.OrderTableHashModShardingAlgorithm
+      order_item_table_hash_mod:
+        type: CLASS_BASED
+        props:
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.engine.dao.sharding.OrderTableHashModShardingAlgorithm
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+
+props:
+  sql-show: true
