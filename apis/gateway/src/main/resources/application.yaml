@@ -53,6 +53,8 @@ spring:
           uri: http://localhost:8004
           predicates:
             - Path=/api/live-start/engine/**
+          filters:
+            - RewritePath=/api/live-start/engine/(?<segment>.*), /api/engine/${segment}
 
         # ----------------------------------------------------------------
         # 分发/推广服务 (distribution)
@@ -71,6 +73,8 @@ spring:
           uri: http://localhost:8006
           predicates:
             - Path=/api/live-start/search/**
+          filters:
+            - RewritePath=/api/live-start/search/(?<segment>.*), /api/search/${segment}
 
         # ----------------------------------------------------------------
         # 结算服务 (settlement)
@@ -80,6 +84,8 @@ spring:
           uri: http://localhost:8007
           predicates:
             - Path=/api/live-start/settlement/**
+          filters:
+            - RewritePath=/api/live-start/settlement/(?<segment>.*), /api/settlement/${segment}
 
 # 日志配置
 logging:
