@@ -52,6 +52,21 @@ public class EventDO {
     private String address;
 
     /**
+     * 门票开售时间
+     */
+    private Date saleStartTime;
+
+    /**
+     * 演出状态 0:待开售 1:已开售 2:已结束
+     */
+    private Integer status;
+
+    /**
+     * XXL-JOB 定时任务ID（用于任务管理）
+     */
+    private Integer xxlJobId;
+
+    /**
      * 创建时间
      */
     @TableField(fill = FieldFill.INSERT)

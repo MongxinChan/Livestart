@@ -38,6 +38,9 @@ public class EventPublishReqDTO {
     @NotBlank(message = "演出地点不能为空")
     private String address;
 
+    @Schema(description = "门票开售时间（不传则立即开售）", example = "2026-06-15 10:00:00")
+    private Date saleStartTime;
+
     @Schema(description = "票档库存设置", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotEmpty(message = "门票票档不能为空")
     @Valid

@@ -106,6 +106,13 @@
             <version>2.2.3</version>
         </dependency>
 
+        <!-- XXL-JOB 执行器（定时任务调度） -->
+        <dependency>
+            <groupId>com.xuxueli</groupId>
+            <artifactId>xxl-job-core</artifactId>
+            <version>2.4.2</version>
+        </dependency>
+
         <!-- TransmittableThreadLocal（跨线程用户上下文传递） -->
         <dependency>
             <groupId>com.alibaba</groupId>
