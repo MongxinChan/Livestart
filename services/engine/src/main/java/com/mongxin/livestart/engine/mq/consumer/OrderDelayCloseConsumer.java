@@ -1,5 +1,6 @@
 package com.mongxin.livestart.engine.mq.consumer;
 
+import com.mongxin.livestart.framework.idempotent.NoMQDuplicateConsume;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -35,6 +36,7 @@ public class OrderDelayCloseConsumer implements RocketMQListener<String> {
     private final org.springframework.data.redis.core.StringRedisTemplate stringRedisTemplate;
 
     @Override
+    @NoMQDuplicateConsume(keyPrefix = "engine:idempotent:mq:delay-close:", key = "#message")
     public void onMessage(String message) {
         log.info("[消费者] 订单超时关单消息：{}", message);
 

@@ -1,5 +1,6 @@
 package com.mongxin.livestart.engine.mq.consumer;
 
+import com.mongxin.livestart.framework.idempotent.NoMQDuplicateConsume;
 import cn.hutool.core.lang.UUID;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
@@ -57,6 +58,7 @@ public class TicketOrderCreateConsumer implements RocketMQListener<String> {
     private static final long ORDER_CLOSE_DELAY_MS = 15 * 60 * 1000L;
 
     @Override
+    @NoMQDuplicateConsume(keyPrefix = "engine:idempotent:mq:create-order:", key = "#message")
     public void onMessage(String message) {
         log.info("[消费者] 收到异步下单落库消息：{}", message);
 

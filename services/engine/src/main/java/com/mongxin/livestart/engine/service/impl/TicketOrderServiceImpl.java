@@ -102,18 +102,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             throw new ClientException("票种库存不足");
         }
 
-        // 分布式锁防重复下单（同一用户同一票种同时只能发起一次）
-        String idempotentKey = String.format(EngineRedisConstant.IDEMPOTENT_ORDER_KEY, userId, requestParam.getSkuId());
-        RLock lock = redissonClient.getLock(idempotentKey);
-        if (!lock.tryLock()) {
-            throw new ClientException("正在处理您的下单请求，请稍候");
-        }
-
-        try {
-            return doCreateOrder(requestParam, sku, Long.parseLong(userId));
-        } finally {
-            lock.unlock();
-        }
+        return doCreateOrder(requestParam, sku, Long.parseLong(userId));
     }
 
     private String doCreateOrder(TicketOrderCreateReqDTO requestParam, TicketSkuDO sku, Long userId) {
