@@ -7,6 +7,7 @@ import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
 import com.mongxin.livestart.engine.common.biz.user.UserContext;
 import com.mongxin.livestart.engine.common.constant.EngineRedisConstant;
@@ -27,8 +28,10 @@ import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.mq.event.OrderDelayCloseEvent;
 import com.mongxin.livestart.engine.mq.event.OrderPaySuccessEvent;
+import com.mongxin.livestart.engine.mq.event.TicketOrderCreateEvent;
 import com.mongxin.livestart.engine.mq.producer.OrderDelayCloseProducer;
 import com.mongxin.livestart.engine.mq.producer.OrderPaySuccessProducer;
+import com.mongxin.livestart.engine.mq.producer.TicketOrderCreateProducer;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
@@ -67,6 +70,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private final TransactionTemplate transactionTemplate;
     private final OrderDelayCloseProducer orderDelayCloseProducer;
     private final OrderPaySuccessProducer orderPaySuccessProducer;
+    private final TicketOrderCreateProducer ticketOrderCreateProducer;
 
     private static final String STOCK_DECREMENT_LUA_PATH = "lua/stock_decrement.lua";
     /** 订单超时关单延时（15分钟，单位 ms） */
@@ -142,73 +146,29 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         // 生成订单号（时间戳 + userId 后4位 + 随机4位）
         String orderNo = generateOrderNo(userId);
 
-        // 编程式事务：DB 乐观锁扣库存 + 写订单 + 写订单明细
-        transactionTemplate.executeWithoutResult(status -> {
-            try {
-                // DB 二次校验扣减库存（乐观锁）
-                int decremented = ticketSkuMapper.decrementStock(sku.getId(), requestParam.getCount(), sku.getVersion());
-                if (!SqlHelper.retBool(decremented)) {
-                    throw new ServiceException("库存不足，请重试");
-                }
-
-                // 写订单主表
-                BigDecimal totalAmount = sku.getSellingPrice().multiply(BigDecimal.valueOf(requestParam.getCount()));
-                Date now = new Date();
-                OrderDO order = OrderDO.builder()
-                        .orderNo(orderNo)
-                        .userId(userId)
-                        .totalAmount(totalAmount)
-                        .status(OrderStatusEnum.PENDING_PAYMENT.getCode())
-                        .createTime(now)
-                        .build();
-                orderMapper.insert(order);
-
-                // 写订单明细（每张票一条记录）
-                List<OrderItemDO> items = new ArrayList<>();
-                for (Long visitorId : requestParam.getVisitorIds()) {
-                    OrderItemDO item = OrderItemDO.builder()
-                            .orderNo(orderNo)
-                            .userId(userId)
-                            .visitorId(visitorId)
-                            .eventId(sku.getEventId())
-                            .skuId(sku.getId())
-                            .checkCode(generateCheckCode(orderNo, visitorId))
-                            .isChecked(0)
-                            .build();
-                    items.add(item);
-                }
-                items.forEach(orderItemMapper::insert);
-
-            } catch (Exception ex) {
-                status.setRollbackOnly();
-                // 归还 Redis 库存（补偿）
-                try {
-                    stringRedisTemplate.opsForValue().increment(stockKey, requestParam.getCount());
-                } catch (Exception redisEx) {
-                    log.error("[下单] Redis 库存归还失败，skuId={}，count={}", sku.getId(), requestParam.getCount(), redisEx);
-                }
-                if (ex instanceof ServiceException) {
-                    throw (ServiceException) ex;
-                }
-                throw new ServiceException("下单失败，请稍后重试");
-            }
-        });
-
-        // 发送延时关单消息（15分钟后触发）
-        long closeTime = System.currentTimeMillis() + ORDER_CLOSE_DELAY_MS;
-        OrderDelayCloseEvent closeEvent = OrderDelayCloseEvent.builder()
+        // 组装异步下单事件
+        TicketOrderCreateEvent createEvent = TicketOrderCreateEvent.builder()
                 .orderNo(orderNo)
                 .userId(userId)
                 .skuId(sku.getId())
                 .count(requestParam.getCount())
-                .delayTime(closeTime)
+                .visitorIds(requestParam.getVisitorIds())
                 .build();
-        SendResult sendResult = orderDelayCloseProducer.sendMessage(closeEvent);
+
+        // 投递异步下单消息到 RocketMQ（高并发削峰）
+        SendResult sendResult = ticketOrderCreateProducer.sendMessage(createEvent);
         if (!"SEND_OK".equals(sendResult.getSendStatus().name())) {
-            log.warn("[下单] 延时关单消息发送失败，orderNo={}", orderNo);
+            log.error("[下单] 异步下单消息投递失败，触发本地补偿，orderNo={}", orderNo);
+            // 归还已扣减的 Redis 缓存库存
+            try {
+                stringRedisTemplate.opsForValue().increment(stockKey, requestParam.getCount());
+            } catch (Exception redisEx) {
+                log.error("[下单] Redis 库存补偿失败（非阻塞），skuId={}，count={}", sku.getId(), requestParam.getCount(), redisEx);
+            }
+            throw new ServiceException("抢票排队人数较多，请稍后重试");
         }
 
-        log.info("[下单] 购票下单成功，userId={}，skuId={}，orderNo={}", userId, requestParam.getSkuId(), orderNo);
+        log.info("[下单] 购票异步下单投递成功，进入后台落库排队，userId={}，skuId={}，orderNo={}", userId, requestParam.getSkuId(), orderNo);
         return orderNo;
     }
 
@@ -223,7 +183,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         if (order == null) {
             throw new ClientException("订单不存在");
         }
-        if (!OrderStatusEnum.PENDING_PAYMENT.getCode().equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatusEnum.PENDING_PAYMENT.getCode()) {
             throw new ClientException("订单状态异常，无法完成支付");
         }
 
@@ -274,7 +234,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         if (order == null) {
             throw new ClientException("订单不存在");
         }
-        if (!OrderStatusEnum.PENDING_PAYMENT.getCode().equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatusEnum.PENDING_PAYMENT.getCode()) {
             throw new ClientException("仅待支付订单可以取消");
         }
 
@@ -319,7 +279,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         if (order == null) {
             throw new ClientException("订单不存在");
         }
-        if (!OrderStatusEnum.PAID.getCode().equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatusEnum.PAID.getCode()) {
             throw new ClientException("仅已支付订单可以申请退票");
         }
 
@@ -363,7 +323,8 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 .eq(requestParam.getStatus() != null, OrderDO::getStatus, requestParam.getStatus())
                 .orderByDesc(OrderDO::getCreateTime);
 
-        IPage<OrderDO> page = orderMapper.selectPage(requestParam, queryWrapper);
+        IPage<OrderDO> queryPage = new Page<>(requestParam.getCurrent(), requestParam.getSize());
+        IPage<OrderDO> page = orderMapper.selectPage(queryPage, queryWrapper);
         return page.convert(order -> {
             TicketOrderPageQueryRespDTO dto = new TicketOrderPageQueryRespDTO();
             dto.setOrderNo(order.getOrderNo());

@@ -54,7 +54,7 @@ public class OrderDelayCloseConsumer implements RocketMQListener<String> {
         }
 
         // 只有待支付状态才关闭
-        if (!OrderStatusEnum.PENDING_PAYMENT.getCode().equals(order.getStatus())) {
+        if (order.getStatus() != OrderStatusEnum.PENDING_PAYMENT.getCode()) {
             log.info("[消费者] 订单状态非待支付，无需关单，orderNo={}，status={}", event.getOrderNo(), order.getStatus());
             return;
         }

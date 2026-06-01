@@ -37,7 +37,6 @@ public class OrderTableHashModShardingAlgorithm implements StandardShardingAlgor
         return availableTargetNames;
     }
 
-    @Override
     public Properties getProps() {
         return new Properties();
     }
