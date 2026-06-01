@@ -38,14 +38,26 @@ public class TicketOrderController {
     private final TicketOrderService ticketOrderService;
 
     /**
+     * 获取动态抢票 URL Path Token
+     */
+    @Operation(summary = "获取动态抢票 URL Path Token", description = "在抢票前由后端动态生成带随机 Hash 盐值的 URL Token")
+    @GetMapping("/token")
+    public Result<String> generatePathToken(Long skuId) {
+        return Results.success(ticketOrderService.generatePathToken(skuId));
+    }
+
+    /**
      * 购票下单
      */
     @Operation(summary = "购票下单", description = "用户选择票种和观演人后发起下单，返回订单流水号")
     @RateLimit(permits = 5, timeWindowMs = 1000)
     @NoDuplicateSubmit(message = "正在处理您的下单请求，请稍候")
-    @PostMapping("/create")
-    public Result<String> createOrder(@Valid @RequestBody TicketOrderCreateReqDTO requestParam) {
-        return Results.success(ticketOrderService.createOrder(requestParam));
+    @PostMapping("/create/{pathToken}")
+    public Result<String> createOrder(
+            @PathVariable String pathToken,
+            @Valid @RequestBody TicketOrderCreateReqDTO requestParam
+    ) {
+        return Results.success(ticketOrderService.createOrder(requestParam, pathToken));
     }
 
     /**

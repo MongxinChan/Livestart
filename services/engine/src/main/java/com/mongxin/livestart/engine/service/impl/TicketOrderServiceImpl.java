@@ -32,6 +32,7 @@ import com.mongxin.livestart.engine.mq.event.TicketOrderCreateEvent;
 import com.mongxin.livestart.engine.mq.producer.OrderDelayCloseProducer;
 import com.mongxin.livestart.engine.mq.producer.OrderPaySuccessProducer;
 import com.mongxin.livestart.engine.mq.producer.TicketOrderCreateProducer;
+import cn.hutool.crypto.SecureUtil;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
@@ -52,6 +53,7 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -77,15 +79,63 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private static final long ORDER_CLOSE_DELAY_MS = 15 * 60 * 1000L;
     /** 用户购票限额 Key 过期时间（7天，演出结束后仍可查询） */
     private static final long USER_LIMIT_KEY_EXPIRE_SECONDS = 7 * 24 * 3600L;
+    /** JVM 级本地售罄拦截缓存 */
+    private static final ConcurrentHashMap<Long, Boolean> soldOutMap = new ConcurrentHashMap<>();
+    /** 抢票接口 Dynamic Path Token Key 前缀 */
+    private static final String PATH_TOKEN_KEY = "engine:pathtoken:%s:%s";
+    /** 抢票接口 Dynamic Path Token 混淆盐值 */
+    private static final String SECRET_SALT = "LiveStart_Engine_PathToken_Salt_Key";
 
     // ============================== 1. 购票下单 ==============================
 
     @Override
-    public String createOrder(TicketOrderCreateReqDTO requestParam) {
+    public String generatePathToken(Long skuId) {
         String userId = UserContext.getUserId();
         if (StrUtil.isBlank(userId)) {
             throw new ClientException("用户未登录");
         }
+
+        // JVM L1 极速拦截判定
+        if (Boolean.TRUE.equals(soldOutMap.get(skuId))) {
+            throw new ClientException("该票种已售罄");
+        }
+
+        // 生成高强度 MD5 动态 Token
+        String tokenSource = userId + "_" + skuId + "_" + SECRET_SALT + "_" + UUID.fastUUID().toString(true);
+        String pathToken = SecureUtil.md5(tokenSource);
+
+        // 缓存入 Redis，有效期为 5 秒
+        String tokenKey = String.format(PATH_TOKEN_KEY, userId, skuId);
+        stringRedisTemplate.opsForValue().set(tokenKey, pathToken, 5, java.util.concurrent.TimeUnit.SECONDS);
+
+        return pathToken;
+    }
+
+    @Override
+    public String createOrder(TicketOrderCreateReqDTO requestParam, String pathToken) {
+        String userId = UserContext.getUserId();
+        if (StrUtil.isBlank(userId)) {
+            throw new ClientException("用户未登录");
+        }
+
+        Long skuId = requestParam.getSkuId();
+
+        // 1. JVM 级 L1 售罄极速拦截，防止击穿 Redis
+        if (Boolean.TRUE.equals(soldOutMap.get(skuId))) {
+            throw new ClientException("该票种已售罄");
+        }
+
+        // 2. 校验 PathToken（防接口提前暴露和脚本抢跑）
+        if (StrUtil.isBlank(pathToken)) {
+            throw new ClientException("安全校验失败，下单请求无效");
+        }
+        String tokenKey = String.format(PATH_TOKEN_KEY, userId, skuId);
+        String cachedToken = stringRedisTemplate.opsForValue().get(tokenKey);
+        if (cachedToken == null || !cachedToken.equals(pathToken)) {
+            throw new ClientException("安全校验失效，请重新发起下单");
+        }
+        // 单次校验通过，立即删除 Token，防重放攻击
+        stringRedisTemplate.delete(tokenKey);
 
         // 参数基础校验：购买数量与观演人数量一致
         if (CollUtil.isEmpty(requestParam.getVisitorIds())
@@ -94,12 +144,14 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         }
 
         // 查询票种信息（公共库，ShardingSphere defaultDataSource）
-        TicketSkuDO sku = ticketSkuMapper.selectById(requestParam.getSkuId());
+        TicketSkuDO sku = ticketSkuMapper.selectById(skuId);
         if (sku == null) {
             throw new ClientException("票种不存在");
         }
         if (sku.getRemainingStock() <= 0) {
-            throw new ClientException("票种库存不足");
+            // 本地标记售罄
+            soldOutMap.put(skuId, true);
+            throw new ClientException("该票种已售罄");
         }
 
         return doCreateOrder(requestParam, sku, Long.parseLong(userId));
@@ -129,6 +181,10 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         long errorCode = StockDecrementReturnCombinedUtil.extractErrorCode(luaResult);
         if (StockDecrementErrorEnum.isFail(errorCode)) {
             StockDecrementErrorEnum error = StockDecrementErrorEnum.fromCode(errorCode);
+            // 如果是因为库存不足导致扣减失败，进行本地 JVM 级售罄标记
+            if (errorCode == StockDecrementErrorEnum.STOCK_INSUFFICIENT.getCode()) {
+                soldOutMap.put(sku.getId(), true);
+            }
             throw new ServiceException(error.getMessage());
         }
 
@@ -254,6 +310,8 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 log.error("[取消] Redis库存归还失败，skuId={}", skuId, e);
             }
             ticketSkuMapper.returnStock(skuId, count);
+            // 移除本地售罄标记
+            soldOutMap.remove(skuId);
         }
 
         log.info("[取消] 订单已取消，orderNo={}", requestParam.getOrderNo());
@@ -297,6 +355,8 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 log.error("[退票] Redis库存归还失败，skuId={}", skuId, e);
             }
             ticketSkuMapper.returnStock(skuId, count);
+            // 移除本地售罄标记
+            soldOutMap.remove(skuId);
         }
 
         log.info("[退票] 退票成功，orderNo={}", requestParam.getOrderNo());

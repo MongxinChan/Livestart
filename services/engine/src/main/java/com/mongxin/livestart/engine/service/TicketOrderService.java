@@ -15,12 +15,21 @@ import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 public interface TicketOrderService {
 
     /**
+     * 获取动态抢票 URL Path Token
+     *
+     * @param skuId 票档 ID
+     * @return 加密 Token
+     */
+    String generatePathToken(Long skuId);
+
+    /**
      * 购票下单
      *
      * @param requestParam 下单请求参数
+     * @param pathToken 动态加密 Token
      * @return 订单流水号
      */
-    String createOrder(TicketOrderCreateReqDTO requestParam);
+    String createOrder(TicketOrderCreateReqDTO requestParam, String pathToken);
 
     /**
      * 支付回调（出票）
