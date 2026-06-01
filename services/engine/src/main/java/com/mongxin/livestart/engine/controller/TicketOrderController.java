@@ -1,5 +1,8 @@
 package com.mongxin.livestart.engine.controller;
 
+import com.mongxin.livestart.engine.common.annotation.RateLimit;
+import com.mongxin.livestart.framework.idempotent.NoDuplicateSubmit;
+
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCreateReqDTO;
@@ -38,6 +41,8 @@ public class TicketOrderController {
      * 购票下单
      */
     @Operation(summary = "购票下单", description = "用户选择票种和观演人后发起下单，返回订单流水号")
+    @RateLimit(permits = 5, timeWindowMs = 1000)
+    @NoDuplicateSubmit(message = "正在处理您的下单请求，请稍候")
     @PostMapping("/create")
     public Result<String> createOrder(@Valid @RequestBody TicketOrderCreateReqDTO requestParam) {
         return Results.success(ticketOrderService.createOrder(requestParam));

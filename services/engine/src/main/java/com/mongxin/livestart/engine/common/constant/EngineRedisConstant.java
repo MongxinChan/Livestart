@@ -29,6 +29,12 @@ public final class EngineRedisConstant {
      */
     public static final String IDEMPOTENT_ORDER_KEY = "engine:idempotent:order:%s:%d";
 
+    /**
+     * 滑动窗口限流 Key
+     * RATE_LIMIT_KEY % userId, uri
+     */
+    public static final String RATE_LIMIT_KEY = "engine:ratelimit:%s:%s";
+
     private EngineRedisConstant() {
     }
 }
