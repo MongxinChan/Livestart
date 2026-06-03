@@ -10,6 +10,7 @@ spring:
     nacos:
       discovery:
         server-addr: 127.0.0.1:8848
+        enabled: false
   datasource:
     driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
     url: jdbc:shardingsphere:classpath:shardingsphere-config.yaml
@@ -17,7 +18,7 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      password: "" # 根据你的本地环境填写密码
+      # password: "" # 根据你的本地环境填写密码
 
 mybatis-plus:
   configuration:

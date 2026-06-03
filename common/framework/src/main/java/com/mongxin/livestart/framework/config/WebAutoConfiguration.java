@@ -14,7 +14,7 @@ public class WebAutoConfiguration {
      */
     @Bean
     @ConditionalOnMissingBean(GlobalExceptionHandler.class)
-    public GlobalExceptionHandler globalExceptionHandler() {
+    public GlobalExceptionHandler defaultGlobalExceptionHandler() {
         return new GlobalExceptionHandler();
     }
 }

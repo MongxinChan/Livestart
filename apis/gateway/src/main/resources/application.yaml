@@ -10,7 +10,7 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      password: 123456
+      # password: 123456
 
   cloud:
     # Nacos 注册中心（开发阶段使用固定 URI，接入 Nacos 后启用）
