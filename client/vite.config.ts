@@ -18,32 +18,32 @@ export default defineConfig({
 
       // 购票引擎 → 端口 8004
       '/api/engine': {
-        target: 'http://localhost:8004',
+        target: 'http://127.0.0.1:8004',
         changeOrigin: true,
       },
       // 搜索服务 → 端口 8006
       '/api/search': {
-        target: 'http://localhost:8006',
+        target: 'http://127.0.0.1:8006',
         changeOrigin: true,
       },
       // 结算服务 → 端口 8007
       '/api/settlement': {
-        target: 'http://localhost:8007',
+        target: 'http://127.0.0.1:8007',
         changeOrigin: true,
       },
       // 商户后台管理 → 端口 8003
       '/api/merchant-admin': {
-        target: 'http://localhost:8003',
+        target: 'http://127.0.0.1:8003',
         changeOrigin: true,
       },
       // 用户服务 → 端口 8002
       '/api/admin': {
-        target: 'http://localhost:8002',
+        target: 'http://127.0.0.1:8002',
         changeOrigin: true,
       },
       // C端用户服务 → 端口 8002
       '/api/live-start/admin': {
-        target: 'http://localhost:8002',
+        target: 'http://127.0.0.1:8002',
         changeOrigin: true,
       },
     },

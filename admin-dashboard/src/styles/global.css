@@ -33,11 +33,71 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 0 24px;
-  background: #fff;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(90deg, #141e30, #243b55);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  color: rgba(255, 255, 255, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
-.admin-header-left { display: flex; align-items: center; gap: 12px; }
-.admin-header-right { display: flex; align-items: center; gap: 16px; }
+
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  color: #fff;
+}
+
+.admin-header-left .anticon {
+  color: rgba(255, 255, 255, 0.85);
+  transition: color 0.3s;
+}
+.admin-header-left .anticon:hover {
+  color: #fff;
+}
+
+/* 覆盖 Ant Design Breadcrumb 的颜色以完美适配暗色顶栏 */
+.admin-header .ant-breadcrumb {
+  font-size: 14px;
+}
+.admin-header .ant-breadcrumb-link {
+  color: rgba(255, 255, 255, 0.65) !important;
+}
+.admin-header .ant-breadcrumb-link a {
+  color: rgba(255, 255, 255, 0.65) !important;
+  transition: color 0.3s;
+}
+.admin-header .ant-breadcrumb-link a:hover {
+  color: #fff !important;
+}
+.admin-header .ant-breadcrumb-separator {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+.admin-header .ant-breadcrumb-item:last-child .ant-breadcrumb-link {
+  color: #fff !important;
+  font-weight: 500;
+}
+
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  color: #fff;
+}
+
+.admin-header-right .ant-badge {
+  color: rgba(255, 255, 255, 0.85);
+  transition: color 0.3s;
+}
+.admin-header-right .ant-badge:hover {
+  color: #fff;
+}
+
+.admin-header-right .ant-space {
+  color: rgba(255, 255, 255, 0.9) !important;
+  transition: color 0.3s;
+}
+.admin-header-right .ant-space:hover {
+  color: #fff !important;
+}
 
 /* Page container */
 .page-container {
