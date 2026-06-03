@@ -139,6 +139,7 @@ export interface SettlementStats {
 export interface StyleItem {
   id: number
   name: string
+  code: string
   description: string
 }
 

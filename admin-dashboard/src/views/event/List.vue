@@ -46,6 +46,8 @@
                 <a>更多 <DownOutlined /></a>
                 <template #overlay>
                   <a-menu @click="({ key }: any) => onAction(key, record)">
+                    <a-menu-item key="config">演出配置</a-menu-item>
+                    <a-menu-divider />
                     <a-menu-item key="publish" :disabled="record.status !== 1">上架开售</a-menu-item>
                     <a-menu-item key="shelve" :disabled="record.status !== 2">下架</a-menu-item>
                     <a-menu-item key="terminate" :disabled="record.status >= 3">
@@ -107,15 +109,66 @@
         </a-form-item>
       </a-form>
     </a-modal>
+
+    <!-- 演出配置弹窗 -->
+    <a-modal
+      v-model:open="configVisible"
+      title="演出配置"
+      :confirm-loading="configSubmitting"
+      @ok="onConfigSubmit"
+      width="620px"
+    >
+      <a-form :model="configData" :label-col="{ span: 7 }" :wrapper-col="{ span: 16 }">
+        <a-form-item label="选座模式">
+          <a-radio-group v-model:value="configData.selectionMode">
+            <a-radio :value="0">系统自动配座 (高并发)</a-radio>
+            <a-radio :value="1">手动选座 (剧场)</a-radio>
+          </a-radio-group>
+        </a-form-item>
+        <a-form-item label="强制实名入场">
+          <a-switch v-model:checked="configVerifyRequired" />
+        </a-form-item>
+        <a-form-item label="单人限购上限">
+          <a-input-number v-model:value="configData.maxTicketsPerUser" :min="1" :max="20" style="width: 100%" />
+        </a-form-item>
+        <a-form-item label="退票政策">
+          <a-select v-model:value="configData.refundPolicyType">
+            <a-select-option :value="0">不可退票</a-select-option>
+            <a-select-option :value="1">全额退票</a-select-option>
+            <a-select-option :value="2">阶梯退票</a-select-option>
+          </a-select>
+        </a-form-item>
+        <template v-if="configData.refundPolicyType === 1 || configData.refundPolicyType === 2">
+          <a-form-item label="全额退票截止">
+            <a-input-number v-model:value="configData.tier1FreeRefundHours" :min="1" addon-after="小时" placeholder="开演前X小时" style="width: 100%" />
+          </a-form-item>
+        </template>
+        <template v-if="configData.refundPolicyType === 2">
+          <a-form-item label="部分退票截止">
+            <a-input-number v-model:value="configData.tier2PartialRefundHours" :min="1" addon-after="小时" placeholder="开演前Y小时" style="width: 100%" />
+          </a-form-item>
+          <a-form-item label="手续费比例">
+            <a-input-number v-model:value="configData.tier2RefundFeeRate" :min="0" :max="1" :step="0.05" :precision="2" placeholder="如 0.20 代表 20%" style="width: 100%" />
+          </a-form-item>
+        </template>
+        <a-form-item label="允许转赠门票">
+          <a-switch v-model:checked="configTransferable" />
+        </a-form-item>
+        <a-form-item label="候补购票功能">
+          <a-switch v-model:checked="configWaitingAllowed" />
+        </a-form-item>
+      </a-form>
+    </a-modal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { eventApi } from '@/api/event'
 import { performerApi } from '@/api/performer'
+import { eventConfigApi, type EventConfigItem } from '@/api/eventConfig'
 import type { EventItem } from '@/types'
 
 const statusLabels: Record<number, string> = { 0: '已下架', 1: '预售', 2: '在售', 3: '售罄' }
@@ -224,9 +277,62 @@ async function onSubmit() {
   }
 }
 
+// 演出配置
+const configVisible = ref(false)
+const configSubmitting = ref(false)
+const configEventId = ref<number>(0)
+const configData = reactive<EventConfigItem>({
+  eventId: 0,
+  selectionMode: 0,
+  isVerifyRequired: 0,
+  maxTicketsPerUser: 4,
+  refundPolicyType: 0,
+  tier1FreeRefundHours: 24,
+  tier2PartialRefundHours: 6,
+  tier2RefundFeeRate: 0.2,
+  isTransferable: 0,
+  isWaitingAllowed: 0,
+})
+
+const configVerifyRequired = computed({
+  get: () => configData.isVerifyRequired === 1,
+  set: (v: boolean) => { configData.isVerifyRequired = v ? 1 : 0 },
+})
+const configTransferable = computed({
+  get: () => configData.isTransferable === 1,
+  set: (v: boolean) => { configData.isTransferable = v ? 1 : 0 },
+})
+const configWaitingAllowed = computed({
+  get: () => configData.isWaitingAllowed === 1,
+  set: (v: boolean) => { configData.isWaitingAllowed = v ? 1 : 0 },
+})
+
+async function openConfig(record: EventItem) {
+  configEventId.value = record.id
+  configData.eventId = record.id
+  try {
+    const res = await eventConfigApi.getByEventId(record.id)
+    if (res) Object.assign(configData, res)
+  } catch {
+    // 如果没有配置记录，使用默认值
+  }
+  configVisible.value = true
+}
+
+async function onConfigSubmit() {
+  configSubmitting.value = true
+  try {
+    await eventConfigApi.update(configData)
+    message.success('配置已保存')
+    configVisible.value = false
+  } finally { configSubmitting.value = false }
+}
+
 // 操作
 async function onAction(key: string, record: EventItem) {
-  if (key === 'publish') {
+  if (key === 'config') {
+    openConfig(record)
+  } else if (key === 'publish') {
     await eventApi.publish(record.id)
     message.success('已上架开售')
     fetchList()

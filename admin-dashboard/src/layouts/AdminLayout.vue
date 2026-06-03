@@ -30,6 +30,7 @@
           <a-menu-item key="/venue">场馆管理</a-menu-item>
           <a-menu-item key="/ticket-sku">票档管理</a-menu-item>
           <a-menu-item key="/performer">艺人管理</a-menu-item>
+          <a-menu-item key="/style">风格管理</a-menu-item>
         </a-sub-menu>
 
         <a-sub-menu key="operation">

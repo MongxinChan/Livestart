@@ -55,6 +55,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/settlement/Report.vue'),
         meta: { title: '结算报表' },
       },
+      {
+        path: 'style',
+        name: 'StyleList',
+        component: () => import('@/views/style/List.vue'),
+        meta: { title: '风格管理' },
+      },
     ],
   },
 ]

@@ -10,7 +10,7 @@
         row-key="id"
         :pagination="pagination"
         @change="onTableChange"
-        :expandable="{ expandedRowRender }"
+        @expand="onExpand"
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'phone'">
@@ -86,7 +86,20 @@ async function fetchList() {
 function onTableChange(pag: any) { pagination.current = pag.current; fetchList() }
 
 // 展开行时加载观演人
-function expandedRowRender() { return null } // 模板中已定义
+async function onExpand(expanded: boolean, record: UserItem) {
+  if (!expanded) return
+  if (visitorMap[record.id]) return  // 已加载过则跳过
+  loadingVisitors[record.id] = true
+  try {
+    const res = await userApi.visitors(record.id)
+    visitorMap[record.id] = res || []
+  } catch {
+    visitorMap[record.id] = []
+  } finally {
+    loadingVisitors[record.id] = false
+  }
+}
 
 onMounted(fetchList)
 </script>
+

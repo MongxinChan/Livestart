@@ -10,6 +10,12 @@
     </a-page-header>
 
     <a-card :bordered="false">
+      <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px">
+        <span style="white-space: nowrap">按演出筛选：</span>
+        <a-input-number v-model:value="filterEventId" :min="1" placeholder="演出 ID" style="width: 160px" allow-clear />
+        <a-button type="primary" @click="onFilter">查询</a-button>
+        <a-button @click="onClearFilter">重置</a-button>
+      </div>
       <a-table :columns="columns" :data-source="list" :loading="loading" row-key="id" :pagination="pagination" @change="onTableChange">
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'stock'">
@@ -72,7 +78,7 @@ const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
 async function fetchList() {
   loading.value = true
   try {
-    const res = await ticketSkuApi.page({ current: pagination.current, size: pagination.pageSize })
+    const res = await ticketSkuApi.page({ eventId: filterEventId.value || undefined, current: pagination.current, size: pagination.pageSize })
     list.value = res?.records || []
     pagination.total = res?.total || 0
   } finally { loading.value = false }
@@ -84,6 +90,10 @@ const formVisible = ref(false)
 const submitting = ref(false)
 const editingId = ref<number | null>(null)
 const formData = reactive({ eventId: 0, title: '', originalPrice: 0, sellingPrice: 0, totalStock: 0, limitNum: 4 })
+
+const filterEventId = ref<number | null>(null)
+function onFilter() { pagination.current = 1; fetchList() }
+function onClearFilter() { filterEventId.value = null; pagination.current = 1; fetchList() }
 
 function openForm(record?: TicketSkuItem) {
   if (record) { editingId.value = record.id; Object.assign(formData, record) }
