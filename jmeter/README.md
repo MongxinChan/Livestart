@@ -21,16 +21,20 @@
 - **请求接口**：`GET /api/engine/event/list`
 - **压测意图**：高并发聚合读场景。由于该接口涉及通过 OpenFeign 远程调用 `merchant-admin` 获取演出及票档列表，并涉及局部缓存装配场馆名，可验证系统的**远程服务 RPC 调用及缓存聚合吞吐极限**。
 
-### 场景三：核心抢票秒杀交易链路 (双阶段事务 + 身份穿透)
-这是一个双阶段事务的复杂压力测试场景，完全模拟真实用户在页面上的高并发抢票动作：
-1. **步骤 1 (获取 URL Path Token)**: `GET /api/engine/order/token?skuId=${skuId}`
-   - 此步骤用于防抢跑。接口返回一个时效为 5s 的随机动态 `pathToken`。
-   - 脚本使用 **JSON Extractor (JSON 提取器)** 动态捕获响应体中的 `$.data` 并暂存至变量 `${pathToken}`。
-2. **步骤 2 (提交订单扣减库存)**: `POST /api/engine/order/create/${pathToken}`
-   - 使用获取到的 `${pathToken}` 构建请求路径，发送购票 JSON 报文进行扣减库存和订单流水创建。
-3. **关键设计 (身份穿透 Header)**:
-   - 购票引擎 `engine` 服务为了避免在微服务内部重复鉴权，使用了 `UserTransmitFilter` 拦截器从 HTTP Header 中直接读取由网关解析出来的 `userId`、`username`、`phone` 用户身份头。
-   - 压测脚本在“HTTP Header 鉴权穿透配置”中自动为抢票请求注入了这三个 Header（从 `users.csv` 中读取），从而**完美支持了直连微服务模式下的性能压测**，避免了报错未登录的问题。
+### 场景三：C端用户全生命周期抢票混合全链路 (多阶段事务 + 身份穿透)
+这是一个高度还原生产环境中真实用户抢票流程的复杂混合链路测试场景，按步骤顺序模拟如下：
+1. **步骤 1 (拉取常用观演人)**: `GET /api/live-start/admin/v1/visitor/list`
+   - **压测意图**：模拟用户在抢票前确认观演人。该接口触发后台对常用实名身份证信息的对称解密，是高并发下的 **CPU 密集型解密算力指标** 测试。
+2. **步骤 2 (获取 URL Path Token)**: `GET /api/engine/order/token?skuId=${skuId}`
+   - **压测意图**：获取限时 5 秒的动态防抢跑 `pathToken`，利用 **JSON Extractor** 动态提取并保存至变量 `${pathToken}`。
+3. **步骤 3 (提交订单抢票下单)**: `POST /api/engine/order/create/${pathToken}`
+   - **压测意图**：带上 Path Token 提交订票参数（含 `visitorIds`），触发 Redis 库存预扣与 RocketMQ 异步事务订单创建。
+4. **步骤 4 (刷新我的订单列表)**: `GET /api/engine/order/page?current=1&size=10`
+   - **压测意图**：模拟用户在提交订单后自动轮询/手动刷新订单列表。此接口触发对分库分表（7个物理库）的多库聚合查询，是典型的高并发读测试。
+
+#### 💡 关键设计：身份穿透 Header
+- 购票引擎与常用观演人接口依赖 `UserTransmitFilter` 拦截器从 HTTP Header 中获取鉴权身份（`userId`、`username`、`phone`）。
+- 压测脚本的 `HTTP Header 鉴权穿透配置` 中自动从 `users.csv` 数据源读取并注入这三个 Header，**支持直连微服务压测，完美避免未登录阻碍**。
 
 ---
 
