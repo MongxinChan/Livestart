@@ -89,4 +89,20 @@ public interface UserService extends IService<UserDO> {
      * @return 分页结果
      */
     IPage<UserRespDTO> pageUser(int current, int size);
+
+    /**
+     * 发送登录验证码
+     *
+     * @param phone 手机号
+     */
+    void sendCode(String phone);
+
+    /**
+     * 验证码快捷登录（若不存在则隐式自动注册）
+     *
+     * @param phone 手机号
+     * @param code 验证码
+     * @return 登录结果（含 token）
+     */
+    UserLoginRespDTO loginByCode(String phone, String code);
 }

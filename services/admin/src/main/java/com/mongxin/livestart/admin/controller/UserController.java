@@ -124,4 +124,23 @@ public class UserController {
             @RequestParam(value = "size", defaultValue = "10") int size) {
         return Results.success(userService.pageUser(current, size));
     }
+
+    /**
+     * 发送登录/注册手机验证码
+     */
+    @PostMapping("/api/live-start/admin/v1/user/send-code")
+    public Result<Void> sendCode(@RequestParam("phone") String phone) {
+        userService.sendCode(phone);
+        return Results.success();
+    }
+
+    /**
+     * 验证码快捷登录与自动注册
+     */
+    @PostMapping("/api/live-start/admin/v1/user/login/code")
+    public Result<UserLoginRespDTO> loginByCode(
+            @RequestParam("phone") String phone,
+            @RequestParam("code") String code) {
+        return Results.success(userService.loginByCode(phone, code));
+    }
 }

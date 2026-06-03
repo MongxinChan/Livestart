@@ -242,4 +242,83 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         resultPage.setRecords(records);
         return resultPage;
     }
+
+    @Override
+    public void sendCode(String phone) {
+        if (StrUtil.isBlank(phone)) {
+            throw new ClientException("手机号不能为空");
+        }
+        String code = RandomUtil.randomNumbers(6);
+        stringRedisTemplate.opsForValue().set("login_code:" + phone, code, 5, TimeUnit.MINUTES);
+        log.info("【模拟短信通道】已向手机号 {} 发送登录验证码: {}", phone, code);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    @Override
+    public UserLoginRespDTO loginByCode(String phone, String code) {
+        if (StrUtil.isBlank(phone) || StrUtil.isBlank(code)) {
+            throw new ClientException("手机号和验证码不能为空");
+        }
+        String cacheCode = stringRedisTemplate.opsForValue().get("login_code:" + phone);
+        if (cacheCode == null || !cacheCode.equals(code)) {
+            throw new ClientException("验证码错误或已失效");
+        }
+        
+        // 校验通过，清理验证码缓存
+        stringRedisTemplate.delete("login_code:" + phone);
+
+        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getPhone, phone)
+                .eq(UserDO::getDelFlag, 0);
+        UserDO userDO = baseMapper.selectOne(queryWrapper);
+
+        if (userDO == null) {
+            // 用户不存在，隐式自动注册
+            userDO = new UserDO();
+            userDO.setPhone(phone);
+            userDO.setUsername("Live_" + RandomUtil.randomString(4));
+            // 自动注册的默认加密密码，安全占位
+            userDO.setPassword(BCrypt.hashpw("LiveStart123", BCrypt.gensalt()));
+            userDO.setIsVerified(0);
+            userDO.setStatus(1);
+            userDO.setUserType(1);
+            
+            try {
+                int inserted = baseMapper.insert(userDO);
+                if (inserted < 1) {
+                    throw new ClientException("自动注册插入失败");
+                }
+                // 初始化社交档案
+                UserProfileDO userProfileDO = new UserProfileDO();
+                userProfileDO.setUserId(userDO.getId());
+                userProfileMapper.insert(userProfileDO);
+
+                // 同步加入布隆过滤器以保证全局判定正确
+                userRegisterCachePenetrationBloomFilter.add(phone);
+            } catch (DuplicateKeyException ex) {
+                // 并发重复注册保护，重新查一次
+                userDO = baseMapper.selectOne(queryWrapper);
+                if (userDO == null) {
+                    throw new ClientException("用户注册并发异常，请稍后重试");
+                }
+            }
+        }
+
+        // 签发 Token (复用之前的 Hash Token 设计)
+        java.util.Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash()
+                .entries(USER_LOGIN_KEY + phone);
+        if (CollUtil.isNotEmpty(hasLoginMap)) {
+            stringRedisTemplate.expire(USER_LOGIN_KEY + phone, 30L, TimeUnit.MINUTES);
+            String token = hasLoginMap.keySet().stream()
+                    .findFirst()
+                    .map(Object::toString)
+                    .orElseThrow(() -> new ClientException("登录会话生成失败"));
+            return new UserLoginRespDTO(token);
+        }
+
+        String uuid = UUID.randomUUID().toString();
+        stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + phone, uuid, JSON.toJSONString(userDO));
+        stringRedisTemplate.expire(USER_LOGIN_KEY + phone, 30L, TimeUnit.DAYS);
+        return new UserLoginRespDTO(uuid);
+    }
 }

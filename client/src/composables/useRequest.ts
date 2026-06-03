@@ -7,6 +7,7 @@ export const apiState = reactive({
   gatewayUrl: 'http://localhost:8888',
   userId: '10086',
   token: 'mock-user-token-9988',
+  currentUser: { username: '陈孟欣 (模拟开发)', realName: '陈孟欣' } as any,
 })
 
 // ========== Mock 数据 ==========

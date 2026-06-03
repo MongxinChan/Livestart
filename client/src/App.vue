@@ -56,8 +56,29 @@
 
             <!-- 用户 -->
             <a-space :size="8" align="center">
-              <a-avatar :size="30" style="background: var(--ls-logo-gradient, #1890ff)">陈</a-avatar>
-              <span style="font-size: 13px; font-weight: 600">陈孟欣</span>
+              <template v-if="apiState.currentUser">
+                <a-dropdown :trigger="['click']">
+                  <a-space style="cursor: pointer">
+                    <a-avatar :size="30" style="background: var(--ls-logo-gradient, #1890ff)">
+                      {{ (apiState.currentUser.realName || apiState.currentUser.username || 'U').substring(0, 1) }}
+                    </a-avatar>
+                    <span style="font-size: 13px; font-weight: 600">{{ apiState.currentUser.realName || apiState.currentUser.username }}</span>
+                  </a-space>
+                  <template #overlay>
+                    <a-menu>
+                      <a-menu-item key="logout" @click="handleLogout">
+                        <template #icon><LogoutOutlined /></template>
+                        退出登录
+                      </a-menu-item>
+                    </a-menu>
+                  </template>
+                </a-dropdown>
+              </template>
+              <template v-else>
+                <a-button type="primary" size="small" ghost @click="showAuthModal = true">
+                  登录 / 注册
+                </a-button>
+              </template>
             </a-space>
           </a-space>
         </div>
@@ -81,89 +102,84 @@
         />
         <MerchantSettlement v-else-if="activeView === 'settlement'" />
       </a-layout-content>
+
+      <!-- ========== 登录/注册快捷通道模态框 ========== -->
+      <a-modal v-model:open="showAuthModal" :footer="null" :width="380" centered destroy-on-close>
+        <template #title>
+          <span style="font-weight: 800; font-size: 1.1rem">
+            <UserOutlined style="margin-right: 8px; color: var(--ant-color-primary)" />
+            快捷验证登录与自动注册
+          </span>
+        </template>
+
+        <a-typography-paragraph type="secondary" style="font-size: 12px; margin-bottom: 18px">
+          已支持手机验证码快捷登录。未注册手机号将自动在后台进行隐式自动注册及社交资料建档。
+        </a-typography-paragraph>
+
+        <a-form layout="vertical" @finish="handleAuthSubmit">
+          <a-form-item label="手机号" required>
+            <a-input v-model:value="authForm.phone" placeholder="请输入11位登录手机号" size="large" maxlength="11">
+              <template #prefix><MobileOutlined style="color: rgba(255,255,255,0.25)" /></template>
+            </a-input>
+          </a-form-item>
+
+          <a-form-item label="短信验证码" required>
+            <a-space style="width: 100%">
+              <a-input v-model:value="authForm.code" placeholder="请输入6位验证码" size="large" maxlength="6" style="flex: 1">
+                <template #prefix><SafetyOutlined style="color: rgba(255,255,255,0.25)" /></template>
+              </a-input>
+              <a-button size="large" :disabled="countdown > 0" @click="sendVerificationCode" style="min-width: 120px">
+                {{ countdown > 0 ? `${countdown}s 重试` : '获取验证码' }}
+              </a-button>
+            </a-space>
+          </a-form-item>
+
+          <a-button type="primary" block size="large" html-type="submit" :loading="authLoading" style="margin-top: 10px">
+            立即登录 / 自动注册
+          </a-button>
+        </a-form>
+      </a-modal>
     </a-layout>
   </a-config-provider>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, type CSSProperties } from 'vue'
 import {
   ThunderboltOutlined,
   BgColorsOutlined,
   DownOutlined,
   CheckOutlined,
-  SearchOutlined,
-  ShoppingOutlined,
-  FundOutlined,
+  UserOutlined,
+  MobileOutlined,
+  SafetyOutlined,
 } from '@ant-design/icons-vue'
-import { themeConfigs, themeOptions, customVars } from './styles/themes'
 import { apiState } from './composables/useRequest'
-import type { ThemeId, LiveEvent } from './types'
+import { useApp } from './composables/useApp'
 import EventSquare from './components/EventSquare.vue'
 import TicketOrderCabin from './components/TicketOrderCabin.vue'
 import MerchantSettlement from './components/MerchantSettlement.vue'
 
-// --- 主题 ---
-const activeTheme = ref<ThemeId>('cyberpunk-dark')
-
-const currentAntTheme = computed(() => themeConfigs[activeTheme.value])
-const currentThemeLabel = computed(() => {
-  const t = themeOptions.find(x => x.id === activeTheme.value)
-  return t ? `${t.icon} ${t.name}` : '主题'
-})
-
-const rootStyle = computed<CSSProperties>(() => {
-  const vars = customVars[activeTheme.value]
-  const style: Record<string, string> = {
-    minHeight: '100vh',
-    transition: 'all 0.3s ease',
-  }
-  for (const [k, v] of Object.entries(vars)) {
-    style[k] = v
-  }
-  return style as CSSProperties
-})
-
-function onThemeChange(info: { key: string | number }) {
-  activeTheme.value = info.key as ThemeId
-}
-
-// --- 导航 ---
-type ViewId = 'square' | 'cabin' | 'orders' | 'settlement'
-const activeView = ref<string>('square')
-const selectedEvent = ref<LiveEvent | null>(null)
-
-const navOptions = [
-  { value: 'square', label: '演出发现', icon: SearchOutlined },
-  { value: 'orders', label: '电子票包', icon: ShoppingOutlined },
-  { value: 'settlement', label: '商户核算', icon: FundOutlined },
-]
-
-function onNavChange(val: string | number) {
-  activeView.value = val as string
-  if (val === 'square') selectedEvent.value = null
-}
-
-function navigateTo(view: ViewId) {
-  activeView.value = view
-  if (view === 'square') selectedEvent.value = null
-}
-
-function selectEventForCabin(event: LiveEvent) {
-  selectedEvent.value = event
-  activeView.value = 'cabin'
-}
-
-// --- 骨架屏移除 ---
-onMounted(() => {
-  const skeleton = document.querySelector('.app-skeleton') as HTMLElement | null
-  if (skeleton) {
-    setTimeout(() => {
-      skeleton.style.opacity = '0'
-      setTimeout(() => skeleton.remove(), 300)
-    }, 400)
-  }
-})
+const {
+  activeTheme,
+  currentAntTheme,
+  currentThemeLabel,
+  themeOptions,
+  rootStyle,
+  onThemeChange,
+  activeView,
+  selectedEvent,
+  navOptions,
+  onNavChange,
+  navigateTo,
+  selectEventForCabin,
+  showAuthModal,
+  authLoading,
+  countdown,
+  authForm,
+  sendVerificationCode,
+  handleAuthSubmit,
+  handleLogout,
+} = useApp()
 </script>
 
 <style scoped>
