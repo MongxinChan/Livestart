@@ -30,6 +30,11 @@
           <template v-if="column.key === 'performerName'">
             <span>{{ record.performerName || '未指定艺人' }}</span>
           </template>
+          <template v-if="column.key === 'ticketStage'">
+            <a-tag :color="record.ticketStage === 2 ? 'orange' : 'blue'">
+              {{ record.ticketStage === 2 ? '二开' : '一开' }}
+            </a-tag>
+          </template>
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColors[record.status]">{{ statusLabels[record.status] }}</a-tag>
           </template>
@@ -94,6 +99,12 @@
         <a-form-item label="海报图片">
           <a-input v-model:value="formData.posterUrl" placeholder="海报图片 URL 地址" />
         </a-form-item>
+        <a-form-item label="开票阶段" required>
+          <a-select v-model:value="formData.ticketStage" placeholder="选择当前开票阶段">
+            <a-select-option :value="1">首次开票 (一开)</a-select-option>
+            <a-select-option :value="2">二次开票 (二开)</a-select-option>
+          </a-select>
+        </a-form-item>
       </a-form>
     </a-modal>
   </div>
@@ -117,6 +128,7 @@ const columns = [
   { title: '类型', key: 'eventType', width: 110 },
   { title: '出演艺人', key: 'performerName', width: 120 },
   { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 170 },
+  { title: '开票阶段', key: 'ticketStage', width: 90 },
   { title: '状态', key: 'status', width: 80 },
   { title: '操作', key: 'action', width: 160, fixed: 'right' as const },
 ]
@@ -165,6 +177,7 @@ const formData = reactive({
   startTime: '',
   posterUrl: '',
   performerId: null as number | null,
+  ticketStage: 1,
 })
 
 function openForm(record?: EventItem) {
@@ -176,6 +189,7 @@ function openForm(record?: EventItem) {
     formData.startTime = record.startTime
     formData.posterUrl = record.posterUrl
     formData.performerId = (record as any).performerId || null
+    formData.ticketStage = record.ticketStage || 1
   } else {
     editingId.value = null
     formData.title = ''
@@ -184,6 +198,7 @@ function openForm(record?: EventItem) {
     formData.startTime = ''
     formData.posterUrl = ''
     formData.performerId = null
+    formData.ticketStage = 1
   }
   formVisible.value = true
 }

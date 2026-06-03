@@ -7,6 +7,9 @@ export interface EventItem {
   startTime: string
   posterUrl: string
   status: number        // 0:下架 1:预售 2:在售 3:售罄
+  performerId?: number
+  performerName?: string
+  ticketStage?: number
 }
 
 export interface EventSaveReq {
@@ -15,7 +18,10 @@ export interface EventSaveReq {
   venueId: number | null
   startTime: string
   posterUrl: string
+  performerId?: number | null
+  ticketStage?: number
 }
+
 
 export interface EventUpdateReq extends EventSaveReq {
   id: number

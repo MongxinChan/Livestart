@@ -40,4 +40,8 @@ public class EventUpdateReqDTO {
 
     @Schema(description = "关联演出歌手/艺人ID")
     private Long performerId;
+
+    @Schema(description = "演出售票阶段 1:一开 2:二开", example = "1")
+    private Integer ticketStage;
 }
+

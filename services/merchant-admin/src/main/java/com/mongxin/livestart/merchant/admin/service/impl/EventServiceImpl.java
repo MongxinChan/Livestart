@@ -66,8 +66,17 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
                     "  UNIQUE KEY `idx_event_performer` (`event_id`,`performer_id`)\n" +
                     ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出艺人关联表';");
             log.info("[merchant-admin] 成功初始化/校验 t_event_performer 演出-艺人关系单表！");
+
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `t_event_ticket_stage` (\n" +
+                    "  `id` bigint NOT NULL AUTO_INCREMENT,\n" +
+                    "  `event_id` bigint NOT NULL COMMENT '演出ID',\n" +
+                    "  `ticket_stage` tinyint(1) NOT NULL DEFAULT '1' COMMENT '开票阶段 1:一开 2:二开',\n" +
+                    "  PRIMARY KEY (`id`),\n" +
+                    "  UNIQUE KEY `idx_event_stage` (`event_id`)\n" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出开票阶段表';");
+            log.info("[merchant-admin] 成功初始化/校验 t_event_ticket_stage 演出开票阶段单表！");
         } catch (Exception e) {
-            log.error("[merchant-admin] 自动生成关系表 t_event_performer 失败", e);
+            log.error("[merchant-admin] 自动生成关系表 t_event_performer 或 t_event_ticket_stage 失败", e);
         }
     }
 
@@ -98,6 +107,11 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             jdbcTemplate.update("INSERT IGNORE INTO t_event_performer (event_id, performer_id) VALUES (?, ?)",
                     eventDO.getId(), requestParam.getPerformerId());
         }
+
+        // 级联持久化开票阶段
+        Integer ticketStage = requestParam.getTicketStage() != null ? requestParam.getTicketStage() : 1;
+        jdbcTemplate.update("INSERT IGNORE INTO t_event_ticket_stage (event_id, ticket_stage) VALUES (?, ?)",
+                eventDO.getId(), ticketStage);
 
         // 级联初始化默认演出配置
         EventConfigDO defaultConfig = new EventConfigDO();
@@ -142,6 +156,19 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             } catch (Exception e) {
                 log.error("级联查询演出歌手名称失败, eventId={}", each.getId(), e);
             }
+
+            // 级联查询获取开票阶段
+            try {
+                List<Integer> stages = jdbcTemplate.queryForList("SELECT ticket_stage FROM t_event_ticket_stage WHERE event_id = ?",
+                        Integer.class, each.getId());
+                if (stages != null && !stages.isEmpty()) {
+                    dto.setTicketStage(stages.get(0));
+                } else {
+                    dto.setTicketStage(1); // 默认一开
+                }
+            } catch (Exception e) {
+                log.error("级联查询演出开票阶段失败, eventId={}", each.getId(), e);
+            }
             return dto;
         });
     }
@@ -169,6 +196,19 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         } catch (Exception e) {
             log.error("级联查询详情演出歌手名称失败, eventId={}", id, e);
         }
+
+        // 级联查询获取开票阶段
+        try {
+            List<Integer> stages = jdbcTemplate.queryForList("SELECT ticket_stage FROM t_event_ticket_stage WHERE event_id = ?",
+                    Integer.class, id);
+            if (stages != null && !stages.isEmpty()) {
+                dto.setTicketStage(stages.get(0));
+            } else {
+                dto.setTicketStage(1); // 默认一开
+            }
+        } catch (Exception e) {
+            log.error("级联查询详情演出开票阶段失败, eventId={}", id, e);
+        }
         return dto;
     }
 
@@ -195,6 +235,13 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         if (requestParam.getPerformerId() != null) {
             jdbcTemplate.update("INSERT IGNORE INTO t_event_performer (event_id, performer_id) VALUES (?, ?)",
                     requestParam.getId(), requestParam.getPerformerId());
+        }
+
+        // 级联更新开票阶段
+        if (requestParam.getTicketStage() != null) {
+            jdbcTemplate.update("DELETE FROM t_event_ticket_stage WHERE event_id = ?", requestParam.getId());
+            jdbcTemplate.update("INSERT IGNORE INTO t_event_ticket_stage (event_id, ticket_stage) VALUES (?, ?)",
+                    requestParam.getId(), requestParam.getTicketStage());
         }
 
         // 重新捞取最新全量数据刷新缓存
@@ -227,6 +274,9 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         // 级联删除艺人关联关系
         jdbcTemplate.update("DELETE FROM t_event_performer WHERE event_id = ?", id);
+
+        // 级联删除开票阶段关系表数据
+        jdbcTemplate.update("DELETE FROM t_event_ticket_stage WHERE event_id = ?", id);
 
         // 同步清除 Redis 缓存
         try {

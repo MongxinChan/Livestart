@@ -48,4 +48,8 @@ public class EventListRespDTO {
 
     @Schema(description = "参演艺人/歌手")
     private String artist;
+
+    @Schema(description = "演出售票阶段 1:一开 2:二开")
+    private Integer ticketStage;
 }
+

@@ -88,6 +88,7 @@ public class EventController {
             dto.setDate(event.getStartTime());
             dto.setPerformerName(event.getPerformerName());
             dto.setArtist(event.getPerformerName());
+            dto.setTicketStage(event.getTicketStage());
 
             // 标签生成
             List<String> tags = new ArrayList<>();

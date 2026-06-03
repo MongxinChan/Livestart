@@ -116,6 +116,13 @@
             >
               {{ event.type }}
             </a-tag>
+            <a-tag
+              v-if="event.ticketStage"
+              :color="event.ticketStage === 2 ? 'orange' : 'blue'"
+              style="position: absolute; top: 10px; right: 10px; border-radius: 6px"
+            >
+              {{ event.ticketStage === 2 ? '二开' : '一开' }}
+            </a-tag>
           </div>
           <!-- 信息 -->
           <h3 style="font-size: 0.9rem; font-weight: 700; line-height: 1.4; height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 8px">

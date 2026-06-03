@@ -40,4 +40,8 @@ public class EventQueryRespDTO {
 
     @Schema(description = "关联演出歌手/艺人名称")
     private String performerName;
+
+    @Schema(description = "演出售票阶段 1:一开 2:二开")
+    private Integer ticketStage;
 }
+

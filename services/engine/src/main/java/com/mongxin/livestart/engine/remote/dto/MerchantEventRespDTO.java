@@ -24,4 +24,6 @@ public class MerchantEventRespDTO {
 
     private Long performerId;
     private String performerName;
+    private Integer ticketStage;
 }
+

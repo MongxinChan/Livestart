@@ -19,7 +19,9 @@ export interface LiveEvent {
   minPrice: number
   tags: string[]
   skus: EventSku[]
+  ticketStage?: number
 }
+
 
 /** 热搜词 */
 export interface HotSearch {
