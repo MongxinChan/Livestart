@@ -41,4 +41,10 @@ build/
 ### Client ###
 /client/node_modules
 /client/.vite
-/client/dist
+/client/dist
+
+### Admin Dashboard ###
+/admin-dashboard/node_modules
+/admin-dashboard/.vite
+/admin-dashboard/dist
+
