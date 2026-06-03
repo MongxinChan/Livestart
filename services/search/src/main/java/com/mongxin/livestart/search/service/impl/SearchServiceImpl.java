@@ -1,6 +1,5 @@
 package com.mongxin.livestart.search.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -11,8 +10,10 @@ import com.mongxin.livestart.search.dao.entity.PerformerDO;
 import com.mongxin.livestart.search.dao.mapper.EventMapper;
 import com.mongxin.livestart.search.dao.mapper.PerformerMapper;
 import com.mongxin.livestart.search.dto.resp.EventSearchRespDTO;
+import com.mongxin.livestart.search.dto.resp.HotSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.PerformerSearchRespDTO;
 import com.mongxin.livestart.search.service.SearchService;
+import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -104,13 +105,37 @@ public class SearchServiceImpl implements SearchService {
     }
 
     @Override
-    public List<String> hotSearchKeywords() {
-        // 从 Redis ZSet 获取最高热度的前 10 个词
-        Set<String> range = stringRedisTemplate.opsForZSet().reverseRange(HOT_SEARCH_KEY, 0, 9);
-        if (range == null || range.isEmpty()) {
+    public List<HotSearchRespDTO> hotSearchKeywords() {
+        // 从 Redis ZSet 获取最高热度的前 10 个词（带 score）
+        Set<ZSetOperations.TypedTuple<String>> tuples =
+                stringRedisTemplate.opsForZSet().reverseRangeWithScores(HOT_SEARCH_KEY, 0, 9);
+        if (tuples == null || tuples.isEmpty()) {
             return Collections.emptyList();
         }
-        return new ArrayList<>(range);
+        return tuples.stream()
+                .map(tuple -> new HotSearchRespDTO(
+                        tuple.getValue(),
+                        tuple.getScore() != null ? tuple.getScore() : 0.0
+                ))
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    public void clickHotSearch(String keyword) {
+        if (StrUtil.isBlank(keyword)) {
+            return;
+        }
+        String cleanKeyword = keyword.trim();
+        if (cleanKeyword.length() < 1 || cleanKeyword.length() > 30) {
+            return;
+        }
+        try {
+            // 每次点击增加 250 分（与客户端 Mock 逻辑保持一致）
+            stringRedisTemplate.opsForZSet().incrementScore(HOT_SEARCH_KEY, cleanKeyword, 250.0);
+            log.info("[搜索] 热搜词点击增分：keyword={}, +250", cleanKeyword);
+        } catch (Exception ex) {
+            log.error("[搜索] 热搜词点击增分异常，keyword={}", cleanKeyword, ex);
+        }
     }
 
     /**

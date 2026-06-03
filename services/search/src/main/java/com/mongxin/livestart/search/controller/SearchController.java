@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
 import com.mongxin.livestart.search.dto.resp.EventSearchRespDTO;
+import com.mongxin.livestart.search.dto.resp.HotSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.PerformerSearchRespDTO;
 import com.mongxin.livestart.search.service.SearchService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -52,11 +53,21 @@ public class SearchController {
     }
 
     /**
-     * 热门搜索推荐
+     * 热门搜索推荐（带分值）
      */
-    @Operation(summary = "热门搜索", description = "获取当前热门搜索关键词列表")
+    @Operation(summary = "热门搜索", description = "获取当前热门搜索关键词列表，含 Redis ZSet 实时热度分值")
     @GetMapping("/hot")
-    public Result<List<String>> hotSearchKeywords() {
+    public Result<List<HotSearchRespDTO>> hotSearchKeywords() {
         return Results.success(searchService.hotSearchKeywords());
+    }
+
+    /**
+     * 热搜词点击增分
+     */
+    @Operation(summary = "热搜词点击", description = "用户点击热搜词时调用，在 Redis ZSet 中增加该词的热度分值")
+    @GetMapping("/click")
+    public Result<Void> clickHotSearch(@RequestParam String keyword) {
+        searchService.clickHotSearch(keyword);
+        return Results.success();
     }
 }
