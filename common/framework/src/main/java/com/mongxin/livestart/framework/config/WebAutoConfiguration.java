@@ -1,6 +1,7 @@
 package com.mongxin.livestart.framework.config;
 
 import com.mongxin.livestart.framework.web.GlobalExceptionHandler;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 
 /**
@@ -12,7 +13,9 @@ public class WebAutoConfiguration {
      * 构建全局异常拦截器组件 Bean
      */
     @Bean
+    @ConditionalOnMissingBean(GlobalExceptionHandler.class)
     public GlobalExceptionHandler globalExceptionHandler() {
         return new GlobalExceptionHandler();
     }
 }
+
