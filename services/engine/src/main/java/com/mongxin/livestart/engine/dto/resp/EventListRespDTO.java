@@ -42,4 +42,10 @@ public class EventListRespDTO {
 
     @Schema(description = "票档规格列表")
     private List<TicketSkuRespDTO> skus;
+
+    @Schema(description = "参演艺人名称")
+    private String performerName;
+
+    @Schema(description = "参演艺人/歌手")
+    private String artist;
 }

@@ -27,4 +27,14 @@ public class PerformerSaveReqDTO {
 
     @Schema(description = "状态 1:正常 0:停演", example = "1")
     private Integer status;
+
+    // ----- 前端兼容与自适应字段 -----
+    @Schema(description = "头像图片 URL（前端字段名映射）")
+    private String avatarUrl;
+
+    @Schema(description = "描述介绍（前端字段名映射）")
+    private String description;
+
+    @Schema(description = "音乐风格流派名称（前端字段名映射，自动隐式查表创建）")
+    private String genre;
 }

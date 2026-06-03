@@ -37,4 +37,7 @@ public class EventUpdateReqDTO {
 
     @Schema(description = "演出状态 0:下架 1:预售 2:在售 3:售罄")
     private Integer status;
+
+    @Schema(description = "关联演出歌手/艺人ID")
+    private Long performerId;
 }

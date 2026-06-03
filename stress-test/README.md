@@ -5,8 +5,8 @@
 ---
 
 ## 📂 文件清单说明
-- [livestart_stress_test.jmx](file:///d:/02_Workspace/Projects/Livestart/stress-test/livestart_stress_test.jmx): JMeter XML 压测脚本模板，支持直接导入 JMeter GUI 进行配置修改。
-- [users.csv](file:///d:/02_Workspace/Projects/Livestart/stress-test/users.csv): 用于并发用户参数化的 CSV 数据文件，提供压测所需的手机号、用户ID、用户名、观演人ID与订票 SKU ID 的对应关系。
+- [livestart_stress_test.jmx](./livestart_stress_test.jmx): JMeter XML 压测脚本模板，支持直接导入 JMeter GUI 进行配置修改。
+- [users.csv](./users.csv): 用于并发用户参数化的 CSV 数据文件，提供压测所需的手机号、用户ID、用户名、观演人ID与订票 SKU ID 的对应关系。
 
 ---
 
@@ -36,7 +36,7 @@
 
 ## ⚙️ 压测参数配置与网络拓扑切换
 
-您可以使用 JMeter 打开 [livestart_stress_test.jmx](file:///d:/02_Workspace/Projects/Livestart/stress-test/livestart_stress_test.jmx) 并在 **“用户定义的变量 (User Defined Variables)”** 中灵活修改如下变量：
+您可以使用 JMeter 打开 [livestart_stress_test.jmx](./livestart_stress_test.jmx) 并在 **“用户定义的变量 (User Defined Variables)”** 中灵活修改如下变量：
 - `HOST`: 目标主机地址（默认 `localhost`）。
 - `ADMIN_PORT`: 用户微服务的端口，直连模式默认为 `8002`。
 - `ENGINE_PORT`: 购票引擎的端口，直连模式默认为 `8004`。

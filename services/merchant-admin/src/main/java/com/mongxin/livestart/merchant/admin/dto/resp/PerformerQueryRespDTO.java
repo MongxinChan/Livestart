@@ -34,4 +34,14 @@ public class PerformerQueryRespDTO {
     @Schema(description = "创建时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createTime;
+
+    // ----- 前端兼容字段 -----
+    @Schema(description = "头像图片 URL（前端表单渲染映射）")
+    private String avatarUrl;
+
+    @Schema(description = "描述介绍（前端表单渲染映射）")
+    private String description;
+
+    @Schema(description = "音乐风格流派名称（前端表单渲染映射）")
+    private String genre;
 }

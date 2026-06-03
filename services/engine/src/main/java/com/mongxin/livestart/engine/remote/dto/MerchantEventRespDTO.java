@@ -21,4 +21,7 @@ public class MerchantEventRespDTO {
 
     private String posterUrl;
     private Integer status;
+
+    private Long performerId;
+    private String performerName;
 }

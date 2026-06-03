@@ -124,6 +124,7 @@
           <div style="font-size: 12px; color: var(--ls-text-secondary); display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px">
             <span><CalendarOutlined /> {{ event.date }}</span>
             <span><EnvironmentOutlined /> {{ event.venue }}</span>
+            <span v-if="event.artist"><UserOutlined /> {{ event.artist }}</span>
           </div>
           <!-- 底部操作 -->
           <a-divider style="margin: 10px 0" />
@@ -151,6 +152,7 @@ import {
   FireOutlined,
   CalendarOutlined,
   EnvironmentOutlined,
+  UserOutlined,
 } from '@ant-design/icons-vue'
 import { request } from '@/composables/useRequest'
 import type { LiveEvent, HotSearch, CarouselSlide } from '@/types'

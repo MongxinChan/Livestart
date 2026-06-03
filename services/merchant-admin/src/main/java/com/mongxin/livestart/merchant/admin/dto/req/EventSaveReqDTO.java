@@ -43,4 +43,7 @@ public class EventSaveReqDTO {
      */
     @Schema(description = "海报图片地址")
     private String posterUrl;
+
+    @Schema(description = "关联演出歌手/艺人ID")
+    private Long performerId;
 }

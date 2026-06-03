@@ -27,11 +27,11 @@ LiveStart 是专门为演唱会、Livehouse 演出设计的在线抢票引擎。
 ---
 
 ## 🎨 赛博多主题 Vue 3 高并发演示客户端 (Client)
-为了让项目具备完美的毕业设计答辩演示效果，我们在项目根目录下新增了 [client](file:///d:/02_Workspace/Projects/Livestart/client) 目录。
+为了让项目具备完美的毕业设计答辩演示效果，我们在项目根目录下新增了 [client](file:///./client) 目录。
 - **视觉风格**：融合大麦与秀动，支持**赛博暗黑、高雅极简、大麦炽红、秀动荧光绿** 4 套配色皮肤一键重绘！
 - **顶部高保真导航栏**：支持广场发现、订单中心、商户结算看板的多维视图无缝平滑路由！
 - **抢票控制舱**：可交互式模拟防刷 Token 动态获取、RocketMQ 并发排队落库及超时关单库存自愈全生命周期。
 - **商户结算看板**：可视化穿透对账扫描 `ds_order` 中 `t_order_item_0 ~ 15` 16张物理订单分表。
 - **极速启动**：支持**免 NPM 依赖双击直接运行**（离线高真 Mock 模式）与 **Vite + 网关反向代理真实联调**双核自适应启动！
 
-具体详细说明及开发操作请查阅：[client/README.md](file:///d:/02_Workspace/Projects/Livestart/client/README.md)
+具体详细说明及开发操作请查阅：[client/README.md](./client/README.md)

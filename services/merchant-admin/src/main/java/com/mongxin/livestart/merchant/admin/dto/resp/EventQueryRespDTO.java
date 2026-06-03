@@ -34,4 +34,10 @@ public class EventQueryRespDTO {
 
     @Schema(description = "状态 0:下架 1:预售 2:在售 3:售罄")
     private Integer status;
+
+    @Schema(description = "关联演出歌手/艺人ID")
+    private Long performerId;
+
+    @Schema(description = "关联演出歌手/艺人名称")
+    private String performerName;
 }

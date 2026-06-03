@@ -86,6 +86,8 @@ public class EventController {
             dto.setType(event.getEventType() != null && event.getEventType() == 0 ? "Livehouse" : "演唱会");
             dto.setCover(event.getPosterUrl());
             dto.setDate(event.getStartTime());
+            dto.setPerformerName(event.getPerformerName());
+            dto.setArtist(event.getPerformerName());
 
             // 标签生成
             List<String> tags = new ArrayList<>();

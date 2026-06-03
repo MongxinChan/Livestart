@@ -27,9 +27,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.annotation.PostConstruct;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -48,6 +50,26 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
     private final EventConfigService eventConfigService;
     private final StringRedisTemplate stringRedisTemplate;
     private final MerchantAdminChainContext merchantAdminChainContext;
+    private final JdbcTemplate jdbcTemplate;
+
+    /**
+     * 启动时自动用 JDBC 校验并生成多对多关联单表 t_event_performer，规避修改 ShardingSphere 广播表
+     */
+    @PostConstruct
+    public void initEventPerformerTable() {
+        try {
+            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `t_event_performer` (\n" +
+                    "  `id` bigint NOT NULL AUTO_INCREMENT,\n" +
+                    "  `event_id` bigint NOT NULL COMMENT '演出ID',\n" +
+                    "  `performer_id` bigint NOT NULL COMMENT '艺人ID',\n" +
+                    "  PRIMARY KEY (`id`),\n" +
+                    "  UNIQUE KEY `idx_event_performer` (`event_id`,`performer_id`)\n" +
+                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出艺人关联表';");
+            log.info("[merchant-admin] 成功初始化/校验 t_event_performer 演出-艺人关系单表！");
+        } catch (Exception e) {
+            log.error("[merchant-admin] 自动生成关系表 t_event_performer 失败", e);
+        }
+    }
 
     @LogRecord(
             success = """
@@ -70,6 +92,12 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         EventDO eventDO = BeanUtil.toBean(requestParam, EventDO.class);
         eventDO.setStatus(EventStatusEnum.PRESALE.getStatus());
         save(eventDO);
+
+        // 级联持久化艺人关联
+        if (requestParam.getPerformerId() != null) {
+            jdbcTemplate.update("INSERT IGNORE INTO t_event_performer (event_id, performer_id) VALUES (?, ?)",
+                    eventDO.getId(), requestParam.getPerformerId());
+        }
 
         // 级联初始化默认演出配置
         EventConfigDO defaultConfig = new EventConfigDO();
@@ -96,13 +124,52 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
                 .eq(requestParam.getStatus() != null, EventDO::getStatus, requestParam.getStatus())
                 .orderByDesc(EventDO::getId);
         IPage<EventDO> selectPage = baseMapper.selectPage(requestParam, queryWrapper);
-        return selectPage.convert(each -> BeanUtil.toBean(each, EventPageQueryRespDTO.class));
+        return selectPage.convert(each -> {
+            EventPageQueryRespDTO dto = BeanUtil.toBean(each, EventPageQueryRespDTO.class);
+            // 级联查询获取出演艺人
+            try {
+                List<Long> pIds = jdbcTemplate.queryForList("SELECT performer_id FROM t_event_performer WHERE event_id = ?",
+                        Long.class, each.getId());
+                if (pIds != null && !pIds.isEmpty()) {
+                    Long pId = pIds.get(0);
+                    dto.setPerformerId(pId);
+                    List<String> pNames = jdbcTemplate.queryForList("SELECT name FROM t_performer WHERE id = ?",
+                            String.class, pId);
+                    if (pNames != null && !pNames.isEmpty()) {
+                        dto.setPerformerName(pNames.get(0));
+                    }
+                }
+            } catch (Exception e) {
+                log.error("级联查询演出歌手名称失败, eventId={}", each.getId(), e);
+            }
+            return dto;
+        });
     }
 
     @Override
     public EventQueryRespDTO getEventById(Long id) {
         EventDO eventDO = getById(id);
-        return BeanUtil.toBean(eventDO, EventQueryRespDTO.class);
+        if (eventDO == null) {
+            return null;
+        }
+        EventQueryRespDTO dto = BeanUtil.toBean(eventDO, EventQueryRespDTO.class);
+        // 级联查询获取出演艺人
+        try {
+            List<Long> pIds = jdbcTemplate.queryForList("SELECT performer_id FROM t_event_performer WHERE event_id = ?",
+                    Long.class, id);
+            if (pIds != null && !pIds.isEmpty()) {
+                Long pId = pIds.get(0);
+                dto.setPerformerId(pId);
+                List<String> pNames = jdbcTemplate.queryForList("SELECT name FROM t_performer WHERE id = ?",
+                        String.class, pId);
+                if (pNames != null && !pNames.isEmpty()) {
+                    dto.setPerformerName(pNames.get(0));
+                }
+            }
+        } catch (Exception e) {
+            log.error("级联查询详情演出歌手名称失败, eventId={}", id, e);
+        }
+        return dto;
     }
 
     @LogRecord(
@@ -122,6 +189,13 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         EventDO eventDO = BeanUtil.toBean(requestParam, EventDO.class);
         updateById(eventDO);
+
+        // 级联更新艺人关联
+        jdbcTemplate.update("DELETE FROM t_event_performer WHERE event_id = ?", requestParam.getId());
+        if (requestParam.getPerformerId() != null) {
+            jdbcTemplate.update("INSERT IGNORE INTO t_event_performer (event_id, performer_id) VALUES (?, ?)",
+                    requestParam.getId(), requestParam.getPerformerId());
+        }
 
         // 重新捞取最新全量数据刷新缓存
         EventDO latestEvent = getById(requestParam.getId());
@@ -150,6 +224,9 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
                 .eq(EventConfigDO::getEventId, id);
         eventConfigService.remove(configQuery);
         removeById(id);
+
+        // 级联删除艺人关联关系
+        jdbcTemplate.update("DELETE FROM t_event_performer WHERE event_id = ?", id);
 
         // 同步清除 Redis 缓存
         try {

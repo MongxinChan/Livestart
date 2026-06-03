@@ -27,6 +27,9 @@
               {{ record.eventType === 0 ? 'Livehouse' : '演唱会' }}
             </a-tag>
           </template>
+          <template v-if="column.key === 'performerName'">
+            <span>{{ record.performerName || '未指定艺人' }}</span>
+          </template>
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColors[record.status]">{{ statusLabels[record.status] }}</a-tag>
           </template>
@@ -78,6 +81,13 @@
         <a-form-item label="关联场馆">
           <a-input-number v-model:value="formData.venueId" :min="1" placeholder="场馆 ID" style="width: 100%" />
         </a-form-item>
+        <a-form-item label="出演艺人">
+          <a-select v-model:value="formData.performerId" placeholder="选择参演歌手/乐队 (可选)" allow-clear>
+            <a-select-option v-for="p in performerOptions" :key="p.id" :value="p.id">
+              {{ p.name }}
+            </a-select-option>
+          </a-select>
+        </a-form-item>
         <a-form-item label="演出时间" required>
           <a-date-picker v-model:value="formData.startTime" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" value-format="YYYY-MM-DD HH:mm:ss" />
         </a-form-item>
@@ -94,6 +104,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { eventApi } from '@/api/event'
+import { performerApi } from '@/api/performer'
 import type { EventItem } from '@/types'
 
 const statusLabels: Record<number, string> = { 0: '已下架', 1: '预售', 2: '在售', 3: '售罄' }
@@ -104,6 +115,7 @@ const columns = [
   { title: '海报', key: 'posterUrl', width: 80 },
   { title: '演出标题', dataIndex: 'title', key: 'title', ellipsis: true },
   { title: '类型', key: 'eventType', width: 110 },
+  { title: '出演艺人', key: 'performerName', width: 120 },
   { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 170 },
   { title: '状态', key: 'status', width: 80 },
   { title: '操作', key: 'action', width: 160, fixed: 'right' as const },
@@ -112,6 +124,7 @@ const columns = [
 const loading = ref(false)
 const list = ref<EventItem[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
+const performerOptions = ref<any[]>([])
 
 async function fetchList() {
   loading.value = true
@@ -123,6 +136,15 @@ async function fetchList() {
     // axios 拦截器已处理错误
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchPerformerOptions() {
+  try {
+    const res = await performerApi.page({ current: 1, size: 100 })
+    performerOptions.value = res?.records || []
+  } catch {
+    // 忽略错误
   }
 }
 
@@ -142,6 +164,7 @@ const formData = reactive({
   venueId: null as number | null,
   startTime: '',
   posterUrl: '',
+  performerId: null as number | null,
 })
 
 function openForm(record?: EventItem) {
@@ -152,6 +175,7 @@ function openForm(record?: EventItem) {
     formData.venueId = record.venueId
     formData.startTime = record.startTime
     formData.posterUrl = record.posterUrl
+    formData.performerId = (record as any).performerId || null
   } else {
     editingId.value = null
     formData.title = ''
@@ -159,6 +183,7 @@ function openForm(record?: EventItem) {
     formData.venueId = null
     formData.startTime = ''
     formData.posterUrl = ''
+    formData.performerId = null
   }
   formVisible.value = true
 }
@@ -219,5 +244,8 @@ async function onAction(key: string, record: EventItem) {
   }
 }
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchList()
+  fetchPerformerOptions()
+})
 </script>

@@ -21,4 +21,20 @@ public class PerformerPageQueryRespDTO {
 
     @Schema(description = "状态 1:正常 0:停演")
     private Integer status;
+
+    @Schema(description = "艺人头像")
+    private String avatar;
+
+    @Schema(description = "艺人介绍")
+    private String bio;
+
+    // ----- 前端兼容字段 -----
+    @Schema(description = "头像图片 URL（前端列渲染映射）")
+    private String avatarUrl;
+
+    @Schema(description = "描述介绍（前端列渲染映射）")
+    private String description;
+
+    @Schema(description = "音乐风格流派名称（前端列渲染映射）")
+    private String genre;
 }
