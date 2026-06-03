@@ -3,42 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Livestart 抢票发现与高并发演示中心</title>
-  
-  <!-- 现代 Google Fonts -->
+  <title>Livestart — 高并发抢票与分表结算演示中心</title>
+  <meta name="description" content="Livestart 高并发抢票引擎前端演示，基于 Vue 3 + Ant Design Vue + TypeScript 构建">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+SC:wght@300;400;500;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- 引入全局赛博多主题 CSS 样式表 -->
-  <link rel="stylesheet" href="./src/style.css">
-
-  <!-- ES Modules 映射导入 (Importmap) - 100% 避免本地 npm 依赖报错 -->
-  <script type="importmap">
-    {
-      "imports": {
-        "vue": "https://unpkg.com/vue@3/dist/vue.esm-browser.js"
-      }
-    }
-  </script>
 </head>
 <body>
-
-  <!-- Vue App 挂载容器 -->
   <div id="app">
-    <!-- 初次加载优雅闪烁骨架 screen -->
     <div class="app-skeleton">
       <div class="skeleton-logo">LIVESTART</div>
       <div class="skeleton-spinner"></div>
-      <div class="skeleton-text">正在加载赛博多主题视觉系统...</div>
+      <div style="color: #90a0c7; font-size: 0.95rem;">正在初始化赛博多主题高并发数据中心...</div>
     </div>
   </div>
-
-  <!-- 矢量图标库 Ionicons -->
-  <script type="module" src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"></script>
-  <script nomodule src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.js"></script>
-
-  <!-- Vue 主入口加载 -->
-  <script type="module" src="./src/main.js"></script>
+  <script type="module" src="/src/main.ts"></script>
 </body>
 </html>

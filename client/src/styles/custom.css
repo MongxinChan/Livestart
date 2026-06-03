@@ -1,0 +1,295 @@
+/* ===========================================================================
+   Livestart 自定义动效样式
+   Ant Design 无法覆盖的特殊 UI 效果
+   =========================================================================== */
+
+/* --- 全局 Reset 补充 --- */
+*, *::before, *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
+}
+
+body {
+  background-color: var(--ls-bg-primary);
+  overflow-x: hidden;
+}
+
+/* --- 滚动条美化 --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--ls-bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--ls-accent-rgb), 0.25);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(var(--ls-accent-rgb), 0.5);
+}
+
+/* --- 毛玻璃面板 --- */
+.glass-panel {
+  background: var(--ls-glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--ls-glass-border);
+  box-shadow: var(--ls-glass-shadow);
+  border-radius: 16px;
+}
+
+/* --- 霓虹辉光卡片悬浮效果 --- */
+.glow-card {
+  transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+.glow-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--ls-neon-glow);
+}
+
+/* --- Logo 渐变文字 --- */
+.text-gradient {
+  background: var(--ls-logo-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* --- 导航栏毛玻璃 --- */
+.ls-header {
+  background: var(--ls-nav-bg) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--ls-glass-border);
+  box-shadow: var(--ls-glass-shadow);
+}
+
+/* --- 轮播 Banner 叠层渐变 --- */
+.carousel-container {
+  border-radius: 20px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--ls-accent-rgb), 0.15);
+  box-shadow: var(--ls-neon-glow);
+}
+.carousel-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(to right,
+    rgba(10, 11, 14, 0.92) 15%,
+    rgba(10, 11, 14, 0.35) 55%,
+    rgba(10, 11, 14, 0.92) 100%);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 60px;
+}
+
+/* --- 拟物电子门票（折叠缺口） --- */
+.ticket-card {
+  background: var(--ls-bg-card);
+  border: 1px solid rgba(var(--ls-accent-rgb), 0.15);
+  border-radius: 16px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  min-height: 140px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+.ticket-card::before,
+.ticket-card::after {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: var(--ls-bg-primary);
+  border-radius: 50%;
+  left: 70%;
+  margin-left: -10px;
+  border: 1px solid rgba(var(--ls-accent-rgb), 0.15);
+  z-index: 5;
+}
+.ticket-card::before { top: -10px; }
+.ticket-card::after { bottom: -10px; }
+
+.ticket-left {
+  flex: 2.3;
+  padding: 20px;
+  border-right: 2px dashed rgba(var(--ls-accent-rgb), 0.15);
+}
+.ticket-right {
+  flex: 1;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+/* --- 已核销钢印效果 --- */
+.stamp-used {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 90px;
+  height: 90px;
+  border: 4px double rgba(var(--ls-accent-rgb), 0.7);
+  border-radius: 50%;
+  color: rgba(var(--ls-accent-rgb), 0.75);
+  font-size: 0.85rem;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(-18deg);
+  letter-spacing: 2px;
+  background: rgba(var(--ls-accent-rgb), 0.05);
+  box-shadow: 0 0 10px rgba(var(--ls-accent-rgb), 0.18);
+  z-index: 10;
+  animation: stamp-drop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+@keyframes stamp-drop {
+  0% { transform: rotate(-55deg) scale(2.8); opacity: 0; }
+  100% { transform: rotate(-18deg) scale(1); opacity: 1; }
+}
+
+/* --- 指纹扫描安全动效 --- */
+.fingerprint-scanner {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  border: 2px solid rgba(var(--ls-accent-rgb), 0.3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--ls-accent-rgb), 0.05);
+  overflow: hidden;
+}
+.fingerprint-scanner::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  background: currentColor;
+  box-shadow: 0 0 10px currentColor;
+  top: 0;
+  left: 0;
+  animation: scan-line 2s linear infinite;
+}
+
+/* --- SVG 柱状图增长动效 --- */
+.bar-rect {
+  transform-origin: bottom;
+  animation: grow-up 1.2s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+}
+
+/* --- 通用关键帧动画 --- */
+@keyframes scan-line {
+  0% { top: 0%; }
+  50% { top: 100%; }
+  100% { top: 0%; }
+}
+@keyframes grow-up {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+@keyframes pulse-light {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* --- 骨架屏 Logo 动画 --- */
+.app-skeleton {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: #0d0e12;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  transition: opacity 0.3s ease;
+}
+.skeleton-logo {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: 0.3rem;
+  background: linear-gradient(135deg, #ff2d55 0%, #00ffcc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 2rem;
+  animation: pulse-light 1.5s infinite;
+}
+.skeleton-spinner {
+  width: 50px;
+  height: 50px;
+  border: 3px solid rgba(255, 45, 85, 0.1);
+  border-radius: 50%;
+  border-top-color: #ff2d55;
+  animation: spin 1s ease-in-out infinite;
+  margin-bottom: 1.5rem;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* --- 分表扫描网格 --- */
+.shard-grid-item {
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: monospace;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: all 0.3s ease;
+}
+
+/* --- Ant Design 覆盖微调 --- */
+.ant-layout {
+  background: var(--ls-bg-primary) !important;
+}
+.ant-layout-header {
+  height: 68px !important;
+  line-height: 68px !important;
+  padding: 0 32px !important;
+}
+.ant-card {
+  border-radius: 16px !important;
+}
+.ant-carousel .slick-slide {
+  height: 300px;
+  overflow: hidden;
+}
+.ant-carousel .slick-slide img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ant-segmented {
+  border-radius: 14px !important;
+}
+
+/* --- 事件封面悬浮缩放 --- */
+.event-cover-wrap {
+  overflow: hidden;
+  border-radius: 12px;
+}
+.event-cover-wrap img {
+  transition: transform 0.5s ease;
+}
+.event-cover-wrap:hover img {
+  transform: scale(1.08);
+}

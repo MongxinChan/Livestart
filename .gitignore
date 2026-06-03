@@ -37,3 +37,8 @@ build/
 
 ### Mac OS ###
 .DS_Store
+
+### Client ###
+/client/node_modules
+/client/.vite
+/client/dist
