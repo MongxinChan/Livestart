@@ -2,6 +2,7 @@ package com.mongxin.livestart.engine.remote;
 
 import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuRespDTO;
+import com.mongxin.livestart.engine.remote.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.framework.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,4 +48,10 @@ public interface MerchantAdminRemoteService {
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "size", defaultValue = "100") Integer size
     );
+
+    /**
+     * 查询场馆详情
+     */
+    @GetMapping("/venue/{id}")
+    Result<MerchantVenueRespDTO> getVenue(@PathVariable("id") Long id);
 }

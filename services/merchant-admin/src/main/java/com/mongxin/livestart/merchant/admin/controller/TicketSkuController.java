@@ -68,4 +68,11 @@ public class TicketSkuController {
         ticketSkuService.deleteTicketSku(id);
         return Results.success();
     }
+
+    @Operation(summary = "修改票种信息")
+    @PutMapping("/update")
+    public Result<Void> updateTicketSku(@RequestBody com.mongxin.livestart.merchant.admin.dao.entity.TicketSkuDO requestParam) {
+        ticketSkuService.updateTicketSku(requestParam);
+        return Results.success();
+    }
 }

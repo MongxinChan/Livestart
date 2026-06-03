@@ -6,6 +6,7 @@ import com.mongxin.livestart.engine.dto.resp.TicketSkuRespDTO;
 import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
 import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuRespDTO;
+import com.mongxin.livestart.engine.remote.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,12 +16,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -70,6 +73,7 @@ public class EventController {
 
         // 3. 聚合组装
         List<EventListRespDTO> resultList = new ArrayList<>();
+        Map<Long, String> venueCache = new HashMap<>();
         for (MerchantEventRespDTO event : events) {
             // 仅返回在售和预售的演出（status = 1:预售 or 2:在售）
             if (event.getStatus() != null && event.getStatus() < 1) {
@@ -114,8 +118,23 @@ public class EventController {
             dto.setSkus(skuList);
             dto.setMinPrice(minPrice);
 
-            // venue 名暂时从标题提取或设为空（Feign 未查 venue，生产可扩展）
-            dto.setVenue("");
+            // 通过 Feign 获取场馆名并利用 Map 做局部缓存防止 1+N 频繁调用
+            if (event.getVenueId() != null) {
+                String venueName = venueCache.computeIfAbsent(event.getVenueId(), id -> {
+                    try {
+                        Result<MerchantVenueRespDTO> venueResult = merchantAdminRemoteService.getVenue(id);
+                        if (venueResult.isSuccess() && venueResult.getData() != null) {
+                            return venueResult.getData().getName();
+                        }
+                    } catch (Exception e) {
+                        log.error("[Engine] Feign 远程调用获取场馆名称失败, venueId={}", id, e);
+                    }
+                    return "未知场馆";
+                });
+                dto.setVenue(venueName);
+            } else {
+                dto.setVenue("未知场馆");
+            }
 
             resultList.add(dto);
         }

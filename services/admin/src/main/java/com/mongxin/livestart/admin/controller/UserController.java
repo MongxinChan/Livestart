@@ -11,6 +11,7 @@ import com.mongxin.livestart.admin.service.UserService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.validation.annotation.Validated;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -112,5 +113,15 @@ public class UserController {
     @PostMapping("/api/live-start/admin/v1/user/MinioAvatar")
     public Result<String> uploadAvatarByMinio(@RequestParam("file") MultipartFile file) throws Exception {
         return Results.success(userService.uploadAvatarByMinio(file));
+    }
+
+    /**
+     * 后台管理端分页查询用户列表
+     */
+    @GetMapping("/api/admin/user/page")
+    public Result<IPage<UserRespDTO>> pageUser(
+            @RequestParam(value = "current", defaultValue = "1") int current,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        return Results.success(userService.pageUser(current, size));
     }
 }

@@ -7,6 +7,7 @@ import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
@@ -79,4 +80,13 @@ public interface UserService extends IService<UserDO> {
      * @return 文件的网络绝对访问路径 URL
      */
     String uploadAvatarByMinio(MultipartFile file) throws Exception;
+
+    /**
+     * 后台管理端分页查询用户列表
+     *
+     * @param current 当前页码
+     * @param size 每页大小
+     * @return 分页结果
+     */
+    IPage<UserRespDTO> pageUser(int current, int size);
 }

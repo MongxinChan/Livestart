@@ -337,4 +337,14 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
             throw new RuntimeException("SHA-256 算法不可用", e);
         }
     }
+
+    @Override
+    public List<VisitorRespDTO> listVisitorsByUserId(Long userId) {
+        LambdaQueryWrapper<UserVisitorDO> queryWrapper = Wrappers.lambdaQuery(UserVisitorDO.class)
+                .eq(UserVisitorDO::getUserId, userId)
+                .eq(UserVisitorDO::getDelFlag, 0)
+                .orderByDesc(UserVisitorDO::getCreateTime);
+        List<UserVisitorDO> doList = baseMapper.selectList(queryWrapper);
+        return doList.stream().map(this::toRespDTO).collect(Collectors.toList());
+    }
 }

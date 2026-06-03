@@ -47,4 +47,8 @@ build/
 /admin-dashboard/node_modules
 /admin-dashboard/.vite
 /admin-dashboard/dist
+
+### Custom Ignores ###
+*.diff
+*.tsbuildinfo
 

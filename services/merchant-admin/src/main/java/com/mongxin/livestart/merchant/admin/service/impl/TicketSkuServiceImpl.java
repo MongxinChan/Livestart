@@ -160,4 +160,22 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
             log.error("票种库存缓存清除失败（非阻塞） | skuId={}", id, e);
         }
     }
+
+    @LogRecord(
+            success = "修改票档：票档ID {{#requestParam.id}}",
+            type = "TicketSku",
+            bizNo = "{{#requestParam.id}}"
+    )
+    @Override
+    public void updateTicketSku(TicketSkuDO requestParam) {
+        TicketSkuDO oldSku = getById(requestParam.getId());
+        if (oldSku == null) {
+            throw new ClientException("票种不存在");
+        }
+        oldSku.setTitle(requestParam.getTitle());
+        oldSku.setOriginalPrice(requestParam.getOriginalPrice());
+        oldSku.setSellingPrice(requestParam.getSellingPrice());
+        oldSku.setLimitNum(requestParam.getLimitNum());
+        updateById(oldSku);
+    }
 }

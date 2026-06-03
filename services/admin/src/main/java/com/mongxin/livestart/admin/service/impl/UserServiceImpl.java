@@ -26,6 +26,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
@@ -220,5 +222,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
         // 2. 无需任何包装，直接把原生的 file 对象转发给底层工具类
         return minioUtil.upload(file);
+    }
+
+    @Override
+    public IPage<UserRespDTO> pageUser(int current, int size) {
+        Page<UserDO> page = new Page<>(current, size);
+        Page<UserDO> userPage = baseMapper.selectPage(page, Wrappers.lambdaQuery(UserDO.class).eq(UserDO::getDelFlag, 0));
+        
+        Page<UserRespDTO> resultPage = new Page<>(current, size, userPage.getTotal());
+        java.util.List<UserRespDTO> records = userPage.getRecords().stream().map(userDO -> {
+            UserRespDTO resp = new UserRespDTO();
+            BeanUtils.copyProperties(userDO, resp);
+            UserProfileDO profile = userProfileMapper.selectById(userDO.getId());
+            if (profile != null) {
+                BeanUtils.copyProperties(profile, resp);
+            }
+            return resp;
+        }).collect(java.util.stream.Collectors.toList());
+        resultPage.setRecords(records);
+        return resultPage;
     }
 }

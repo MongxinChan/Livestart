@@ -60,4 +60,11 @@ public interface TicketSkuService extends IService<TicketSkuDO> {
      * @param id 票种ID
      */
     void deleteTicketSku(Long id);
+
+    /**
+     * 修改票种配置
+     *
+     * @param ticketSkuDO 票种实体
+     */
+    void updateTicketSku(TicketSkuDO ticketSkuDO);
 }

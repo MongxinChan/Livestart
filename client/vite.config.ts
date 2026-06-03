@@ -41,6 +41,11 @@ export default defineConfig({
         target: 'http://localhost:8002',
         changeOrigin: true,
       },
+      // C端用户服务 → 端口 8002
+      '/api/live-start/admin': {
+        target: 'http://localhost:8002',
+        changeOrigin: true,
+      },
     },
   },
 })

@@ -275,7 +275,7 @@ import {
   CheckCircleOutlined, CalendarOutlined, EnvironmentOutlined,
   WechatOutlined, AlipayCircleOutlined,
 } from '@ant-design/icons-vue'
-import { request } from '@/composables/useRequest'
+import { request, apiState } from '@/composables/useRequest'
 import type { LiveEvent, EventSku, Order, Visitor, GrabStatus } from '@/types'
 
 const props = defineProps<{
@@ -298,11 +298,31 @@ const activeSku = computed<EventSku | null>(() => {
 const totalPrice = computed(() => (activeSku.value ? activeSku.value.price : 0) * ticketCount.value)
 
 // --- 观演人 ---
-const visitorList = ref<Visitor[]>([
-  { id: 201, name: '陈孟欣 (开发者)', idCard: '3301**********1234', checked: true },
-  { id: 202, name: '张学友 (模拟人)', idCard: '4402**********9988', checked: false },
-  { id: 203, name: '李四 (模拟人)', idCard: '1103**********5678', checked: false },
-])
+const visitorList = ref<Visitor[]>([])
+
+async function fetchVisitors() {
+  if (apiState.isMock) {
+    visitorList.value = [
+      { id: 201, name: '陈孟欣 (开发者)', idCard: '3301**********1234', checked: true },
+      { id: 202, name: '张学友 (模拟人)', idCard: '4402**********9988', checked: false },
+      { id: 203, name: '李四 (模拟人)', idCard: '1103**********5678', checked: false },
+    ]
+    ticketCount.value = 1
+    return
+  }
+  try {
+    const list = await request<any[]>('/api/live-start/admin/v1/visitor/list')
+    visitorList.value = (list || []).map((v, i) => ({
+      id: v.id,
+      name: v.realName,
+      idCard: v.cardNo,
+      checked: i === 0,
+    }))
+    ticketCount.value = visitorList.value.filter(v => v.checked).length || 1
+  } catch (err) {
+    console.error('拉取观演人列表失败', err)
+  }
+}
 
 function toggleVisitor(v: Visitor) {
   v.checked = !v.checked
@@ -484,10 +504,12 @@ function performCheckCode(order: Order) {
 // --- 生命周期 ---
 watch(() => props.selectedEvent, (ev) => {
   if (ev && ev.skus.length > 0) activeSkuId.value = ev.skus[0].id
+  fetchVisitors()
 })
 
 onMounted(() => {
   fetchOrders()
+  fetchVisitors()
   if (props.selectedEvent && props.selectedEvent.skus.length > 0) {
     activeSkuId.value = props.selectedEvent.skus[0].id
   }

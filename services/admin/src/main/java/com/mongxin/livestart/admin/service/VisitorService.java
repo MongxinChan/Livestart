@@ -54,4 +54,12 @@ public interface VisitorService extends IService<UserVisitorDO> {
      * @return 观演人详情
      */
     VisitorRespDTO getVisitorById(Long id);
+
+    /**
+     * 查询指定用户的常用观演人列表（后台管理端使用）
+     *
+     * @param userId 用户 ID
+     * @return 观演人列表
+     */
+    List<VisitorRespDTO> listVisitorsByUserId(Long userId);
 }
