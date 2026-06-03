@@ -9,9 +9,9 @@ dataSources:
   ds_common:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_common?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: &db_user ${SPRING_DATASOURCE_USERNAME:root}
-    password: &db_pass ${SPRING_DATASOURCE_PASSWORD:123456}
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: &db_user root
+    password: &db_pass 123456
   
   # 1.2 用户分库 0
   ds_user_0:
@@ -87,9 +87,6 @@ rules:
       - t_event
       - t_event_config
 
-    # 默认落库数据源：所有未匹配分片逻辑表的表（如手机号映射路由表 t_user_phone_mapping 等）默认全部落 ds_common 库
-    defaultDataSourceName: ds_common
-
     # =========================================================================
     # 3. 分片算法具体配置
     # =========================================================================
@@ -140,6 +137,9 @@ rules:
     keyGenerators:
       snowflake:
         type: SNOWFLAKE
+
+  - !SINGLE
+    defaultDataSource: ds_common
 
 # =========================================================================
 # 5. 全局基础属性配置

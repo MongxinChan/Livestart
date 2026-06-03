@@ -10,24 +10,34 @@ mode:
   type: Standalone
 
 dataSources:
-  ds_order:
+  ds_order_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
-    username: root
-    password: root
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order_0?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: &db_user root
+    password: &db_pass 123456
+  ds_order_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order_1?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    username: *db_user
+    password: *db_pass
   ds_common:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
-    username: root
-    password: root
+    username: *db_user
+    password: *db_pass
 
 rules:
   - !SHARDING
     tables:
       t_order:
-        actualDataNodes: ds_order.t_order_${0..15}
+        actualDataNodes: ds_order_${0..1}.t_order_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_database_inline
         tableStrategy:
           standard:
             shardingColumn: user_id
@@ -36,7 +46,11 @@ rules:
           column: id
           keyGeneratorName: snowflake
       t_order_item:
-        actualDataNodes: ds_order.t_order_item_${0..15}
+        actualDataNodes: ds_order_${0..1}.t_order_item_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_database_inline
         tableStrategy:
           standard:
             shardingColumn: user_id
@@ -46,8 +60,12 @@ rules:
           keyGeneratorName: snowflake
     bindingTables:
       - t_order,t_order_item
-    defaultDataSourceName: ds_common
+
     shardingAlgorithms:
+      order_database_inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_order_${user_id % 2}
       order_table_hash_mod:
         type: CLASS_BASED
         props:
@@ -61,6 +79,9 @@ rules:
     keyGenerators:
       snowflake:
         type: SNOWFLAKE
+
+  - !SINGLE
+    defaultDataSource: ds_common
 
 props:
   sql-show: true

@@ -9,9 +9,9 @@ dataSources:
   ds_common:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_common?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: &db_user ${SPRING_DATASOURCE_USERNAME:root}
-    password: &db_pass ${SPRING_DATASOURCE_PASSWORD:123456}
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: &db_user root
+    password: &db_pass 123456
   
   # 用户物理库
   ds_user_0:
@@ -61,8 +61,8 @@ dataSources:
 rules:
   - !SHARDING
     tables:
-      # 商户后台涉及到的都是单表管理，但需要强力配置广播同步：
-      # 当商家创建演出、配置、上架票档库存时，ShardingSphere 自动双写广播到所有的 7 个物理库中！
+      t_placeholder:
+        actualDataNodes: ds_common.t_placeholder
       
     # 广播表声明
     broadcastTables:
@@ -71,8 +71,8 @@ rules:
       - ticket_skus
       - t_refund_policy
 
-    # 默认数据源：商户后台管理的元数据表（如 场馆表、艺人表、风格表等）一律默认安全路由落入公共配置库 ds_common
-    defaultDataSourceName: ds_common
+  - !SINGLE
+    defaultDataSource: ds_common
 
 # =========================================================================
 # 3. 全局基础属性配置
