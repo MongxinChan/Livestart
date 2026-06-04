@@ -30,6 +30,12 @@
           <template v-if="column.key === 'performerName'">
             <span>{{ record.performerName || '未指定艺人' }}</span>
           </template>
+          <template v-if="column.key === 'genre'">
+            <template v-if="record.genre">
+              <a-tag v-for="g in record.genre.split(',')" :key="g" color="purple">{{ g }}</a-tag>
+            </template>
+            <a-tag v-else color="gray">未分类</a-tag>
+          </template>
           <template v-if="column.key === 'ticketStage'">
             <a-tag :color="record.ticketStage === 2 ? 'orange' : 'blue'">
               {{ record.ticketStage === 2 ? '二开' : '一开' }}
@@ -94,6 +100,18 @@
               {{ p.name }}
             </a-select-option>
           </a-select>
+        </a-form-item>
+        <a-form-item label="音乐风格">
+          <a-select
+            v-model:value="formData.styleIds"
+            mode="multiple"
+            show-search
+            option-filter-prop="name"
+            placeholder="请选择音乐风格（支持搜索）"
+            :options="styleOptions"
+            :field-names="{ label: 'name', value: 'id' }"
+            allow-clear
+          />
         </a-form-item>
         <a-form-item label="演出时间" required>
           <a-date-picker v-model:value="formData.startTime" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" value-format="YYYY-MM-DD HH:mm:ss" />
@@ -168,6 +186,7 @@ import { message, Modal } from 'ant-design-vue'
 import { PlusOutlined, DownOutlined } from '@ant-design/icons-vue'
 import { eventApi } from '@/api/event'
 import { performerApi } from '@/api/performer'
+import { styleApi } from '@/api/style'
 import { eventConfigApi, type EventConfigItem } from '@/api/eventConfig'
 import type { EventItem } from '@/types'
 
@@ -180,6 +199,7 @@ const columns = [
   { title: '演出标题', dataIndex: 'title', key: 'title', ellipsis: true },
   { title: '类型', key: 'eventType', width: 110 },
   { title: '出演艺人', key: 'performerName', width: 120 },
+  { title: '风格', key: 'genre', width: 150 },
   { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 170 },
   { title: '开票阶段', key: 'ticketStage', width: 90 },
   { title: '状态', key: 'status', width: 80 },
@@ -190,6 +210,7 @@ const loading = ref(false)
 const list = ref<EventItem[]>([])
 const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
 const performerOptions = ref<any[]>([])
+const styleOptions = ref<any[]>([])
 
 async function fetchList() {
   loading.value = true
@@ -213,6 +234,15 @@ async function fetchPerformerOptions() {
   }
 }
 
+async function fetchStyleOptions() {
+  try {
+    const res = await styleApi.page({ current: 1, size: 100 })
+    styleOptions.value = res?.records || []
+  } catch {
+    // 忽略错误
+  }
+}
+
 function onTableChange(pag: any) {
   pagination.current = pag.current
   pagination.pageSize = pag.pageSize
@@ -231,6 +261,7 @@ const formData = reactive({
   posterUrl: '',
   performerId: null as number | null,
   ticketStage: 1,
+  styleIds: [] as number[],
 })
 
 function openForm(record?: EventItem) {
@@ -243,6 +274,7 @@ function openForm(record?: EventItem) {
     formData.posterUrl = record.posterUrl
     formData.performerId = (record as any).performerId || null
     formData.ticketStage = record.ticketStage || 1
+    formData.styleIds = (record as any).styleIds || []
   } else {
     editingId.value = null
     formData.title = ''
@@ -252,6 +284,7 @@ function openForm(record?: EventItem) {
     formData.posterUrl = ''
     formData.performerId = null
     formData.ticketStage = 1
+    formData.styleIds = []
   }
   formVisible.value = true
 }
@@ -368,5 +401,5 @@ async function onAction(key: string, record: EventItem) {
 onMounted(() => {
   fetchList()
   fetchPerformerOptions()
-})
-</script>
+  fetchStyleOptions()
+})</script>
