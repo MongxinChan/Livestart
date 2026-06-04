@@ -78,6 +78,19 @@ CREATE TABLE `t_performer_style_relation` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='艺人风格关联多对多中间表';
 
 -- ----------------------------
+-- Table structure for t_event_style_relation
+-- 演出与风格关联多对多中间表
+-- ----------------------------
+DROP TABLE IF EXISTS `t_event_style_relation`;
+CREATE TABLE `t_event_style_relation` (
+  `event_id` bigint NOT NULL COMMENT '演出ID',
+  `style_id` bigint NOT NULL COMMENT '风格ID',
+  PRIMARY KEY (`event_id`,`style_id`),
+  KEY `idx_style_event` (`style_id`,`event_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出风格关联多对多中间表';
+
+
+-- ----------------------------
 -- Table structure for t_event
 -- 演出基础信息表
 -- ----------------------------
