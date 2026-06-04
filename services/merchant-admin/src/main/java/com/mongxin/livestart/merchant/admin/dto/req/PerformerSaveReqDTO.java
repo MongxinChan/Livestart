@@ -37,4 +37,7 @@ public class PerformerSaveReqDTO {
 
     @Schema(description = "音乐风格流派名称（前端字段名映射，自动隐式查表创建）")
     private String genre;
+
+    @Schema(description = "多选关联的风格ID集合")
+    private java.util.List<Long> styleIds;
 }

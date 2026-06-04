@@ -49,5 +49,8 @@ public class EventSaveReqDTO {
 
     @Schema(description = "演出售票阶段 1:一开 2:二开", example = "1")
     private Integer ticketStage;
+
+    @Schema(description = "多选关联的风格ID集合")
+    private java.util.List<Long> styleIds;
 }
 

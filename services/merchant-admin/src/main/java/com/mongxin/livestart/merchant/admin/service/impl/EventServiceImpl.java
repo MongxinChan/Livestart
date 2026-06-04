@@ -1,6 +1,7 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
@@ -12,7 +13,11 @@ import com.mongxin.livestart.merchant.admin.common.constant.MerchantAdminRedisCo
 import com.mongxin.livestart.merchant.admin.common.enums.EventStatusEnum;
 import com.mongxin.livestart.merchant.admin.dao.entity.EventConfigDO;
 import com.mongxin.livestart.merchant.admin.dao.entity.EventDO;
+import com.mongxin.livestart.merchant.admin.dao.entity.EventStyleRelationDO;
+import com.mongxin.livestart.merchant.admin.dao.entity.StyleDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.EventMapper;
+import com.mongxin.livestart.merchant.admin.dao.mapper.EventStyleRelationMapper;
+import com.mongxin.livestart.merchant.admin.dao.mapper.StyleMapper;
 import com.mongxin.livestart.merchant.admin.dto.req.EventPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventSaveReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventUpdateReqDTO;
@@ -36,6 +41,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.mongxin.livestart.merchant.admin.common.enums.ChainBizMarkEnum.MERCHANT_ADMIN_CREATE_EVENT_KEY;
 
@@ -51,6 +57,8 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
     private final StringRedisTemplate stringRedisTemplate;
     private final MerchantAdminChainContext merchantAdminChainContext;
     private final JdbcTemplate jdbcTemplate;
+    private final EventStyleRelationMapper eventStyleRelationMapper;
+    private final StyleMapper styleMapper;
 
     /**
      * 启动时自动用 JDBC 校验并生成多对多关联单表 t_event_performer，规避修改 ShardingSphere 广播表
@@ -106,6 +114,16 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         if (requestParam.getPerformerId() != null) {
             jdbcTemplate.update("INSERT IGNORE INTO t_event_performer (event_id, performer_id) VALUES (?, ?)",
                     eventDO.getId(), requestParam.getPerformerId());
+        }
+
+        // 级联持久化音乐风格关联
+        if (CollUtil.isNotEmpty(requestParam.getStyleIds())) {
+            for (Long styleId : requestParam.getStyleIds()) {
+                eventStyleRelationMapper.insert(EventStyleRelationDO.builder()
+                        .eventId(eventDO.getId())
+                        .styleId(styleId)
+                        .build());
+            }
         }
 
         // 级联持久化开票阶段
@@ -169,6 +187,26 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             } catch (Exception e) {
                 log.error("级联查询演出开票阶段失败, eventId={}", each.getId(), e);
             }
+
+            // 级联查询获取演出风格
+            try {
+                List<EventStyleRelationDO> relations = eventStyleRelationMapper.selectList(
+                        Wrappers.lambdaQuery(EventStyleRelationDO.class)
+                                .eq(EventStyleRelationDO::getEventId, each.getId())
+                );
+                List<Long> styleIds = relations.stream().map(EventStyleRelationDO::getStyleId).collect(Collectors.toList());
+                dto.setStyleIds(styleIds);
+                if (CollUtil.isNotEmpty(styleIds)) {
+                    List<StyleDO> styles = styleMapper.selectBatchIds(styleIds);
+                    if (CollUtil.isNotEmpty(styles)) {
+                        String genreNames = styles.stream().map(StyleDO::getName).collect(Collectors.joining(","));
+                        dto.setGenre(genreNames);
+                    }
+                }
+            } catch (Exception e) {
+                log.error("级联查询演出风格失败, eventId={}", each.getId(), e);
+            }
+
             return dto;
         });
     }
@@ -209,6 +247,26 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         } catch (Exception e) {
             log.error("级联查询详情演出开票阶段失败, eventId={}", id, e);
         }
+
+        // 级联查询获取演出风格
+        try {
+            List<EventStyleRelationDO> relations = eventStyleRelationMapper.selectList(
+                    Wrappers.lambdaQuery(EventStyleRelationDO.class)
+                            .eq(EventStyleRelationDO::getEventId, id)
+            );
+            List<Long> styleIds = relations.stream().map(EventStyleRelationDO::getStyleId).collect(Collectors.toList());
+            dto.setStyleIds(styleIds);
+            if (CollUtil.isNotEmpty(styleIds)) {
+                List<StyleDO> styles = styleMapper.selectBatchIds(styleIds);
+                if (CollUtil.isNotEmpty(styles)) {
+                    String genreNames = styles.stream().map(StyleDO::getName).collect(Collectors.joining(","));
+                    dto.setGenre(genreNames);
+                }
+            }
+        } catch (Exception e) {
+            log.error("级联查询详情演出风格失败, eventId={}", id, e);
+        }
+
         return dto;
     }
 
@@ -244,6 +302,20 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
                     requestParam.getId(), requestParam.getTicketStage());
         }
 
+        // 级联更新音乐风格关联（先删后增）
+        eventStyleRelationMapper.delete(
+                Wrappers.lambdaQuery(EventStyleRelationDO.class)
+                        .eq(EventStyleRelationDO::getEventId, requestParam.getId())
+        );
+        if (CollUtil.isNotEmpty(requestParam.getStyleIds())) {
+            for (Long styleId : requestParam.getStyleIds()) {
+                eventStyleRelationMapper.insert(EventStyleRelationDO.builder()
+                        .eventId(requestParam.getId())
+                        .styleId(styleId)
+                        .build());
+            }
+        }
+
         // 重新捞取最新全量数据刷新缓存
         EventDO latestEvent = getById(requestParam.getId());
         EventConfigDO latestConfig = eventConfigService.getByEventId(requestParam.getId());
@@ -277,6 +349,12 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         // 级联删除开票阶段关系表数据
         jdbcTemplate.update("DELETE FROM t_event_ticket_stage WHERE event_id = ?", id);
+
+        // 级联清除风格关联中间表数据
+        eventStyleRelationMapper.delete(
+                Wrappers.lambdaQuery(EventStyleRelationDO.class)
+                        .eq(EventStyleRelationDO::getEventId, id)
+        );
 
         // 同步清除 Redis 缓存
         try {

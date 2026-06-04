@@ -44,4 +44,7 @@ public class PerformerQueryRespDTO {
 
     @Schema(description = "音乐风格流派名称（前端表单渲染映射）")
     private String genre;
+
+    @Schema(description = "多选关联的风格ID集合")
+    private java.util.List<Long> styleIds;
 }

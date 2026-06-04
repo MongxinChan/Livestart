@@ -1,6 +1,7 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
@@ -9,8 +10,10 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.merchant.admin.dao.entity.PerformerDO;
 import com.mongxin.livestart.merchant.admin.dao.entity.StyleDO;
+import com.mongxin.livestart.merchant.admin.dao.entity.PerformerStyleRelationDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.PerformerMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.StyleMapper;
+import com.mongxin.livestart.merchant.admin.dao.mapper.PerformerStyleRelationMapper;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerSaveReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerPageQueryRespDTO;
@@ -18,6 +21,10 @@ import com.mongxin.livestart.merchant.admin.dto.resp.PerformerQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.PerformerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 艺人/乐队服务实现层
@@ -27,6 +34,9 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
 
     @Autowired
     private StyleMapper styleMapper;
+
+    @Autowired
+    private PerformerStyleRelationMapper performerStyleRelationMapper;
 
     @Override
     public void createPerformer(PerformerSaveReqDTO requestParam) {
@@ -45,14 +55,31 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
         performerDO.setAvatar(finalAvatar);
         performerDO.setBio(finalBio);
 
-        // 风格关联处理（自动隐式匹配与查表注册）
-        if (StrUtil.isNotBlank(requestParam.getGenre())) {
+        // 风格关联处理（优先采用前端传过来的 styleIds 列表，如果没有则尝试原来的单风格）
+        if (CollUtil.isNotEmpty(requestParam.getStyleIds())) {
+            performerDO.setStyleId(requestParam.getStyleIds().get(0));
+        } else if (StrUtil.isNotBlank(requestParam.getGenre())) {
             performerDO.setStyleId(getOrCreateStyleId(requestParam.getGenre()));
         } else if (requestParam.getStyleId() != null) {
             performerDO.setStyleId(requestParam.getStyleId());
         }
 
         save(performerDO);
+
+        // 持久化多对多关联中间表
+        if (CollUtil.isNotEmpty(requestParam.getStyleIds())) {
+            for (Long styleId : requestParam.getStyleIds()) {
+                performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
+                        .performerId(performerDO.getId())
+                        .styleId(styleId)
+                        .build());
+            }
+        } else if (performerDO.getStyleId() != null) {
+            performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
+                    .performerId(performerDO.getId())
+                    .styleId(performerDO.getStyleId())
+                    .build());
+        }
     }
 
     @Override
@@ -74,11 +101,31 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
             dto.setAvatarUrl(each.getAvatar());
             dto.setDescription(each.getBio());
 
-            // 查表动态装配风格名称
-            if (each.getStyleId() != null) {
-                StyleDO style = styleMapper.selectById(each.getStyleId());
-                if (style != null) {
-                    dto.setGenre(style.getName());
+            // 查中间表获取多风格ID
+            List<PerformerStyleRelationDO> relations = performerStyleRelationMapper.selectList(
+                    Wrappers.lambdaQuery(PerformerStyleRelationDO.class)
+                            .eq(PerformerStyleRelationDO::getPerformerId, each.getId())
+            );
+            List<Long> styleIds = relations.stream().map(PerformerStyleRelationDO::getStyleId).collect(Collectors.toList());
+            
+            // 存量数据平滑自动迁移
+            if (CollUtil.isEmpty(styleIds) && each.getStyleId() != null) {
+                styleIds = new ArrayList<>();
+                styleIds.add(each.getStyleId());
+                performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
+                        .performerId(each.getId())
+                        .styleId(each.getStyleId())
+                        .build());
+            }
+
+            dto.setStyleIds(styleIds);
+
+            // 动态拼接多风格名称
+            if (CollUtil.isNotEmpty(styleIds)) {
+                List<StyleDO> styles = styleMapper.selectBatchIds(styleIds);
+                if (CollUtil.isNotEmpty(styles)) {
+                    String genreNames = styles.stream().map(StyleDO::getName).collect(Collectors.joining(","));
+                    dto.setGenre(genreNames);
                 }
             }
             return dto;
@@ -97,11 +144,31 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
         dto.setAvatarUrl(performerDO.getAvatar());
         dto.setDescription(performerDO.getBio());
 
-        // 查表装配风格名称
-        if (performerDO.getStyleId() != null) {
-            StyleDO style = styleMapper.selectById(performerDO.getStyleId());
-            if (style != null) {
-                dto.setGenre(style.getName());
+        // 查中间表获取多风格ID
+        List<PerformerStyleRelationDO> relations = performerStyleRelationMapper.selectList(
+                Wrappers.lambdaQuery(PerformerStyleRelationDO.class)
+                        .eq(PerformerStyleRelationDO::getPerformerId, performerDO.getId())
+        );
+        List<Long> styleIds = relations.stream().map(PerformerStyleRelationDO::getStyleId).collect(Collectors.toList());
+
+        // 存量数据平滑自动迁移
+        if (CollUtil.isEmpty(styleIds) && performerDO.getStyleId() != null) {
+            styleIds = new ArrayList<>();
+            styleIds.add(performerDO.getStyleId());
+            performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
+                    .performerId(performerDO.getId())
+                    .styleId(performerDO.getStyleId())
+                    .build());
+        }
+
+        dto.setStyleIds(styleIds);
+
+        // 动态拼接多风格名称
+        if (CollUtil.isNotEmpty(styleIds)) {
+            List<StyleDO> styles = styleMapper.selectBatchIds(styleIds);
+            if (CollUtil.isNotEmpty(styles)) {
+                String genreNames = styles.stream().map(StyleDO::getName).collect(Collectors.joining(","));
+                dto.setGenre(genreNames);
             }
         }
         return dto;
@@ -122,19 +189,46 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
         performerDO.setAvatar(finalAvatar);
         performerDO.setBio(finalBio);
 
-        // 风格关联处理（自动隐式匹配与查表注册）
-        if (StrUtil.isNotBlank(requestParam.getGenre())) {
+        // 风格关联处理（优先采用多风格ID）
+        if (CollUtil.isNotEmpty(requestParam.getStyleIds())) {
+            performerDO.setStyleId(requestParam.getStyleIds().get(0));
+        } else if (StrUtil.isNotBlank(requestParam.getGenre())) {
             performerDO.setStyleId(getOrCreateStyleId(requestParam.getGenre()));
         } else {
             performerDO.setStyleId(requestParam.getStyleId());
         }
 
         updateById(performerDO);
+
+        // 更新多风格中间表（先删后增）
+        performerStyleRelationMapper.delete(
+                Wrappers.lambdaQuery(PerformerStyleRelationDO.class)
+                        .eq(PerformerStyleRelationDO::getPerformerId, performerDO.getId())
+        );
+
+        if (CollUtil.isNotEmpty(requestParam.getStyleIds())) {
+            for (Long styleId : requestParam.getStyleIds()) {
+                performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
+                        .performerId(performerDO.getId())
+                        .styleId(styleId)
+                        .build());
+            }
+        } else if (performerDO.getStyleId() != null) {
+            performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
+                    .performerId(performerDO.getId())
+                    .styleId(performerDO.getStyleId())
+                    .build());
+        }
     }
 
     @Override
     public void deletePerformer(Long id) {
         removeById(id);
+        // 级联清除多风格中间表记录
+        performerStyleRelationMapper.delete(
+                Wrappers.lambdaQuery(PerformerStyleRelationDO.class)
+                        .eq(PerformerStyleRelationDO::getPerformerId, id)
+        );
     }
 
     /**

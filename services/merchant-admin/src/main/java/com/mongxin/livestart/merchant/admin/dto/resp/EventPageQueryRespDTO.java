@@ -43,5 +43,11 @@ public class EventPageQueryRespDTO {
 
     @Schema(description = "演出售票阶段 1:一开 2:二开")
     private Integer ticketStage;
+
+    @Schema(description = "多选关联的风格ID集合")
+    private java.util.List<Long> styleIds;
+
+    @Schema(description = "演出关联的所有音乐风格名称（用逗号隔开，以便回显与展示）")
+    private String genre;
 }
 
