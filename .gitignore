@@ -51,4 +51,6 @@ build/
 ### Custom Ignores ###
 *.diff
 *.tsbuildinfo
-
+.gemini_scratch/
+*.pdf
+*.bat

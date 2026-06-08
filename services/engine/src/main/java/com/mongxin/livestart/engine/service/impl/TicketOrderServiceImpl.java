@@ -33,10 +33,15 @@ import com.mongxin.livestart.engine.mq.producer.OrderDelayCloseProducer;
 import com.mongxin.livestart.engine.mq.producer.OrderPaySuccessProducer;
 import com.mongxin.livestart.engine.mq.producer.TicketOrderCreateProducer;
 import cn.hutool.crypto.SecureUtil;
+import com.mongxin.livestart.engine.config.AlipayConfig;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.exception.ServiceException;
+import com.alipay.api.AlipayClient;
+import com.alipay.api.DefaultAlipayClient;
+import com.alipay.api.request.AlipayTradePagePayRequest;
+import com.alibaba.fastjson2.JSONObject;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.client.producer.SendResult;
@@ -73,6 +78,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private final OrderDelayCloseProducer orderDelayCloseProducer;
     private final OrderPaySuccessProducer orderPaySuccessProducer;
     private final TicketOrderCreateProducer ticketOrderCreateProducer;
+    private final AlipayConfig alipayConfig;
 
     private static final String STOCK_DECREMENT_LUA_PATH = "lua/stock_decrement.lua";
     /** 订单超时关单延时（15分钟，单位 ms） */
@@ -268,6 +274,116 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         }
 
         log.info("[支付回调] 支付成功出票，orderNo={}", requestParam.getOrderNo());
+    }
+
+    @Override
+    public String payWithAlipay(String orderNo) {
+        String userId = UserContext.getUserId();
+        if (StrUtil.isBlank(userId)) {
+            throw new ClientException("用户未登录");
+        }
+
+        // 查询订单（按 orderNo + userId 走分片路由）
+        OrderDO order = getOrderByNo(orderNo, Long.parseLong(userId));
+        if (order == null) {
+            throw new ClientException("订单不存在");
+        }
+        if (order.getStatus() != OrderStatusEnum.PENDING_PAYMENT.getCode()) {
+            throw new ClientException("订单状态异常，无法发起支付");
+        }
+
+        try {
+            // 初始化 AlipayClient
+            AlipayClient client = new DefaultAlipayClient(
+                    alipayConfig.getGatewayUrl(),
+                    alipayConfig.getAppId(),
+                    alipayConfig.getPrivateKey(),
+                    "json",
+                    alipayConfig.getCharset(),
+                    alipayConfig.getPublicKey(),
+                    alipayConfig.getSignType()
+            );
+
+            // 构造 PagePay 请求
+            AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
+            request.setNotifyUrl(alipayConfig.getNotifyUrl());
+            request.setReturnUrl(alipayConfig.getReturnUrl());
+
+            // 构造请求内容
+            JSONObject biz = new JSONObject();
+            biz.put("out_trade_no", order.getOrderNo());
+            biz.put("total_amount", order.getTotalAmount().toString());
+            biz.put("subject", "LiveStart 统一票务结算 - " + order.getOrderNo());
+            biz.put("product_code", "FAST_INSTANT_TRADE_PAY");
+            request.setBizContent(biz.toString());
+
+            // 执行并获取 HTML Form 表单
+            return client.pageExecute(request).getBody();
+        } catch (Exception ex) {
+            log.error("[支付宝支付] 发起支付异常，orderNo={}", orderNo, ex);
+            throw new ServiceException("支付宝支付接口调用失败：" + ex.getMessage());
+        }
+    }
+
+    @Override
+    public void paySuccess(String orderNo, String tradeNo) {
+        // 由于是异步回调，没有 userId header，直接全路由查询
+        LambdaQueryWrapper<OrderDO> query = Wrappers.lambdaQuery(OrderDO.class)
+                .eq(OrderDO::getOrderNo, orderNo);
+        OrderDO order = orderMapper.selectOne(query);
+
+        if (order == null) {
+            log.error("[支付成功通知] 订单不存在，orderNo={}", orderNo);
+            throw new ClientException("订单不存在");
+        }
+
+        // 幂等处理：若已支付则直接返回成功
+        if (order.getStatus() == OrderStatusEnum.PAID.getCode()) {
+            log.info("[支付成功通知] 订单已是支付成功状态，无需重复处理，orderNo={}", orderNo);
+            return;
+        }
+
+        if (order.getStatus() != OrderStatusEnum.PENDING_PAYMENT.getCode()) {
+            log.warn("[支付成功通知] 订单非待支付状态，无法处理支付，orderNo={}，status={}", orderNo, order.getStatus());
+            throw new ClientException("订单状态异常，无法处理支付");
+        }
+
+        // CAS 更新为已支付
+        transactionTemplate.executeWithoutResult(status -> {
+            try {
+                int affected = orderMapper.updateOrderStatus(
+                        order.getId(), order.getUserId(),
+                        OrderStatusEnum.PAID.getCode(),
+                        OrderStatusEnum.PENDING_PAYMENT.getCode()
+                );
+                if (!SqlHelper.retBool(affected)) {
+                    throw new ServiceException("支付通知处理失败（状态已变更）");
+                }
+                // 更新支付时间
+                OrderDO updateOrder = OrderDO.builder()
+                        .id(order.getId())
+                        .userId(order.getUserId())
+                        .payTime(new Date())
+                        .build();
+                orderMapper.updateById(updateOrder);
+            } catch (Exception ex) {
+                status.setRollbackOnly();
+                throw ex;
+            }
+        });
+
+        // 发送支付成功消息（出票后置处理）
+        OrderPaySuccessEvent payEvent = OrderPaySuccessEvent.builder()
+                .orderNo(orderNo)
+                .userId(order.getUserId())
+                .tradeNo(tradeNo)
+                .build();
+        SendResult sendResult = orderPaySuccessProducer.sendMessage(payEvent);
+        if (!"SEND_OK".equals(sendResult.getSendStatus().name())) {
+            log.warn("[支付成功通知] 支付成功消息发送失败，orderNo={}", orderNo);
+        }
+
+        log.info("[支付成功通知] 支付处理成功并已投递出票事件，orderNo={}", orderNo);
     }
 
     // ============================== 3. 取消订单 ==============================

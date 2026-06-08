@@ -60,3 +60,14 @@ livestart:
   engine:
     # 订单超时关单时间（分钟）
     order-close-delay-minutes: 15
+
+# 支付宝沙箱环境配置项
+alipay:
+  app-id: 9021111111111111
+  private-key: ${ALIPAY_PRIVATE_KEY:xxx}
+  public-key: ${ALIPAY_PUBLIC_KEY:xxx}
+  gateway-url: https://openapi.alipaydev.com/gateway.do
+  notify-url: ${ALIPAY_NOTIFY_URL:http://127.0.0.1:8004/api/engine/order/pay/alipay/notify}
+  return-url: ${ALIPAY_RETURN_URL:http://localhost:3000}
+  charset: UTF-8
+  sign-type: RSA2

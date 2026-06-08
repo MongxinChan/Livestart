@@ -443,6 +443,27 @@ async function confirmMockPay() {
     setTimeout(() => osc.stop(), 180)
   } catch (_) { /* 忽略音频错误 */ }
 
+  // 支付宝真实/联调支付跳转
+  if (payMethod.value === 'alipay' && !apiState.isMock) {
+    try {
+      const payFormHtml = await request<string>('/api/engine/order/pay/alipay?orderNo=' + payingOrder.value.orderNo)
+      const div = document.createElement('div')
+      div.innerHTML = payFormHtml
+      document.body.appendChild(div)
+      const form = div.querySelector('form')
+      if (form) {
+        form.submit()
+      } else {
+        message.error('支付宝表单解析失败')
+      }
+      return
+    } catch (err: any) {
+      message.error('发起支付宝支付失败: ' + err.message)
+      return
+    }
+  }
+
+  // 微信或 Mock 模式下的支付流程
   try {
     await request('/api/engine/order/pay-callback', {
       method: 'POST',

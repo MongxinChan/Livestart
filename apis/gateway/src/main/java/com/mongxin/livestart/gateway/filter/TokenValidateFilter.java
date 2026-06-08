@@ -60,7 +60,9 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
             "/api/live-start/admin/v1/user", // 用户注册 (POST)
             "/api/live-start/admin/v1/has-phone/**", // 手机号查重
             "/api/live-start/admin/v1/user/check-login", // 登录态查询（内部用）
-            "/api/merchant-admin/**" // 商户后台 MVP 阶段暂不鉴权
+            "/api/merchant-admin/**", // 商户后台 MVP 阶段暂不鉴权
+            "/api/live-start/engine/order/pay/alipay/notify", // 支付宝回调(网关路径)
+            "/api/engine/order/pay/alipay/notify" // 支付宝回调(直接路径)
     );
 
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();

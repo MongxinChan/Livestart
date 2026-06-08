@@ -18,6 +18,11 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import com.mongxin.livestart.engine.config.AlipayConfig;
+import com.alipay.api.internal.util.AlipaySignature;
+import jakarta.servlet.http.HttpServletRequest;
+import java.util.Map;
+import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -36,6 +41,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class TicketOrderController {
 
     private final TicketOrderService ticketOrderService;
+    private final AlipayConfig alipayConfig;
 
     /**
      * 获取动态抢票 URL Path Token
@@ -68,6 +74,58 @@ public class TicketOrderController {
     public Result<Void> payCallback(@Valid @RequestBody TicketOrderPayCallbackReqDTO requestParam) {
         ticketOrderService.payCallback(requestParam);
         return Results.success();
+    }
+
+    /**
+     * 发起支付宝沙箱支付
+     */
+    @Operation(summary = "发起支付宝沙箱支付", description = "获取渲染后的支付宝支付 HTML Form 表单")
+    @GetMapping("/pay/alipay")
+    public Result<String> payWithAlipay(@Parameter(description = "订单流水号", required = true) String orderNo) {
+        return Results.success(ticketOrderService.payWithAlipay(orderNo));
+    }
+
+    /**
+     * 支付宝异步回调通知
+     */
+    @Operation(summary = "支付宝异步回调通知", description = "接收支付宝异步支付结果通知")
+    @PostMapping("/pay/alipay/notify")
+    public String alipayNotify(HttpServletRequest request) {
+        Map<String, String> params = new HashMap<>();
+        Map<String, String[]> requestParams = request.getParameterMap();
+        for (String name : requestParams.keySet()) {
+            String[] values = requestParams.get(name);
+            String valueStr = "";
+            for (int i = 0; i < values.length; i++) {
+                valueStr = (i == values.length - 1) ? valueStr + values[i] : valueStr + values[i] + ",";
+            }
+            params.put(name, valueStr);
+        }
+
+        try {
+            // 验签
+            boolean signVerified = AlipaySignature.rsaCheckV1(
+                    params,
+                    alipayConfig.getPublicKey(),
+                    alipayConfig.getCharset(),
+                    alipayConfig.getSignType()
+            );
+
+            if (signVerified) {
+                String orderNo = params.get("out_trade_no");
+                String tradeNo = params.get("trade_no");
+                String tradeStatus = params.get("trade_status");
+
+                if ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus)) {
+                    ticketOrderService.paySuccess(orderNo, tradeNo);
+                }
+                return "success";
+            } else {
+                return "fail";
+            }
+        } catch (Exception e) {
+            return "fail";
+        }
     }
 
     /**

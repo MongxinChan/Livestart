@@ -39,6 +39,22 @@ public interface TicketOrderService {
     void payCallback(TicketOrderPayCallbackReqDTO requestParam);
 
     /**
+     * 发起支付宝沙箱支付
+     *
+     * @param orderNo 订单流水号
+     * @return 支付宝返回的支付 HTML 表单
+     */
+    String payWithAlipay(String orderNo);
+
+    /**
+     * 支付宝异步回调支付成功处理
+     *
+     * @param orderNo 订单流水号
+     * @param tradeNo 支付宝交易号
+     */
+    void paySuccess(String orderNo, String tradeNo);
+
+    /**
      * 取消订单
      *
      * @param requestParam 取消请求参数
