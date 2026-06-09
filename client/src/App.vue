@@ -21,7 +21,7 @@
           <!-- 右侧控制 -->
           <a-space :size="12">
             <!-- Mock/网关开关 -->
-            <a-space :size="6" align="center">
+            <a-space v-if="isMockEnv" :size="6" align="center">
               <a-badge :status="apiState.isMock ? 'default' : 'success'" />
               <span style="font-size: 12px; color: var(--ls-text-secondary)">
                 {{ apiState.isMock ? '离线 Mock' : '网关联调' }}
@@ -66,6 +66,10 @@
                   </a-space>
                   <template #overlay>
                     <a-menu>
+                      <a-menu-item key="visitor" @click="showVisitorModal = true">
+                        <template #icon><TeamOutlined /></template>
+                        常用观演人
+                      </a-menu-item>
                       <a-menu-item key="logout" @click="handleLogout">
                         <template #icon><LogoutOutlined /></template>
                         退出登录
@@ -94,13 +98,12 @@
           v-else-if="activeView === 'cabin'"
           :selected-event="selectedEvent"
           @back-to-square="navigateTo('square')"
+          @go-to-orders="navigateTo('orders')"
         />
-        <TicketOrderCabin
+        <MyTickets
           v-else-if="activeView === 'orders'"
-          :selected-event="null"
           @back-to-square="navigateTo('square')"
         />
-        <MerchantSettlement v-else-if="activeView === 'settlement'" />
       </a-layout-content>
 
       <!-- ========== 登录/注册快捷通道模态框 ========== -->
@@ -139,6 +142,9 @@
           </a-button>
         </a-form>
       </a-modal>
+
+      <!-- ========== 常用观演人管理模态框 ========== -->
+      <VisitorManagerModal v-model:open="showVisitorModal" />
     </a-layout>
   </a-config-provider>
 </template>
@@ -152,12 +158,16 @@ import {
   UserOutlined,
   MobileOutlined,
   SafetyOutlined,
+  TeamOutlined,
 } from '@ant-design/icons-vue'
 import { apiState } from './composables/useRequest'
 import { useApp } from './composables/useApp'
 import EventSquare from './components/EventSquare.vue'
 import TicketOrderCabin from './components/TicketOrderCabin.vue'
-import MerchantSettlement from './components/MerchantSettlement.vue'
+import MyTickets from './components/MyTickets.vue'
+import VisitorManagerModal from './components/VisitorManagerModal.vue'
+
+const isMockEnv = import.meta.env.VITE_USE_MOCK === 'true'
 
 const {
   activeTheme,
@@ -173,6 +183,7 @@ const {
   navigateTo,
   selectEventForCabin,
   showAuthModal,
+  showVisitorModal,
   authLoading,
   countdown,
   authForm,

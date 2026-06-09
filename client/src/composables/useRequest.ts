@@ -1,14 +1,30 @@
 import { reactive } from 'vue'
 import type { LiveEvent, HotSearch, Order, SettlementResult } from '@/types'
 
+// 从 LocalStorage 加载缓存的登录状态
+const savedUserId = localStorage.getItem('livestart_user_id') || ''
+const savedToken = localStorage.getItem('livestart_token') || ''
+let savedUser = null
+try {
+  const userStr = localStorage.getItem('livestart_current_user')
+  if (userStr) savedUser = JSON.parse(userStr)
+} catch (_) {}
+
 // ========== 全局 API 状态 ==========
 export const apiState = reactive({
-  isMock: true,
+  isMock: import.meta.env.VITE_USE_MOCK === 'true',
   gatewayUrl: 'http://localhost:8888',
-  userId: '10086',
-  token: 'mock-user-token-9988',
-  currentUser: { username: '陈孟欣 (模拟开发)', realName: '陈孟欣' } as any,
+  userId: savedUserId || (import.meta.env.VITE_USE_MOCK === 'true' ? '10086' : ''),
+  token: savedToken || (import.meta.env.VITE_USE_MOCK === 'true' ? 'mock-user-token-9988' : ''),
+  currentUser: savedUser || (import.meta.env.VITE_USE_MOCK === 'true' ? { username: '陈孟欣 (模拟开发)', realName: '陈孟欣' } : null) as any,
 })
+
+// ========== Mock 观演人 ==========
+export let MOCK_VISITORS = [
+  { id: 201, userId: 10086, realName: '陈孟欣 (开发者)', cardType: 1, cardTypeDesc: '身份证', cardNo: '3301**********1234', mobile: '188****8888' },
+  { id: 202, userId: 10086, realName: '张学友 (模拟人)', cardType: 1, cardTypeDesc: '身份证', cardNo: '4402**********9988', mobile: '199****9999' },
+  { id: 203, userId: 10086, realName: '李四 (模拟人)', cardType: 1, cardTypeDesc: '身份证', cardNo: '1103**********5678', mobile: '177****7777' },
+]
 
 // ========== Mock 数据 ==========
 export const MOCK_EVENTS: LiveEvent[] = [
@@ -19,6 +35,7 @@ export const MOCK_EVENTS: LiveEvent[] = [
     cover: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=600',
     date: '2026-06-25 19:30',
     venue: '上海 Modern Sky LAB',
+    city: '上海市/上海市',
     artist: '万能青年旅店',
     minPrice: 280,
     tags: ['独立摇滚', 'Livehouse', '热卖中'],
@@ -35,6 +52,7 @@ export const MOCK_EVENTS: LiveEvent[] = [
     cover: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=600',
     date: '2026-07-12 19:00',
     venue: '杭州奥体中心体育场 (大莲花)',
+    city: '浙江省/杭州市',
     artist: '周杰伦',
     minPrice: 580,
     tags: ['流行巨星', '体育场', '准点抢票'],
@@ -52,6 +70,7 @@ export const MOCK_EVENTS: LiveEvent[] = [
     cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=600',
     date: '2026-08-08 20:00',
     venue: '深圳 HOU Live',
+    city: '广东省/深圳市',
     artist: '重塑雕像的权利',
     minPrice: 320,
     tags: ['后朋克', '极致美学', '特惠中'],
@@ -67,6 +86,7 @@ export const MOCK_EVENTS: LiveEvent[] = [
     cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=600',
     date: '2026-08-20 19:30',
     venue: '广州大学城体育中心体育场',
+    city: '广东省/广州市',
     artist: '陈奕迅',
     minPrice: 680,
     tags: ['华语金曲', '万人现场', '即将开售'],
@@ -96,7 +116,7 @@ export const MOCK_ORDERS: Order[] = [
     price: 380,
     count: 2,
     totalAmount: 760,
-    status: 1,
+    status: 0,
     statusDesc: '待支付 (剩余14分52秒)',
     createTime: '2026-06-02 10:15:00',
     checkCode: '',
@@ -110,7 +130,7 @@ export const MOCK_ORDERS: Order[] = [
     price: 320,
     count: 1,
     totalAmount: 320,
-    status: 2,
+    status: 1,
     statusDesc: '出票成功 (待核销)',
     createTime: '2026-06-02 09:20:00',
     checkCode: 'RE-TREAD-8888-9999',
@@ -188,7 +208,7 @@ function handleMock(url: string, options: RequestInit = {}): Promise<any> {
           price: sku ? sku.price : 100,
           count: reqData.count,
           totalAmount: (sku ? sku.price : 100) * reqData.count,
-          status: 1,
+          status: 0,
           statusDesc: '待支付 (剩余15分00秒)',
           createTime: new Date().toLocaleString(),
           checkCode: '',
@@ -207,7 +227,7 @@ function handleMock(url: string, options: RequestInit = {}): Promise<any> {
         const reqData = JSON.parse((options.body as string) || '{}')
         const order = MOCK_ORDERS.find(o => o.orderNo === reqData.orderNo)
         if (order) {
-          order.status = 2
+          order.status = 1
           order.statusDesc = '出票成功 (待核销)'
           order.checkCode = 'TICKET-' + Math.floor(1000 + Math.random() * 9000) + '-' + Math.floor(1000 + Math.random() * 9000)
           resolve(true)
@@ -221,7 +241,7 @@ function handleMock(url: string, options: RequestInit = {}): Promise<any> {
         const reqData = JSON.parse((options.body as string) || '{}')
         const order = MOCK_ORDERS.find(o => o.orderNo === reqData.orderNo)
         if (order) {
-          order.status = 3
+          order.status = 2
           order.statusDesc = '已取消 (库存已自动安全归还)'
           const allSkus = MOCK_EVENTS.flatMap(e => e.skus)
           const sku = allSkus.find(s => s.id === order.skuId)
@@ -237,7 +257,7 @@ function handleMock(url: string, options: RequestInit = {}): Promise<any> {
         const reqData = JSON.parse((options.body as string) || '{}')
         const order = MOCK_ORDERS.find(o => o.orderNo === reqData.orderNo)
         if (order) {
-          order.status = 4
+          order.status = 3
           order.statusDesc = '已退票 (资金与库存已秒级回流)'
           const allSkus = MOCK_EVENTS.flatMap(e => e.skus)
           const sku = allSkus.find(s => s.id === order.skuId)
@@ -285,6 +305,52 @@ function handleMock(url: string, options: RequestInit = {}): Promise<any> {
           settleTime: new Date().toLocaleString(),
           shards,
         } as SettlementResult)
+        return
+      }
+      
+      // 常用观演人列表
+      if (url.includes('/api/live-start/admin/v1/visitor/list')) {
+        resolve(MOCK_VISITORS)
+        return
+      }
+      // 新增常用观演人
+      if (url.includes('/api/live-start/admin/v1/visitor') && options.method === 'POST') {
+        const reqData = JSON.parse((options.body as string) || '{}')
+        const id = Date.now()
+        const rawCard = reqData.cardNo || ''
+        const desensitizedCard = rawCard.length === 18 ? rawCard.replace(/^(\d{4})\d{10}(\d{4})$/, '$1**********$2') : rawCard
+        
+        MOCK_VISITORS.push({
+          id,
+          userId: Number(apiState.userId || 10086),
+          realName: reqData.realName,
+          cardType: reqData.cardType || 1,
+          cardTypeDesc: reqData.cardType === 1 ? '身份证' : '其他证件',
+          cardNo: desensitizedCard,
+          mobile: reqData.mobile || '',
+        })
+        resolve(true)
+        return
+      }
+      // 修改常用观演人
+      if (url.includes('/api/live-start/admin/v1/visitor') && options.method === 'PUT') {
+        const reqData = JSON.parse((options.body as string) || '{}')
+        const visitor = MOCK_VISITORS.find(v => v.id === reqData.id)
+        if (visitor) {
+          if (reqData.realName) visitor.realName = reqData.realName
+          if (reqData.mobile !== undefined) visitor.mobile = reqData.mobile
+          resolve(true)
+        } else {
+          reject(new Error('未找到该常用观演人'))
+        }
+        return
+      }
+      // 删除常用观演人
+      if (url.includes('/api/live-start/admin/v1/visitor/') && options.method === 'DELETE') {
+        const lastSlash = url.lastIndexOf('/')
+        const id = Number(url.substring(lastSlash + 1))
+        MOCK_VISITORS = MOCK_VISITORS.filter(v => v.id !== id)
+        resolve(true)
         return
       }
 

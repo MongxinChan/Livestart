@@ -43,7 +43,6 @@ export function useApp() {
   const navOptions = [
     { value: 'square', label: '演出发现', icon: SearchOutlined },
     { value: 'orders', label: '电子票包', icon: ShoppingOutlined },
-    { value: 'settlement', label: '商户核算', icon: FundOutlined },
   ]
 
   function onNavChange(val: string | number) {
@@ -62,6 +61,7 @@ export function useApp() {
   }
 
   const showAuthModal = ref(false)
+  const showVisitorModal = ref(false)
   const authLoading = ref(false)
   const countdown = ref(0)
   const authForm = reactive({
@@ -124,6 +124,9 @@ export function useApp() {
           realName: '新用户 (' + authForm.phone.substring(7) + ')',
           phone: authForm.phone,
         }
+        localStorage.setItem('livestart_token', apiState.token)
+        localStorage.setItem('livestart_user_id', apiState.userId)
+        localStorage.setItem('livestart_current_user', JSON.stringify(apiState.currentUser))
         message.success('登录成功！')
         showAuthModal.value = false
         authForm.phone = ''
@@ -138,11 +141,14 @@ export function useApp() {
       
       // 更新登录状态
       apiState.token = data.token
+      localStorage.setItem('livestart_token', data.token)
       
       // 拉取用户信息
       const userRes = await request(`/api/live-start/admin/v1/user/${authForm.phone}`)
       apiState.userId = String(userRes.id)
       apiState.currentUser = userRes
+      localStorage.setItem('livestart_user_id', String(userRes.id))
+      localStorage.setItem('livestart_current_user', JSON.stringify(userRes))
 
       message.success('验证成功，登录就绪！')
       showAuthModal.value = false
@@ -160,9 +166,17 @@ export function useApp() {
 
   // 退出登录
   async function handleLogout() {
+    if (!apiState.isMock && apiState.currentUser) {
+      try {
+        await request(`/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}&token=${apiState.token}`, { method: 'DELETE' })
+      } catch (_) {}
+    }
     apiState.userId = ''
     apiState.token = ''
     apiState.currentUser = null
+    localStorage.removeItem('livestart_token')
+    localStorage.removeItem('livestart_user_id')
+    localStorage.removeItem('livestart_current_user')
     message.success('已安全退出登录态')
     window.location.reload()
   }
@@ -192,6 +206,7 @@ export function useApp() {
     navigateTo,
     selectEventForCabin,
     showAuthModal,
+    showVisitorModal,
     authLoading,
     countdown,
     authForm,

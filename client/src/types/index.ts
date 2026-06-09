@@ -15,6 +15,7 @@ export interface LiveEvent {
   cover: string
   date: string
   venue: string
+  city?: string
   artist: string
   minPrice: number
   tags: string[]
@@ -29,8 +30,8 @@ export interface HotSearch {
   score: number
 }
 
-/** 订单状态：1待支付 2已支付 3已取消 4已退票 */
-export type OrderStatus = 1 | 2 | 3 | 4
+/** 订单状态：0待支付 1已支付 2已取消 3已退票 */
+export type OrderStatus = 0 | 1 | 2 | 3
 
 /** 订单 */
 export interface Order {
