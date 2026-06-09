@@ -293,3 +293,129 @@ body {
 .event-cover-wrap:hover img {
   transform: scale(1.08);
 }
+
+/* --- 统一分类与城市筛选胶囊面板 --- */
+.filters-panel {
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.015);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+  backdrop-filter: blur(8px);
+}
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.filter-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ls-text-secondary);
+  min-width: 50px;
+}
+.filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.filter-tag {
+  font-size: 12px;
+  padding: 4px 14px;
+  border-radius: 20px;
+  cursor: pointer;
+  color: var(--ls-text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.25s ease;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.filter-tag:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--ls-text-primary);
+  transform: translateY(-1px);
+}
+.filter-tag.active {
+  background: var(--ant-color-primary) !important;
+  color: #fff !important;
+  border-color: var(--ant-color-primary) !important;
+  box-shadow: 0 2px 10px rgba(var(--ls-accent-rgb), 0.35);
+}
+
+/* --- 压测面板指标卡片 --- */
+.stress-metric-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 3px solid;
+  border-radius: 4px;
+}
+
+/* --- 电子票包特有拟物毛玻璃门票 --- */
+.my-tickets-view .ticket-card {
+  display: flex;
+  background: var(--ls-glass-bg);
+  border: 1px solid var(--ls-glass-border);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: var(--ls-glass-shadow);
+  margin: 10px 0;
+}
+.my-tickets-view .ticket-left {
+  flex: 1;
+  padding: 16px;
+  border-right: 1px dashed rgba(var(--ls-accent-rgb), 0.2);
+  position: relative;
+}
+.my-tickets-view .ticket-left::after {
+  content: '';
+  position: absolute;
+  right: -8px;
+  top: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--ls-bg-primary);
+  border-radius: 50%;
+}
+.my-tickets-view .ticket-left::before {
+  content: '';
+  position: absolute;
+  right: -8px;
+  bottom: -8px;
+  width: 16px;
+  height: 16px;
+  background: var(--ls-bg-primary);
+  border-radius: 50%;
+}
+.my-tickets-view .ticket-right {
+  width: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--ls-accent-rgb), 0.03);
+  padding: 12px;
+  position: relative;
+}
+.my-tickets-view .stamp-used {
+  border: 2px solid var(--ls-text-secondary);
+  color: var(--ls-text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  text-transform: uppercase;
+  transform: rotate(-15deg);
+  opacity: 0.8;
+}
+
+/* --- 常用观演人列表样式 --- */
+.visitor-manager-list .ant-list-item {
+  padding: 10px 16px !important;
+  transition: background 0.3s;
+}
+.visitor-manager-list .ant-list-item:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+
+
