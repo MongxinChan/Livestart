@@ -73,7 +73,7 @@ public class EventController {
 
         // 3. 聚合组装
         List<EventListRespDTO> resultList = new ArrayList<>();
-        Map<Long, String> venueCache = new HashMap<>();
+        Map<Long, MerchantVenueRespDTO> venueCache = new HashMap<>();
         for (MerchantEventRespDTO event : events) {
             // 仅返回在售和预售的演出（status = 1:预售 or 2:在售）
             if (event.getStatus() != null && event.getStatus() < 1) {
@@ -121,22 +121,29 @@ public class EventController {
             dto.setSkus(skuList);
             dto.setMinPrice(minPrice);
 
-            // 通过 Feign 获取场馆名并利用 Map 做局部缓存防止 1+N 频繁调用
+            // 通过 Feign 获取场馆名和城市并利用 Map 做局部缓存防止 1+N 频繁调用
             if (event.getVenueId() != null) {
-                String venueName = venueCache.computeIfAbsent(event.getVenueId(), id -> {
+                MerchantVenueRespDTO venueDTO = venueCache.computeIfAbsent(event.getVenueId(), id -> {
                     try {
                         Result<MerchantVenueRespDTO> venueResult = merchantAdminRemoteService.getVenue(id);
                         if (venueResult.isSuccess() && venueResult.getData() != null) {
-                            return venueResult.getData().getName();
+                            return venueResult.getData();
                         }
                     } catch (Exception e) {
-                        log.error("[Engine] Feign 远程调用获取场馆名称失败, venueId={}", id, e);
+                        log.error("[Engine] Feign 远程调用获取场馆详情失败, venueId={}", id, e);
                     }
-                    return "未知场馆";
+                    return null;
                 });
-                dto.setVenue(venueName);
+                if (venueDTO != null) {
+                    dto.setVenue(venueDTO.getName());
+                    dto.setCity(venueDTO.getCity());
+                } else {
+                    dto.setVenue("未知场馆");
+                    dto.setCity("未知城市");
+                }
             } else {
                 dto.setVenue("未知场馆");
+                dto.setCity("未知城市");
             }
 
             resultList.add(dto);

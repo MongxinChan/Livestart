@@ -38,6 +38,7 @@ public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implemen
     public IPage<VenuePageQueryRespDTO> pageQueryVenues(VenuePageQueryReqDTO requestParam) {
         LambdaQueryWrapper<VenueDO> queryWrapper = Wrappers.lambdaQuery(VenueDO.class)
                 .eq(StrUtil.isNotBlank(requestParam.getCity()), VenueDO::getCity, requestParam.getCity())
+                .orderByAsc(VenueDO::getCity)
                 .orderByDesc(VenueDO::getId);
         IPage<VenueDO> selectPage = baseMapper.selectPage(requestParam, queryWrapper);
         return selectPage.convert(each -> BeanUtil.toBean(each, VenuePageQueryRespDTO.class));

@@ -51,5 +51,9 @@ public class EventListRespDTO {
 
     @Schema(description = "演出售票阶段 1:一开 2:二开")
     private Integer ticketStage;
+
+    @Schema(description = "演出城市")
+    private String city;
 }
+
 
