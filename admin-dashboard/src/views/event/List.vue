@@ -402,4 +402,5 @@ onMounted(() => {
   fetchList()
   fetchPerformerOptions()
   fetchStyleOptions()
-})</script>
+})
+</script>

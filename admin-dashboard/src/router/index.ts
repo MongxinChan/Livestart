@@ -3,6 +3,12 @@ import type { RouteRecordRaw } from 'vue-router'
 
 const routes: RouteRecordRaw[] = [
   {
+    path: '/login',
+    name: 'Login',
+    component: () => import('@/views/login/Index.vue'),
+    meta: { title: '管理员登录' },
+  },
+  {
     path: '/',
     component: () => import('@/layouts/AdminLayout.vue'),
     redirect: '/dashboard',
@@ -72,7 +78,21 @@ const router = createRouter({
 
 router.beforeEach((to, _from, next) => {
   document.title = `${(to.meta as any).title || 'Livestart'} - 管理后台`
-  next()
+  
+  const token = localStorage.getItem('admin_token')
+  if (to.path === '/login') {
+    if (token) {
+      next('/dashboard')
+    } else {
+      next()
+    }
+  } else {
+    if (!token) {
+      next('/login')
+    } else {
+      next()
+    }
+  }
 })
 
 export default router

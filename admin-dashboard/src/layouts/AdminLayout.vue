@@ -70,12 +70,12 @@
           </a-badge>
           <a-dropdown>
             <a-space style="cursor: pointer">
-              <a-avatar :size="28" style="background: #1677ff">管</a-avatar>
-              <span style="font-weight: 500">系统管理员</span>
+              <a-avatar :size="28" style="background: #1677ff">{{ adminRealName.charAt(0) }}</a-avatar>
+              <span style="font-weight: 500">{{ adminRealName }}</span>
               <DownOutlined />
             </a-space>
             <template #overlay>
-              <a-menu>
+              <a-menu @click="handleMenuClick">
                 <a-menu-item key="profile">个人设置</a-menu-item>
                 <a-menu-divider />
                 <a-menu-item key="logout">退出登录</a-menu-item>
@@ -103,8 +103,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { message, Modal } from 'ant-design-vue'
 import {
   ThunderboltOutlined,
   DashboardOutlined,
@@ -128,6 +129,39 @@ const currentTitle = computed(() => (route.meta as any).title || '')
 watch(() => route.path, (path) => {
   selectedKeys.value = [path]
 })
+
+const adminRealName = ref('系统管理员')
+
+onMounted(() => {
+  const adminUserStr = localStorage.getItem('admin_user')
+  if (adminUserStr) {
+    try {
+      const adminUser = JSON.parse(adminUserStr)
+      adminRealName.value = adminUser.realName || '系统管理员'
+    } catch {
+      // 忽略解析错误
+    }
+  }
+})
+
+function handleMenuClick({ key }: { key: string }) {
+  if (key === 'logout') {
+    Modal.confirm({
+      title: '安全退出',
+      content: '确定要退出当前管理后台登录吗？',
+      okText: '确定',
+      cancelText: '取消',
+      onOk() {
+        localStorage.removeItem('admin_token')
+        localStorage.removeItem('admin_user')
+        message.success('已安全退出登录')
+        router.push('/login')
+      }
+    })
+  } else if (key === 'profile') {
+    message.info('个人设置功能建设中...')
+  }
+}
 
 function onMenuClick({ key }: { key: string }) {
   router.push(key)

@@ -124,7 +124,7 @@ async function onSubmit() {
   submitting.value = true
   try {
     if (editingId.value) { await performerApi.update({ id: editingId.value, ...formData } as any); message.success('更新成功') }
-    else { await performerApi.create(formData); message.success('创建成功') }
+    else { await performerApi.create(formData as any); message.success('创建成功') }
     formVisible.value = false; fetchList()
   } finally { submitting.value = false }
 }
