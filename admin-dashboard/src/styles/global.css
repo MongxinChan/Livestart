@@ -140,3 +140,208 @@ body {
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
+
+/* ===========================================================================
+   登录页面特有样式 (已规范化提取为全局标准 CSS)
+   =========================================================================== */
+.login-wrapper {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: radial-gradient(circle at center, #0f172a, #020617);
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+/* 霓虹发光球体 */
+.login-wrapper .glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.login-wrapper .orb-1 {
+  width: 500px;
+  height: 500px;
+  background: #3b82f6;
+  top: -10%;
+  left: -10%;
+  animation: moveOrb1 25s infinite alternate ease-in-out;
+}
+
+.login-wrapper .orb-2 {
+  width: 400px;
+  height: 400px;
+  background: #8b5cf6;
+  bottom: -5%;
+  right: -5%;
+  animation: moveOrb2 20s infinite alternate ease-in-out;
+}
+
+@keyframes moveOrb1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(100px, 80px) scale(1.1); }
+}
+
+@keyframes moveOrb2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-80px, -60px) scale(1.1); }
+}
+
+/* 磨砂毛玻璃卡片 */
+.login-card {
+  z-index: 10;
+  width: 420px;
+  padding: 40px;
+  background: rgba(15, 23, 42, 0.45);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.login-card:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 35px;
+}
+
+.logo-area {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.logo-icon {
+  font-size: 28px;
+  color: #3b82f6;
+  margin-right: 8px;
+  filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.5));
+}
+
+.logo-text {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  background: linear-gradient(135deg, #60a5fa, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.45);
+  letter-spacing: 1px;
+}
+
+/* Ant Design 表单微调成暗色系 */
+.login-wrapper .ant-form-item-label > label {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.login-wrapper .ant-input, 
+.login-wrapper .ant-input-password {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+  border-radius: 6px !important;
+}
+
+.login-wrapper .ant-input:focus, 
+.login-wrapper .ant-input-affix-wrapper-focused {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+.login-wrapper .ant-input-password .ant-input {
+  background: transparent !important;
+  border: none !important;
+}
+
+.login-wrapper .ant-input-password .anticon {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+.login-wrapper .ant-input-password .anticon:hover {
+  color: #fff !important;
+}
+
+/* 按钮区域 */
+.actions-area {
+  margin-top: 28px;
+  margin-bottom: 0;
+}
+
+.login-btn {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3) !important;
+  font-weight: 600 !important;
+  transition: all 0.3s ease !important;
+}
+
+.login-btn:hover {
+  opacity: 0.95;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4) !important;
+}
+
+.divider-text {
+  text-align: center;
+  position: relative;
+  margin: 20px 0;
+}
+
+.divider-text::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.divider-text span {
+  position: relative;
+  display: inline-block;
+  padding: 0 12px;
+  background: #0d1629;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 12px;
+}
+
+.mock-btn {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-weight: 500 !important;
+  transition: all 0.3s ease !important;
+}
+
+.mock-btn:hover {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #fff !important;
+  border-color: #3b82f6 !important;
+}
+
+.login-footer {
+  text-align: center;
+  margin-top: 30px;
+  color: rgba(255, 255, 255, 0.25);
+  font-size: 12px;
+}
+
