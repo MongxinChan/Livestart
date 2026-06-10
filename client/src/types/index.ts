@@ -1,4 +1,3 @@
-/** 票档 SKU */
 export interface EventSku {
   id: number
   name: string
@@ -7,7 +6,6 @@ export interface EventSku {
   total: number
 }
 
-/** 演出信息 */
 export interface LiveEvent {
   id: number
   title: string
@@ -23,17 +21,13 @@ export interface LiveEvent {
   ticketStage?: number
 }
 
-
-/** 热搜词 */
 export interface HotSearch {
   keyword: string
   score: number
 }
 
-/** 订单状态：0待支付 1已支付 2已取消 3已退票 */
 export type OrderStatus = 0 | 1 | 2 | 3
 
-/** 订单 */
 export interface Order {
   orderNo: string
   title: string
@@ -49,7 +43,6 @@ export interface Order {
   isChecked: number
 }
 
-/** 分表数据 */
 export interface ShardData {
   tableName: string
   orders: number
@@ -58,7 +51,6 @@ export interface ShardData {
   dbShard: string
 }
 
-/** 结算结果 */
 export interface SettlementResult {
   eventId: string
   eventName: string
@@ -71,7 +63,6 @@ export interface SettlementResult {
   shards: ShardData[]
 }
 
-/** 轮播数据 */
 export interface CarouselSlide {
   title: string
   desc: string
@@ -80,7 +71,6 @@ export interface CarouselSlide {
   eventId: number
 }
 
-/** 实名观演人 */
 export interface Visitor {
   id: number
   name: string
@@ -88,10 +78,8 @@ export interface Visitor {
   checked: boolean
 }
 
-/** 抢票状态 */
 export type GrabStatus = 'idle' | 'fetching_token' | 'grabbing' | 'success' | 'failed'
 
-/** 柱状图可视化分片 */
 export interface LiveShard {
   tableName: string
   visible: boolean
@@ -99,10 +87,8 @@ export interface LiveShard {
   revenue: number
 }
 
-/** 主题 ID */
 export type ThemeId = 'cyberpunk-dark' | 'minimalist-light' | 'damai-crimson' | 'showstart-neon'
 
-/** 主题配置项 */
 export interface ThemeOption {
   id: ThemeId
   name: string

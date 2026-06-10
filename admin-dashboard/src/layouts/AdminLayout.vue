@@ -1,6 +1,5 @@
 <template>
   <a-layout style="min-height: 100vh">
-    <!-- 侧边栏 -->
     <a-layout-sider
       v-model:collapsed="collapsed"
       collapsible
@@ -12,12 +11,8 @@
         <ThunderboltOutlined class="admin-logo-icon" />
         <span class="admin-logo-text" :class="{ collapsed }">LIVESTART</span>
       </div>
-      <a-menu
-        v-model:selectedKeys="selectedKeys"
-        theme="dark"
-        mode="inline"
-        @click="onMenuClick"
-      >
+
+      <a-menu v-model:selectedKeys="selectedKeys" theme="dark" mode="inline" @click="onMenuClick">
         <a-menu-item key="/dashboard">
           <template #icon><DashboardOutlined /></template>
           <span>数据看板</span>
@@ -47,9 +42,7 @@
       </a-menu>
     </a-layout-sider>
 
-    <!-- 主区域 -->
     <a-layout>
-      <!-- 顶栏 -->
       <a-layout-header class="admin-header">
         <div class="admin-header-left">
           <component
@@ -57,6 +50,7 @@
             style="font-size: 18px; cursor: pointer"
             @click="collapsed = !collapsed"
           />
+
           <a-breadcrumb>
             <a-breadcrumb-item>
               <router-link to="/dashboard">首页</router-link>
@@ -64,16 +58,19 @@
             <a-breadcrumb-item v-if="currentTitle">{{ currentTitle }}</a-breadcrumb-item>
           </a-breadcrumb>
         </div>
+
         <div class="admin-header-right">
           <a-badge :count="3" :offset="[-4, 4]">
             <BellOutlined style="font-size: 18px; cursor: pointer" />
           </a-badge>
+
           <a-dropdown>
             <a-space style="cursor: pointer">
               <a-avatar :size="28" style="background: #1677ff">{{ adminRealName.charAt(0) }}</a-avatar>
               <span style="font-weight: 500">{{ adminRealName }}</span>
               <DownOutlined />
             </a-space>
+
             <template #overlay>
               <a-menu @click="handleMenuClick">
                 <a-menu-item key="profile">个人设置</a-menu-item>
@@ -85,7 +82,6 @@
         </div>
       </a-layout-header>
 
-      <!-- 内容区 -->
       <a-layout-content style="margin: 0">
         <div class="page-container">
           <router-view v-slot="{ Component }">
@@ -94,6 +90,7 @@
             </transition>
           </router-view>
         </div>
+
         <div class="admin-footer">
           Livestart Admin Dashboard &copy; 2026 陈孟欣 · Powered by Vue 3 + Ant Design Vue
         </div>
@@ -103,44 +100,42 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
-  ThunderboltOutlined,
-  DashboardOutlined,
   AppstoreOutlined,
-  TeamOutlined,
-  FundOutlined,
   BellOutlined,
+  DashboardOutlined,
   DownOutlined,
+  FundOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  TeamOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons-vue'
+import { clearAdminSession, getAdminSession } from '@/api/http'
 
 const router = useRouter()
 const route = useRoute()
 
 const collapsed = ref(false)
 const selectedKeys = ref<string[]>([route.path])
-
-const currentTitle = computed(() => (route.meta as any).title || '')
-
-watch(() => route.path, (path) => {
-  selectedKeys.value = [path]
-})
-
 const adminRealName = ref('系统管理员')
 
+const currentTitle = computed(() => route.meta.title || '')
+
+watch(
+  () => route.path,
+  (path) => {
+    selectedKeys.value = [path]
+  }
+)
+
 onMounted(() => {
-  const adminUserStr = localStorage.getItem('admin_user')
-  if (adminUserStr) {
-    try {
-      const adminUser = JSON.parse(adminUserStr)
-      adminRealName.value = adminUser.realName || '系统管理员'
-    } catch {
-      // 忽略解析错误
-    }
+  const adminUser = getAdminSession()
+  if (adminUser?.realName) {
+    adminRealName.value = adminUser.realName
   }
 })
 
@@ -152,14 +147,16 @@ function handleMenuClick({ key }: { key: string }) {
       okText: '确定',
       cancelText: '取消',
       onOk() {
-        localStorage.removeItem('admin_token')
-        localStorage.removeItem('admin_user')
+        clearAdminSession()
         message.success('已安全退出登录')
         router.push('/login')
-      }
+      },
     })
-  } else if (key === 'profile') {
-    message.info('个人设置功能建设中...')
+    return
+  }
+
+  if (key === 'profile') {
+    message.info('个人设置功能建设中')
   }
 }
 

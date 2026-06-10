@@ -9,6 +9,8 @@ import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 
+import java.math.BigDecimal;
+
 /**
  * 购票订单服务接口
  */
@@ -53,6 +55,15 @@ public interface TicketOrderService {
      * @param tradeNo 支付宝交易号
      */
     void paySuccess(String orderNo, String tradeNo);
+
+    /**
+     * 支付宝异步通知支付成功处理
+     *
+     * @param orderNo 订单流水号
+     * @param tradeNo 支付宝交易号
+     * @param payAmount 实付金额
+     */
+    void paySuccess(String orderNo, String tradeNo, BigDecimal payAmount);
 
     /**
      * 取消订单

@@ -1,22 +1,18 @@
-import { ref, reactive, computed, onMounted, type CSSProperties } from 'vue'
-import {
-  SearchOutlined,
-  ShoppingOutlined,
-  FundOutlined,
-} from '@ant-design/icons-vue'
+import { computed, onMounted, reactive, ref, type CSSProperties } from 'vue'
+import { SearchOutlined, ShoppingOutlined } from '@ant-design/icons-vue'
 import { message } from 'ant-design-vue'
 import { themeConfigs, themeOptions, customVars } from '../styles/themes'
 import { apiState, request } from './useRequest'
-import type { ThemeId, LiveEvent } from '../types'
+import { clearSession, persistSession } from './sessionState'
+import type { LiveEvent, ThemeId } from '../types'
 
 export function useApp() {
-  // --- 主题 ---
   const activeTheme = ref<ThemeId>('cyberpunk-dark')
 
   const currentAntTheme = computed(() => themeConfigs[activeTheme.value])
   const currentThemeLabel = computed(() => {
-    const t = themeOptions.find(x => x.id === activeTheme.value)
-    return t ? `${t.icon} ${t.name}` : '主题'
+    const selected = themeOptions.find((item) => item.id === activeTheme.value)
+    return selected ? `${selected.icon} ${selected.name}` : '主题'
   })
 
   const rootStyle = computed<CSSProperties>(() => {
@@ -25,9 +21,11 @@ export function useApp() {
       minHeight: '100vh',
       transition: 'all 0.3s ease',
     }
-    for (const [k, v] of Object.entries(vars)) {
-      style[k] = v
+
+    for (const [key, value] of Object.entries(vars)) {
+      style[key] = value
     }
+
     return style as CSSProperties
   })
 
@@ -35,8 +33,8 @@ export function useApp() {
     activeTheme.value = info.key as ThemeId
   }
 
-  // --- 导航 ---
   type ViewId = 'square' | 'cabin' | 'orders' | 'settlement'
+
   const activeView = ref<string>('square')
   const selectedEvent = ref<LiveEvent | null>(null)
 
@@ -46,13 +44,17 @@ export function useApp() {
   ]
 
   function onNavChange(val: string | number) {
-    activeView.value = val as string
-    if (val === 'square') selectedEvent.value = null
+    activeView.value = String(val)
+    if (val === 'square') {
+      selectedEvent.value = null
+    }
   }
 
   function navigateTo(view: ViewId) {
     activeView.value = view
-    if (view === 'square') selectedEvent.value = null
+    if (view === 'square') {
+      selectedEvent.value = null
+    }
   }
 
   function selectEventForCabin(event: LiveEvent) {
@@ -69,93 +71,88 @@ export function useApp() {
     code: '',
   })
 
-  // 发送验证码
+  function startCountdown() {
+    countdown.value = 60
+    const timer = window.setInterval(() => {
+      if (countdown.value > 0) {
+        countdown.value -= 1
+      } else {
+        window.clearInterval(timer)
+      }
+    }, 1000)
+  }
+
   async function sendVerificationCode() {
     if (!authForm.phone || authForm.phone.length !== 11) {
-      message.warning('请输入正确的11位手机号！')
+      message.warning('请输入正确的 11 位手机号')
       return
     }
 
     if (apiState.isMock) {
-      message.success('【模拟短信】验证码已发送，请填入 888888 登录')
-      countdown.value = 60
-      const timer = setInterval(() => {
-        if (countdown.value > 0) countdown.value--
-        else clearInterval(timer)
-      }, 1000)
+      message.success('【模拟短信】验证码已发送，请填写 888888 登录')
+      startCountdown()
       return
     }
 
     try {
       await request(`/api/live-start/admin/v1/user/send-code?phone=${authForm.phone}`, { method: 'POST' })
-      message.success('验证码已成功发送！请查看后端控制台日志打印')
-      countdown.value = 60
-      const timer = setInterval(() => {
-        if (countdown.value > 0) countdown.value--
-        else clearInterval(timer)
-      }, 1000)
+      message.success('验证码已发送，请查看后端控制台日志')
+      startCountdown()
     } catch (err: any) {
-      message.error('发送验证码失败: ' + err.message)
+      message.error(`发送验证码失败: ${err.message}`)
     }
   }
 
-  // 登录/自动注册提交
   async function handleAuthSubmit() {
     if (!authForm.phone || authForm.phone.length !== 11) {
-      message.warning('请输入正确的11位手机号！')
+      message.warning('请输入正确的 11 位手机号')
       return
     }
+
     if (!authForm.code || authForm.code.length !== 6) {
-      message.warning('请输入6位数字验证码！')
+      message.warning('请输入 6 位数字验证码')
       return
     }
 
     authLoading.value = true
+
     try {
       if (apiState.isMock) {
         if (authForm.code !== '888888') {
-          throw new Error('验证码错误！请填入 888888 登录')
+          throw new Error('验证码错误，请填写 888888 登录')
         }
-        // Mock 成功登录
+
         apiState.userId = '20099'
-        apiState.token = 'mock-session-token-' + authForm.phone
+        apiState.token = `mock-session-token-${authForm.phone}`
         apiState.currentUser = {
-          username: 'Live_' + authForm.phone.substring(7),
-          realName: '新用户 (' + authForm.phone.substring(7) + ')',
+          username: `Live_${authForm.phone.substring(7)}`,
+          realName: `新用户(${authForm.phone.substring(7)})`,
           phone: authForm.phone,
         }
-        localStorage.setItem('livestart_token', apiState.token)
-        localStorage.setItem('livestart_user_id', apiState.userId)
-        localStorage.setItem('livestart_current_user', JSON.stringify(apiState.currentUser))
-        message.success('登录成功！')
+        persistSession()
+        message.success('登录成功')
         showAuthModal.value = false
         authForm.phone = ''
         authForm.code = ''
         return
       }
 
-      // 联调登录
-      const data = await request(`/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`, {
-        method: 'POST'
-      })
-      
-      // 更新登录状态
+      const data = await request<{ token: string }>(
+        `/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`,
+        { method: 'POST' }
+      )
+
       apiState.token = data.token
-      localStorage.setItem('livestart_token', data.token)
-      
-      // 拉取用户信息
-      const userRes = await request(`/api/live-start/admin/v1/user/${authForm.phone}`)
+
+      const userRes = await request<any>(`/api/live-start/admin/v1/user/${authForm.phone}`)
       apiState.userId = String(userRes.id)
       apiState.currentUser = userRes
-      localStorage.setItem('livestart_user_id', String(userRes.id))
-      localStorage.setItem('livestart_current_user', JSON.stringify(userRes))
+      persistSession()
 
-      message.success('验证成功，登录就绪！')
+      message.success('验证成功，登录完成')
       showAuthModal.value = false
       authForm.phone = ''
       authForm.code = ''
-      
-      // 强制刷新页面以同步状态
       window.location.reload()
     } catch (err: any) {
       message.error(err.message || '登录验证失败，请重试')
@@ -164,32 +161,33 @@ export function useApp() {
     }
   }
 
-  // 退出登录
   async function handleLogout() {
     if (!apiState.isMock && apiState.currentUser) {
       try {
-        await request(`/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}&token=${apiState.token}`, { method: 'DELETE' })
-      } catch (_) {}
+        await request(
+          `/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}&token=${apiState.token}`,
+          { method: 'DELETE' }
+        )
+      } catch {
+        // Swallow logout errors so local session can still be cleared.
+      }
     }
-    apiState.userId = ''
-    apiState.token = ''
-    apiState.currentUser = null
-    localStorage.removeItem('livestart_token')
-    localStorage.removeItem('livestart_user_id')
-    localStorage.removeItem('livestart_current_user')
-    message.success('已安全退出登录态')
+
+    clearSession()
+    message.success('已安全退出登录状态')
     window.location.reload()
   }
 
-  // --- 骨架屏移除 ---
   onMounted(() => {
     const skeleton = document.querySelector('.app-skeleton') as HTMLElement | null
-    if (skeleton) {
-      setTimeout(() => {
-        skeleton.style.opacity = '0'
-        setTimeout(() => skeleton.remove(), 300)
-      }, 400)
+    if (!skeleton) {
+      return
     }
+
+    window.setTimeout(() => {
+      skeleton.style.opacity = '0'
+      window.setTimeout(() => skeleton.remove(), 300)
+    }, 400)
   })
 
   return {

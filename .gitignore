@@ -54,3 +54,8 @@ build/
 .gemini_scratch/
 *.pdf
 *.bat
+
+### Claude Code ###
+.claude/
+CLAUDE.md
+docs/

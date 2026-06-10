@@ -21,9 +21,11 @@ import jakarta.validation.Valid;
 import com.mongxin.livestart.engine.config.AlipayConfig;
 import com.alipay.api.internal.util.AlipaySignature;
 import jakarta.servlet.http.HttpServletRequest;
+import java.math.BigDecimal;
 import java.util.Map;
 import java.util.HashMap;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -35,6 +37,7 @@ import org.springframework.web.bind.annotation.RestController;
  * 购票订单 Controller
  */
 @Tag(name = "购票引擎 - 订单管理")
+@Slf4j
 @RestController
 @RequestMapping("/api/engine/order")
 @RequiredArgsConstructor
@@ -115,15 +118,21 @@ public class TicketOrderController {
                 String orderNo = params.get("out_trade_no");
                 String tradeNo = params.get("trade_no");
                 String tradeStatus = params.get("trade_status");
+                String appId = params.get("app_id");
+                String totalAmount = params.get("total_amount");
 
+                if (!alipayConfig.getAppId().equals(appId)) {
+                    return "fail";
+                }
                 if ("TRADE_SUCCESS".equals(tradeStatus) || "TRADE_FINISHED".equals(tradeStatus)) {
-                    ticketOrderService.paySuccess(orderNo, tradeNo);
+                    ticketOrderService.paySuccess(orderNo, tradeNo, new BigDecimal(totalAmount));
                 }
                 return "success";
             } else {
                 return "fail";
             }
         } catch (Exception e) {
+            log.error("[支付宝回调] 处理异步通知异常", e);
             return "fail";
         }
     }
