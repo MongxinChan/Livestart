@@ -83,6 +83,7 @@ http.interceptors.response.use(
 
     if (status === 401) {
       clearAdminSession()
+      window.location.href = '/login'
     }
 
     const msg = error.response?.data?.message || error.message || '网络异常'

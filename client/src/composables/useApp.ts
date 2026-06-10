@@ -165,7 +165,7 @@ export function useApp() {
     if (!apiState.isMock && apiState.currentUser) {
       try {
         await request(
-          `/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}&token=${apiState.token}`,
+          `/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}`,
           { method: 'DELETE' }
         )
       } catch {

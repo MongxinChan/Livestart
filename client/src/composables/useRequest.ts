@@ -28,7 +28,9 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
     throw new Error(errData.message || `网络异常 (HTTP ${response.status})`)
   }
 
-  const resJson = await response.json()
+  const resJson = await response.json().catch(() => {
+    throw new Error('服务器响应格式异常，请稍后重试')
+  })
   if (resJson.code !== '0' && resJson.code !== 0 && resJson.code !== '200') {
     throw new Error(resJson.message || '业务请求失败')
   }

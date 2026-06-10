@@ -39,6 +39,8 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
     );
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
+    private static final List<String> TRUSTED_HEADERS = List.of("userId", "username", "realName");
+
     private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
 
     @Override
@@ -46,7 +48,7 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
         String requestPath = exchange.getRequest().getPath().value();
         if (isSkipPath(requestPath)) {
             log.debug("[Gateway-Auth] Skip auth for path={}", requestPath);
-            return chain.filter(exchange);
+            return chain.filter(stripTrustedHeaders(exchange));
         }
 
         String phone = exchange.getRequest().getHeaders().getFirst("phone");
@@ -66,7 +68,7 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
                     }
 
                     JSONObject userInfo = JSON.parseObject(userPayload);
-                    ServerHttpRequest mutatedRequest = exchange.getRequest().mutate()
+                    ServerHttpRequest mutatedRequest = stripTrustedHeaders(exchange).getRequest().mutate()
                             .header("userId", valueOrEmpty(userInfo.getString("id")))
                             .header("username", valueOrEmpty(userInfo.getString("username")))
                             .header("phone", phone)
@@ -99,13 +101,21 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
         return value != null ? value : "";
     }
 
-    private Mono<Void> writeUnauthorized(ServerWebExchange exchange, String message) {
+    private ServerWebExchange stripTrustedHeaders(ServerWebExchange exchange) {
+        ServerHttpRequest.Builder builder = exchange.getRequest().mutate();
+        for (String header : TRUSTED_HEADERS) {
+            builder.headers(h -> h.remove(header));
+        }
+        return exchange.mutate().request(builder.build()).build();
+    }
+
+    private Mono<Void> writeUnauthorized(ServerWebExchange exchange, String msg) {
         ServerHttpResponse response = exchange.getResponse();
         response.setStatusCode(HttpStatus.UNAUTHORIZED);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
         Map<String, Object> body = Map.of(
                 "code", "A000004",
-                "message", message,
+                "message", msg,
                 "data", ""
         );
         byte[] bytes = JSON.toJSONString(body).getBytes(StandardCharsets.UTF_8);
