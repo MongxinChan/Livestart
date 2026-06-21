@@ -20,10 +20,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Set;
+import java.text.SimpleDateFormat;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -39,6 +37,7 @@ public class SearchServiceImpl implements SearchService {
     private final StringRedisTemplate stringRedisTemplate;
 
     private static final String HOT_SEARCH_KEY = "search:hot_keywords";
+    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
     @Override
     public IPage<EventSearchRespDTO> searchEvents(String keyword, Integer pageNum, Integer pageSize) {
@@ -64,7 +63,7 @@ public class SearchServiceImpl implements SearchService {
             resultPage.setRecords(Collections.emptyList());
         } else {
             List<EventSearchRespDTO> list = eventPage.getRecords().stream()
-                    .map(item -> BeanUtil.copyProperties(item, EventSearchRespDTO.class))
+                    .map(this::toEventSearchRespDTO)
                     .collect(Collectors.toList());
             resultPage.setRecords(list);
         }
@@ -136,6 +135,64 @@ public class SearchServiceImpl implements SearchService {
         } catch (Exception ex) {
             log.error("[搜索] 热搜词点击增分异常，keyword={}", cleanKeyword, ex);
         }
+    }
+
+    @Override
+    public List<String> suggestKeywords(String keyword, int limit) {
+        if (StrUtil.isBlank(keyword)) {
+            return Collections.emptyList();
+        }
+        String cleanKeyword = keyword.trim();
+        Set<String> results = new LinkedHashSet<>();
+
+        // 1. 从 Redis ZSet 热搜词中前缀匹配（得分高者优先）
+        Set<ZSetOperations.TypedTuple<String>> hotTuples =
+                stringRedisTemplate.opsForZSet().reverseRangeWithScores(HOT_SEARCH_KEY, 0, 49);
+        if (hotTuples != null) {
+            hotTuples.stream()
+                    .map(ZSetOperations.TypedTuple::getValue)
+                    .filter(v -> v != null && v.contains(cleanKeyword))
+                    .limit(limit)
+                    .forEach(results::add);
+        }
+
+        // 2. 若热搜未填满，从 DB title 中补充
+        if (results.size() < limit) {
+            LambdaQueryWrapper<EventDO> queryWrapper = Wrappers.lambdaQuery(EventDO.class)
+                    .like(EventDO::getTitle, cleanKeyword)
+                    .select(EventDO::getTitle)
+                    .last("LIMIT " + limit);
+            eventMapper.selectList(queryWrapper).stream()
+                    .map(EventDO::getTitle)
+                    .filter(t -> !results.contains(t))
+                    .limit(limit - results.size())
+                    .forEach(results::add);
+        }
+
+        return new ArrayList<>(results);
+    }
+
+    // ---- 私有方法 ----
+
+    /**
+     * EventDO → EventSearchRespDTO 字段转换
+     * 负责填充前端 LiveEvent 对齐字段，消除前端的手动映射兜底逻辑
+     */
+    private EventSearchRespDTO toEventSearchRespDTO(EventDO item) {
+        EventSearchRespDTO dto = BeanUtil.copyProperties(item, EventSearchRespDTO.class);
+        // 演出类型文本
+        dto.setType(item.getEventType() != null && item.getEventType() == 0 ? "Livehouse" : "演唱会");
+        // 封面图（直接使用 posterUrl）
+        dto.setCover(item.getPosterUrl());
+        // 格式化演出时间
+        dto.setDate(item.getStartTime() != null ? DATE_FORMAT.format(item.getStartTime()) : "");
+        // 场馆（暂用兜底，TODO: 关联 venue 表）
+        dto.setVenue("待确认场馆");
+        // 艺人（暂留空，TODO: 关联 performer 表）
+        dto.setArtist("");
+        // 最低价格（暂留 0，TODO: 关联 sku 表）
+        dto.setMinPrice(0);
+        return dto;
     }
 
     /**

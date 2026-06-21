@@ -24,4 +24,14 @@ public interface SearchService {
      * @param keyword 关键词
      */
     void clickHotSearch(String keyword);
+
+    /**
+     * 搜索建议（autocomplete）
+     * 优先从 Redis 热搜词前缀匹配，不足时从 DB title 补充
+     *
+     * @param keyword 输入关键词
+     * @param limit   最大返回条数
+     * @return 建议词列表
+     */
+    List<String> suggestKeywords(String keyword, int limit);
 }
