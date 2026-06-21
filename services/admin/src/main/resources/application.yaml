@@ -23,8 +23,8 @@ spring:
 
 mybatis-plus:
     configuration:
-        map-underscore-to-camel-case: false
-        #关闭驼峰转下划线
+        map-underscore-to-camel-case: true
+        #开启驼峰转下划线
 
 aliyun:
     oss:
