@@ -208,8 +208,11 @@ public class UserTicketServiceImpl extends ServiceImpl<UserTicketMapper, UserTic
     }
 
     private String resolveTicketStatusDesc(Integer statusCode) {
+        if (statusCode == null) {
+            return "未知状态";
+        }
         for (TicketStatusEnum value : TicketStatusEnum.values()) {
-            if (value.getCode().equals(statusCode)) {
+            if (value.getCode() == statusCode) {
                 return value.getDesc();
             }
         }

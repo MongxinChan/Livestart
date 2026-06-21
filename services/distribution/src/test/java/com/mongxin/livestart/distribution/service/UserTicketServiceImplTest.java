@@ -86,4 +86,16 @@ class UserTicketServiceImplTest {
         assertEquals("秒杀库存不足，冲突退回，请重试", ex.getMessage());
         verify(stringRedisTemplate).execute(any(RedisScript.class), eq(redisKeys), eq("1"), eq("1"));
     }
+
+    @Test
+    void shouldResolveTicketStatusDescCorrectly() throws Exception {
+        java.lang.reflect.Method method = UserTicketServiceImpl.class.getDeclaredMethod("resolveTicketStatusDesc", Integer.class);
+        method.setAccessible(true);
+
+        assertEquals("未使用", method.invoke(userTicketService, 0));
+        assertEquals("已使用", method.invoke(userTicketService, 1));
+        assertEquals("已退票", method.invoke(userTicketService, 2));
+        assertEquals("未知状态", method.invoke(userTicketService, (Integer) null));
+        assertEquals("未知状态", method.invoke(userTicketService, 99));
+    }
 }
