@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 /**
  * 商户后台管理服务 Feign Client
@@ -28,7 +28,7 @@ public interface MerchantAdminRemoteService {
      * 分页查询演出列表
      */
     @GetMapping("/event/page")
-    Result<IPage<MerchantEventRespDTO>> pageQueryEvents(
+    Result<Page<MerchantEventRespDTO>> pageQueryEvents(
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "size", defaultValue = "50") Integer size
     );
@@ -43,7 +43,7 @@ public interface MerchantAdminRemoteService {
      * 分页查询票档列表
      */
     @GetMapping("/ticket-sku/page")
-    Result<IPage<MerchantTicketSkuRespDTO>> pageQueryTicketSkus(
+    Result<Page<MerchantTicketSkuRespDTO>> pageQueryTicketSkus(
             @RequestParam(value = "eventId", required = false) Long eventId,
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "size", defaultValue = "100") Integer size

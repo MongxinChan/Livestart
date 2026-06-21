@@ -1,6 +1,7 @@
 package com.mongxin.livestart.engine.controller;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mongxin.livestart.engine.dto.resp.EventListRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketSkuRespDTO;
 import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
@@ -52,7 +53,7 @@ public class EventController {
         log.info("[Engine] 拉取 C 端演出列表，远程调用 merchant-admin...");
 
         // 1. Feign 获取演出列表
-        Result<IPage<MerchantEventRespDTO>> eventResult = merchantAdminRemoteService.pageQueryEvents(1, 50);
+        Result<Page<MerchantEventRespDTO>> eventResult = merchantAdminRemoteService.pageQueryEvents(1, 50);
         if (eventResult.isFail() || eventResult.getData() == null) {
             log.warn("[Engine] 远程调用 merchant-admin 获取演出列表失败: {}", eventResult.getMessage());
             return Results.success(Collections.emptyList());
@@ -64,7 +65,7 @@ public class EventController {
         }
 
         // 2. Feign 获取全部票档
-        Result<IPage<MerchantTicketSkuRespDTO>> skuResult = merchantAdminRemoteService.pageQueryTicketSkus(null, 1, 500);
+        Result<Page<MerchantTicketSkuRespDTO>> skuResult = merchantAdminRemoteService.pageQueryTicketSkus(null, 1, 500);
         Map<Long, List<MerchantTicketSkuRespDTO>> skuGroupByEvent = Collections.emptyMap();
         if (skuResult.isSuccess() && skuResult.getData() != null && skuResult.getData().getRecords() != null) {
             skuGroupByEvent = skuResult.getData().getRecords().stream()
