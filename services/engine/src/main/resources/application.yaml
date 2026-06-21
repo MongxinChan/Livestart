@@ -63,11 +63,11 @@ livestart:
 
 # 支付宝沙箱环境配置项
 alipay:
-  app-id: 9021111111111111
+  app-id: ${ALIPAY_APP_ID:9021000164662769}
   private-key: ${ALIPAY_PRIVATE_KEY:xxx}
   public-key: ${ALIPAY_PUBLIC_KEY:xxx}
   gateway-url: https://openapi.alipaydev.com/gateway.do
-  notify-url: ${ALIPAY_NOTIFY_URL:http://127.0.0.1:8004/api/engine/order/pay/alipay/notify}
+  notify-url: ${ALIPAY_NOTIFY_URL:http://127.0.0.1:8888/api/live-start/engine/order/pay/alipay/notify}
   return-url: ${ALIPAY_RETURN_URL:http://localhost:3000}
   charset: UTF-8
   sign-type: RSA2
