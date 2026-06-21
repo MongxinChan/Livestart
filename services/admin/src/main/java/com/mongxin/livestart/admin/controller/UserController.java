@@ -118,7 +118,7 @@ public class UserController {
     /**
      * 后台管理端分页查询用户列表
      */
-    @GetMapping("/api/admin/user/page")
+    @GetMapping("/api/live-start/admin/v1/user/page")
     public Result<IPage<UserRespDTO>> pageUser(
             @RequestParam(value = "current", defaultValue = "1") int current,
             @RequestParam(value = "size", defaultValue = "10") int size) {

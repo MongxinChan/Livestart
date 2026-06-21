@@ -73,7 +73,7 @@ public class VisitorController {
     /**
      * 查询指定用户的常用观演人列表（后台管理端使用）
      */
-    @GetMapping("/api/admin/visitor/list/{userId}")
+    @GetMapping("/api/live-start/admin/v1/visitor/list/{userId}")
     public Result<List<VisitorRespDTO>> listVisitorsByUserId(@PathVariable("userId") Long userId) {
         return Results.success(visitorService.listVisitorsByUserId(userId));
     }
