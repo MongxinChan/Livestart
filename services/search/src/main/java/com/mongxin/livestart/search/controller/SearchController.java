@@ -10,10 +10,7 @@ import com.mongxin.livestart.search.service.SearchService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -63,11 +60,24 @@ public class SearchController {
 
     /**
      * 热搜词点击增分
+     * 改为 POST，因为该操作具有副作用（写 Redis），GET 语义不正确
      */
     @Operation(summary = "热搜词点击", description = "用户点击热搜词时调用，在 Redis ZSet 中增加该词的热度分值")
-    @GetMapping("/click")
+    @PostMapping("/click")
     public Result<Void> clickHotSearch(@RequestParam String keyword) {
         searchService.clickHotSearch(keyword);
         return Results.success();
+    }
+
+    /**
+     * 搜索建议（autocomplete）
+     * 用于导航栏搜索框实时下拉提示，优先热搜词前缀匹配，不足时补充 DB title
+     */
+    @Operation(summary = "搜索建议", description = "根据输入前缀实时返回搜索建议词，适用于 autocomplete 场景")
+    @GetMapping("/suggest")
+    public Result<List<String>> suggestKeywords(
+            @RequestParam String keyword,
+            @RequestParam(defaultValue = "5") Integer limit) {
+        return Results.success(searchService.suggestKeywords(keyword, limit));
     }
 }
