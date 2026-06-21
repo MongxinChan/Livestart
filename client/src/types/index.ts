@@ -94,3 +94,6 @@ export interface ThemeOption {
   name: string
   icon: string
 }
+
+export type ViewId = 'square' | 'cabin' | 'orders'
+
