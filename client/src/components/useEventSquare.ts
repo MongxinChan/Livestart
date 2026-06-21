@@ -104,24 +104,11 @@ export function useEventSquare(emit: any) {
     }
     loading.value = true
     try {
+      // 后端 EventSearchRespDTO 已对齐 LiveEvent 字段，直接使用 records
       const res = await request<any>('/api/search/event?keyword=' + encodeURIComponent(searchQuery.value))
-      const rawList = Array.isArray(res) ? res : (res?.records || [])
-      events.value = rawList.map((item: any) => {
-        if (item.cover !== undefined) return item
-        return {
-          id: item.id,
-          title: item.title,
-          type: item.eventType === 0 ? 'Livehouse' : '演唱会',
-          cover: item.posterUrl || 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=600',
-          date: item.startTime ? new Date(item.startTime).toLocaleString() : '',
-          venue: '场馆 ID: ' + item.venueId,
-          artist: '',
-          minPrice: 0,
-          tags: [item.eventType === 0 ? 'Livehouse' : '演唱会'],
-          skus: []
-        } as LiveEvent
-      })
-      await request('/api/search/click?keyword=' + encodeURIComponent(searchQuery.value))
+      events.value = Array.isArray(res) ? res : (res?.records || [])
+      // click 接口为 POST（有副作用，GET 语义不正确）
+      await request('/api/search/click?keyword=' + encodeURIComponent(searchQuery.value), { method: 'POST' })
       fetchHotSearches()
     } catch (err) {
       console.error('搜索失败', err)
