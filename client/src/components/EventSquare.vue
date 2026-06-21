@@ -101,7 +101,7 @@
           </span>
         </div>
       </div>
-      <div class="filter-row" style="display: flex; align-items: center; gap: 16px">
+      <div class="filter-row" style="margin-bottom: 14px; display: flex; align-items: center; gap: 16px">
         <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">分类：</span>
         <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
           <span
@@ -111,6 +111,19 @@
             @click="activeCategory = cat"
           >
             {{ cat }}
+          </span>
+        </div>
+      </div>
+      <div class="filter-row" style="display: flex; align-items: center; gap: 16px">
+        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">价格：</span>
+        <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
+          <span
+            v-for="p in priceRanges"
+            :key="p.label"
+            :class="['filter-tag', { active: activePriceLabel === p.label }]"
+            @click="activePriceLabel = p.label"
+          >
+            {{ p.label }}
           </span>
         </div>
       </div>
@@ -198,10 +211,12 @@ const {
   searchQuery,
   activeCategory,
   activeCity,
+  activePriceLabel,
   loading,
   hotSearches,
   citiesList,
   categoriesList,
+  priceRanges,
   carouselSlides,
   recommendCards,
   filteredEvents,

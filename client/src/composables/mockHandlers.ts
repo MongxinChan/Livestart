@@ -5,6 +5,28 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
   return new Promise((resolve, reject) => {
     window.setTimeout(() => {
       if (url.includes('/api/search/event') || url.includes('/api/engine/event/list')) {
+        if (url.includes('/api/search/event')) {
+          const params = new URLSearchParams(url.split('?')[1] || '')
+          const keyword = params.get('keyword')?.trim() || ''
+          const eventType = params.get('eventType')
+          const city = params.get('city')?.trim() || ''
+          const minPrice = params.get('minPrice')
+          const maxPrice = params.get('maxPrice')
+
+          const TYPE_TO_TEXT: Record<string, string> = { '0': 'Livehouse', '1': '演唱会', '2': '音乐节' }
+
+          const filtered = mockEvents.filter((event) => {
+            if (keyword && !event.title.includes(keyword)) return false
+            if (eventType !== null && eventType !== '' && TYPE_TO_TEXT[eventType] !== event.type) return false
+            if (city && !(event.city || '').includes(city)) return false
+            if (minPrice !== null && event.minPrice < Number(minPrice)) return false
+            if (maxPrice !== null && event.minPrice > Number(maxPrice)) return false
+            return true
+          })
+
+          resolve({ records: filtered, total: filtered.length, size: filtered.length, current: 1, pages: 1 })
+          return
+        }
         resolve(mockEvents)
         return
       }

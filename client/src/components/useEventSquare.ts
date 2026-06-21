@@ -1,17 +1,40 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { request } from '@/composables/useRequest'
 import type { LiveEvent, HotSearch, CarouselSlide } from '@/types'
+
+export interface PriceRangeOption {
+  label: string
+  minPrice: number | null
+  maxPrice: number | null
+}
+
+export const PRICE_RANGES: PriceRangeOption[] = [
+  { label: '不限', minPrice: null, maxPrice: null },
+  { label: '100 以下', minPrice: null, maxPrice: 100 },
+  { label: '100-300', minPrice: 100, maxPrice: 300 },
+  { label: '300-800', minPrice: 300, maxPrice: 800 },
+  { label: '800 以上', minPrice: 800, maxPrice: null },
+]
+
+const CATEGORY_TO_TYPE: Record<string, number | null> = {
+  '全部': null,
+  '演唱会': 1,
+  'Livehouse': 0,
+  '音乐节': 2,
+}
 
 export function useEventSquare(emit: any) {
   const searchQuery = ref('')
   const activeCategory = ref('全部')
   const activeCity = ref('全国')
+  const activePriceLabel = ref<string>('不限')
   const loading = ref(false)
   const events = ref<LiveEvent[]>([])
   const hotSearches = ref<HotSearch[]>([])
 
   const citiesList = ['全国', '北京', '上海', '杭州', '广州', '深圳', '成都', '武汉', '西安']
   const categoriesList = ['全部', '演唱会', 'Livehouse', '音乐节']
+  const priceRanges = PRICE_RANGES
 
   const carouselSlides: CarouselSlide[] = [
     {
@@ -62,26 +85,46 @@ export function useEventSquare(emit: any) {
     },
   ]
 
-  // --- 计算属性 ---
-  const filteredEvents = computed(() => {
-    let list = events.value
-    if (activeCategory.value !== '全部') {
-      list = list.filter(e => e.type === activeCategory.value)
+  const filteredEvents = computed(() => events.value)
+
+  function buildSearchQueryString(): string {
+    const params = new URLSearchParams()
+    if (searchQuery.value.trim()) {
+      params.set('keyword', searchQuery.value.trim())
+    }
+    const eventType = CATEGORY_TO_TYPE[activeCategory.value]
+    if (eventType !== null && eventType !== undefined) {
+      params.set('eventType', String(eventType))
     }
     if (activeCity.value !== '全国') {
-      list = list.filter(e => {
-        const c = e.city || ''
-        return c.includes(activeCity.value)
-      })
+      params.set('city', activeCity.value)
     }
-    return list
-  })
+    const priceRange = priceRanges.find(p => p.label === activePriceLabel.value)
+    if (priceRange?.minPrice != null) {
+      params.set('minPrice', String(priceRange.minPrice))
+    }
+    if (priceRange?.maxPrice != null) {
+      params.set('maxPrice', String(priceRange.maxPrice))
+    }
+    params.set('pageNum', '1')
+    params.set('pageSize', '20')
+    return params.toString()
+  }
 
-  // --- 方法 ---
   async function fetchEvents() {
     loading.value = true
     try {
-      events.value = await request<LiveEvent[]>('/api/engine/event/list')
+      const hasFilter = activeCategory.value !== '全部'
+        || activeCity.value !== '全国'
+        || activePriceLabel.value !== '不限'
+        || searchQuery.value.trim() !== ''
+
+      if (hasFilter) {
+        const res = await request<any>('/api/search/event?' + buildSearchQueryString())
+        events.value = Array.isArray(res) ? res : (res?.records || [])
+      } else {
+        events.value = await request<LiveEvent[]>('/api/engine/event/list')
+      }
     } catch (err) {
       console.error('拉取演出失败', err)
     } finally {
@@ -98,24 +141,20 @@ export function useEventSquare(emit: any) {
   }
 
   async function handleSearch() {
-    if (!searchQuery.value.trim()) {
-      fetchEvents()
-      return
-    }
-    loading.value = true
-    try {
-      // 后端 EventSearchRespDTO 已对齐 LiveEvent 字段，直接使用 records
-      const res = await request<any>('/api/search/event?keyword=' + encodeURIComponent(searchQuery.value))
-      events.value = Array.isArray(res) ? res : (res?.records || [])
-      // click 接口为 POST（有副作用，GET 语义不正确）
-      await request('/api/search/click?keyword=' + encodeURIComponent(searchQuery.value), { method: 'POST' })
-      fetchHotSearches()
-    } catch (err) {
-      console.error('搜索失败', err)
-    } finally {
-      loading.value = false
+    await fetchEvents()
+    if (searchQuery.value.trim()) {
+      try {
+        await request('/api/search/click?keyword=' + encodeURIComponent(searchQuery.value), { method: 'POST' })
+        fetchHotSearches()
+      } catch (err) {
+        console.error('点击热搜失败', err)
+      }
     }
   }
+
+  watch([activeCategory, activeCity, activePriceLabel], () => {
+    fetchEvents()
+  })
 
   function clickHotWord(word: string) {
     searchQuery.value = word
@@ -136,11 +175,13 @@ export function useEventSquare(emit: any) {
     searchQuery,
     activeCategory,
     activeCity,
+    activePriceLabel,
     loading,
     events,
     hotSearches,
     citiesList,
     categoriesList,
+    priceRanges,
     carouselSlides,
     recommendCards,
     filteredEvents,

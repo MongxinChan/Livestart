@@ -9,6 +9,7 @@ import com.mongxin.livestart.search.dao.entity.EventDO;
 import com.mongxin.livestart.search.dao.entity.PerformerDO;
 import com.mongxin.livestart.search.dao.mapper.EventMapper;
 import com.mongxin.livestart.search.dao.mapper.PerformerMapper;
+import com.mongxin.livestart.search.dto.req.EventSearchReqDTO;
 import com.mongxin.livestart.search.dto.resp.EventSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.HotSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.PerformerSearchRespDTO;
@@ -40,29 +41,46 @@ public class SearchServiceImpl implements SearchService {
     private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
 
     @Override
-    public IPage<EventSearchRespDTO> searchEvents(String keyword, Integer pageNum, Integer pageSize) {
-        log.info("[搜索] 检索演出，keyword={}, pageNum={}, pageSize={}", keyword, pageNum, pageSize);
+    public IPage<EventSearchRespDTO> searchEvents(EventSearchReqDTO req) {
+        log.info("[搜索] 检索演出，req={}", req);
 
         // 记录热搜词
-        recordHotSearch(keyword);
+        recordHotSearch(req.getKeyword());
 
-        Page<EventDO> page = new Page<>(pageNum, pageSize);
-        LambdaQueryWrapper<EventDO> queryWrapper = Wrappers.lambdaQuery(EventDO.class);
-        if (StrUtil.isNotBlank(keyword)) {
-            queryWrapper.like(EventDO::getTitle, keyword);
-        }
-        queryWrapper.orderByDesc(EventDO::getId);
+        // 分页计算
+        int pageNum = req.getPageNum() != null ? req.getPageNum() : 1;
+        int pageSize = req.getPageSize() != null ? req.getPageSize() : 10;
+        int offset = (pageNum - 1) * pageSize;
 
-        IPage<EventDO> eventPage = eventMapper.selectPage(page, queryWrapper);
+        // 调用自定义 SQL 查询
+        List<EventDO> eventList = eventMapper.searchEventsWithFilters(
+                req.getKeyword(),
+                req.getEventType(),
+                req.getCity(),
+                req.getMinPrice(),
+                req.getMaxPrice(),
+                offset,
+                pageSize
+        );
 
+        // 查询总数
+        long total = eventMapper.countEventsWithFilters(
+                req.getKeyword(),
+                req.getEventType(),
+                req.getCity(),
+                req.getMinPrice(),
+                req.getMaxPrice()
+        );
+
+        // 构建分页响应
         IPage<EventSearchRespDTO> resultPage = new Page<>(pageNum, pageSize);
-        resultPage.setTotal(eventPage.getTotal());
-        resultPage.setPages(eventPage.getPages());
+        resultPage.setTotal(total);
+        resultPage.setPages((long) Math.ceil((double) total / pageSize));
 
-        if (eventPage.getRecords().isEmpty()) {
+        if (eventList.isEmpty()) {
             resultPage.setRecords(Collections.emptyList());
         } else {
-            List<EventSearchRespDTO> list = eventPage.getRecords().stream()
+            List<EventSearchRespDTO> list = eventList.stream()
                     .map(this::toEventSearchRespDTO)
                     .collect(Collectors.toList());
             resultPage.setRecords(list);

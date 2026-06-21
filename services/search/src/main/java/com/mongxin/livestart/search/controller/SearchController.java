@@ -3,6 +3,7 @@ package com.mongxin.livestart.search.controller;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
+import com.mongxin.livestart.search.dto.req.EventSearchReqDTO;
 import com.mongxin.livestart.search.dto.resp.EventSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.HotSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.PerformerSearchRespDTO;
@@ -27,14 +28,12 @@ public class SearchController {
 
     /**
      * 搜索演唱会/演出
+     * 支持关键词、演出类型、城市、价格区间多维度过滤
      */
-    @Operation(summary = "搜索演出", description = "根据关键词搜索演唱会、演出项目，支持分页")
+    @Operation(summary = "搜索演出", description = "根据关键词搜索演唱会、演出项目，支持演出类型、城市、价格区间过滤与分页")
     @GetMapping("/event")
-    public Result<IPage<EventSearchRespDTO>> searchEvents(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(defaultValue = "1") Integer pageNum,
-            @RequestParam(defaultValue = "10") Integer pageSize) {
-        return Results.success(searchService.searchEvents(keyword, pageNum, pageSize));
+    public Result<IPage<EventSearchRespDTO>> searchEvents(EventSearchReqDTO req) {
+        return Results.success(searchService.searchEvents(req));
     }
 
     /**
