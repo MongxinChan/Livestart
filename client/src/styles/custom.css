@@ -262,9 +262,7 @@ body {
   background: var(--ls-bg-primary) !important;
 }
 .ant-layout-header {
-  height: 68px !important;
-  line-height: 68px !important;
-  padding: 0 32px !important;
+  /* 已替换为自定义 sticky header，此规则保留空块以防外部依赖 */
 }
 .ant-card {
   border-radius: 16px !important;
