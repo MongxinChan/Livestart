@@ -31,11 +31,15 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
     private static final String USER_LOGIN_KEY = "live-start:login:";
     private static final List<String> SKIP_PATHS = List.of(
             "/api/live-start/admin/v1/user/login",
+            "/api/live-start/admin/v1/user/login/code",
+            "/api/live-start/admin/v1/user/send-code",
             "/api/live-start/admin/v1/user",
             "/api/live-start/admin/v1/has-phone/**",
             "/api/live-start/admin/v1/user/check-login",
             "/api/live-start/engine/order/pay/alipay/notify",
-            "/api/engine/order/pay/alipay/notify"
+            "/api/engine/order/pay/alipay/notify",
+            "/api/live-start/engine/event/**",
+            "/api/live-start/search/**"
     );
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 

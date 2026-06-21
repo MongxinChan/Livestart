@@ -6,8 +6,10 @@
   "scripts": {
     "dev": "vite",
     "dev:mock": "vite --mode development",
+    "dev:local": "vite --mode local-real",
     "dev:real": "vite --mode publish",
-    "build": "vue-tsc -b && vite build",
+    "build": "vue-tsc -b && vite build --mode publish",
+    "build:mock": "vue-tsc -b && vite build --mode development",
     "preview": "vite preview"
   },
   "dependencies": {

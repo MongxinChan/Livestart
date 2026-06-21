@@ -3,10 +3,14 @@ import { apiState } from './sessionState'
 
 export { apiState } from './sessionState'
 
+const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
+
 export async function request<T = any>(url: string, options: RequestInit = {}): Promise<T> {
   if (apiState.isMock) {
     return handleMockRequest(url, options) as Promise<T>
   }
+
+  const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -17,7 +21,7 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
     ...((options.headers as Record<string, string>) || {}),
   }
 
-  const response = await fetch(url, { ...options, headers })
+  const response = await fetch(fullUrl, { ...options, headers })
 
   if (!response.ok) {
     if (response.status === 429) {
