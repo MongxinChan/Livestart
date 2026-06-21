@@ -59,3 +59,8 @@ build/
 .claude/
 CLAUDE.md
 docs/
+
+### Key files ###
+*私钥*.txt
+应用公钥*.txt
+支付宝公钥.txt
