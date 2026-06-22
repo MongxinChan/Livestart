@@ -28,9 +28,8 @@ public class SearchController {
 
     /**
      * 搜索演唱会/演出
-     * 支持关键词、演出类型、城市、价格区间多维度过滤
      */
-    @Operation(summary = "搜索演出", description = "根据关键词搜索演唱会、演出项目，支持演出类型、城市、价格区间过滤与分页")
+    @Operation(summary = "搜索演出", description = "根据关键词搜索演唱会、演出项目，支持分页")
     @GetMapping("/event")
     public Result<IPage<EventSearchRespDTO>> searchEvents(EventSearchReqDTO req) {
         return Results.success(searchService.searchEvents(req));

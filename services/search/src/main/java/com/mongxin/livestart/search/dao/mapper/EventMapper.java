@@ -27,7 +27,7 @@ public interface EventMapper extends BaseMapper<EventDO> {
     @Select("<script>" +
             "SELECT DISTINCT e.* FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "LEFT JOIN ticket_skus sku ON e.id = sku.event_id " +
+            "LEFT JOIN t_ticket_sku sku ON e.id = sku.event_id " +
             "WHERE 1=1 " +
             "<if test='keyword != null and keyword != \"\"'>" +
             "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +
@@ -40,7 +40,7 @@ public interface EventMapper extends BaseMapper<EventDO> {
             "</if>" +
             "<if test='minPrice != null or maxPrice != null'>" +
             "  AND e.id IN (" +
-            "    SELECT event_id FROM ticket_skus " +
+            "    SELECT event_id FROM t_ticket_sku " +
             "    WHERE 1=1 " +
             "    <if test='minPrice != null'> AND selling_price &gt;= #{minPrice} </if>" +
             "    <if test='maxPrice != null'> AND selling_price &lt;= #{maxPrice} </if>" +
@@ -65,7 +65,7 @@ public interface EventMapper extends BaseMapper<EventDO> {
     @Select("<script>" +
             "SELECT COUNT(DISTINCT e.id) FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "LEFT JOIN ticket_skus sku ON e.id = sku.event_id " +
+            "LEFT JOIN t_ticket_sku sku ON e.id = sku.event_id " +
             "WHERE 1=1 " +
             "<if test='keyword != null and keyword != \"\"'>" +
             "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +
@@ -78,7 +78,7 @@ public interface EventMapper extends BaseMapper<EventDO> {
             "</if>" +
             "<if test='minPrice != null or maxPrice != null'>" +
             "  AND e.id IN (" +
-            "    SELECT event_id FROM ticket_skus " +
+            "    SELECT event_id FROM t_ticket_sku " +
             "    WHERE 1=1 " +
             "    <if test='minPrice != null'> AND selling_price &gt;= #{minPrice} </if>" +
             "    <if test='maxPrice != null'> AND selling_price &lt;= #{maxPrice} </if>" +
