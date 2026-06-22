@@ -18,20 +18,20 @@
           <span>数据看板</span>
         </a-menu-item>
 
-        <a-sub-menu key="content">
+        <a-sub-menu v-if="canSeeContentSubmenu" key="content">
           <template #icon><AppstoreOutlined /></template>
           <template #title>内容管理</template>
           <a-menu-item key="/event">演出管理</a-menu-item>
-          <a-menu-item key="/venue">场馆管理</a-menu-item>
           <a-menu-item key="/ticket-sku">票档管理</a-menu-item>
-          <a-menu-item key="/performer">艺人管理</a-menu-item>
-          <a-menu-item key="/style">风格管理</a-menu-item>
+          <a-menu-item v-if="isSuper" key="/venue">场馆管理</a-menu-item>
+          <a-menu-item v-if="isSuper" key="/performer">艺人管理</a-menu-item>
+          <a-menu-item v-if="isSuper" key="/style">风格管理</a-menu-item>
         </a-sub-menu>
 
-        <a-sub-menu key="operation">
+        <a-sub-menu v-if="canSeeOperationSubmenu" key="operation">
           <template #icon><TeamOutlined /></template>
           <template #title>运营管理</template>
-          <a-menu-item key="/user">用户管理</a-menu-item>
+          <a-menu-item v-if="isSuper" key="/user">用户管理</a-menu-item>
           <a-menu-item key="/order">订单管理</a-menu-item>
         </a-sub-menu>
 
@@ -114,7 +114,7 @@ import {
   TeamOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons-vue'
-import { clearAdminSession, getAdminSession } from '@/api/http'
+import { clearAdminSession, getAdminSession, UserRole } from '@/api/http'
 
 const router = useRouter()
 const route = useRoute()
@@ -124,6 +124,13 @@ const selectedKeys = ref<string[]>([route.path])
 const adminRealName = ref('系统管理员')
 
 const currentTitle = computed(() => route.meta.title || '')
+
+const currentUserType = computed(() => getAdminSession()?.userType)
+const isSuper = computed(() => currentUserType.value === UserRole.SuperAdmin)
+/** 内容子菜单：超管完整可见；场地管理员只看演出，仍展示分组 */
+const canSeeContentSubmenu = computed(() => isSuper.value || currentUserType.value === UserRole.VenueAdmin)
+/** 运营子菜单：场地管理员只能看到订单，超管完整 */
+const canSeeOperationSubmenu = computed(() => isSuper.value || currentUserType.value === UserRole.VenueAdmin)
 
 watch(
   () => route.path,

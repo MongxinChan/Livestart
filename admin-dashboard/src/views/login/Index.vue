@@ -102,7 +102,15 @@ import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { MobileOutlined, SafetyCertificateOutlined, ThunderboltOutlined } from '@ant-design/icons-vue'
-import http, { saveAdminSession } from '@/api/http'
+import http, {
+  saveAdminSession,
+  updateAdminSession,
+  clearAdminSession,
+  ADMIN_DASHBOARD_ALLOWED_ROLES,
+  UserRole,
+  type UserRoleValue,
+} from '@/api/http'
+import { userApi } from '@/api/user'
 
 interface LoginResponse {
   token?: string
@@ -153,11 +161,12 @@ async function sendVerificationCode() {
   }
 }
 
-function persistSession(token: string, phone: string, payload: LoginResponse) {
+async function persistSession(token: string, phone: string, payload: LoginResponse) {
   const username = payload.username || phone
   const userId = String(payload.userId || '1')
   const realName = payload.realName || username || '管理员'
 
+  console.log('[Login] 保存基础 session', { token: token.substring(0, 20), phone, userId })
   saveAdminSession(token, {
     username,
     userId,
@@ -165,8 +174,36 @@ function persistSession(token: string, phone: string, payload: LoginResponse) {
     phone,
   })
 
-  message.success(`欢迎回来，${realName}`)
-  router.push('/dashboard')
+  // 调 /me 校验角色：场地管理员(3) 或 超管(4) 才能登录后台
+  try {
+    console.log('[Login] 调用 /me 接口获取 userType')
+    const me = await userApi.me()
+    console.log('[Login] /me 接口返回', me)
+
+    const userType = me?.userType as UserRoleValue | undefined
+    if (!userType || !ADMIN_DASHBOARD_ALLOWED_ROLES.includes(userType)) {
+      console.error('[Login] 角色验证失败', { userType, allowedRoles: ADMIN_DASHBOARD_ALLOWED_ROLES })
+      clearAdminSession()
+      message.error(buildRoleRejectMessage(userType))
+      return
+    }
+
+    console.log('[Login] 角色验证通过，更新 session', { userType })
+    updateAdminSession({ userType, realName: me.realName || realName })
+    message.success(`欢迎回来，${me.realName || realName}`)
+    router.push('/dashboard')
+  } catch (err) {
+    // /me 调用失败时保守处理：清掉 session，避免半登录态
+    console.error('[Login] /me 接口调用失败', err)
+    clearAdminSession()
+    message.error('登录校验失败，请稍后重试')
+  }
+}
+
+function buildRoleRejectMessage(userType?: UserRoleValue): string {
+  if (userType === UserRole.Fan) return '该账号是普通用户，请使用客户端登录，后台仅限场地管理员/超管访问'
+  if (userType === UserRole.Artist) return '艺人账号暂不支持登录后台'
+  return '该账号无后台访问权限'
 }
 
 async function handleMockLogin() {
@@ -174,11 +211,15 @@ async function handleMockLogin() {
 
   window.setTimeout(() => {
     mockLoading.value = false
-    persistSession(`mock-admin-token-${Date.now()}`, '13800000000', {
+    saveAdminSession(`mock-admin-token-${Date.now()}`, {
       username: 'admin',
       userId: '1',
       realName: '系统管理员',
+      phone: '13800000000',
+      userType: UserRole.SuperAdmin,
     })
+    message.success('Mock 超级管理员登录成功')
+    router.push('/dashboard')
   }, 400)
 }
 
@@ -200,7 +241,7 @@ async function handleLogin() {
     )
 
     if (data?.token) {
-      persistSession(data.token, loginForm.phone, data)
+      await persistSession(data.token, loginForm.phone, data)
       return
     }
 

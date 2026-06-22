@@ -3,11 +3,30 @@ import { message } from 'ant-design-vue'
 import type { AxiosError } from 'axios'
 import type { ApiResult } from '@/types'
 
+/**
+ * admin-dashboard 用户角色（与后端 t_user.user_type 对齐）
+ *   1 = 乐迷    （禁止登录后台）
+ *   2 = 艺人    （考虑中，当前禁止登录后台）
+ *   3 = 场地管理员/主办方
+ *   4 = 超级管理员
+ */
+export const UserRole = {
+  Fan: 1,
+  Artist: 2,
+  VenueAdmin: 3,
+  SuperAdmin: 4,
+} as const
+export type UserRoleValue = typeof UserRole[keyof typeof UserRole]
+
+/** admin-dashboard 允许登录的角色（场地管理员 + 超管） */
+export const ADMIN_DASHBOARD_ALLOWED_ROLES: UserRoleValue[] = [UserRole.VenueAdmin, UserRole.SuperAdmin]
+
 export interface AdminSession {
   username: string
   userId: string
   realName: string
   phone?: string
+  userType?: UserRoleValue
 }
 
 const TOKEN_KEY = 'admin_token'
@@ -36,9 +55,23 @@ export function saveAdminSession(token: string, session: AdminSession) {
   localStorage.setItem(USER_KEY, JSON.stringify(session))
 }
 
+export function updateAdminSession(patch: Partial<AdminSession>) {
+  const current = getAdminSession()
+  if (!current) return
+  localStorage.setItem(USER_KEY, JSON.stringify({ ...current, ...patch }))
+}
+
 export function clearAdminSession() {
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
+}
+
+export function isSuperAdmin(): boolean {
+  return getAdminSession()?.userType === UserRole.SuperAdmin
+}
+
+export function getCurrentUserType(): UserRoleValue | undefined {
+  return getAdminSession()?.userType
 }
 
 const http = axios.create({

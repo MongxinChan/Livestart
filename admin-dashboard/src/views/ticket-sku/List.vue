@@ -10,14 +10,41 @@
     </a-page-header>
 
     <a-card :bordered="false">
-      <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px">
+      <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
         <span style="white-space: nowrap">按演出筛选：</span>
-        <a-input-number v-model:value="filterEventId" :min="1" placeholder="演出 ID" style="width: 160px" allow-clear />
+        <a-radio-group v-model:value="filterMode" button-style="solid">
+          <a-radio-button value="id">按 ID</a-radio-button>
+          <a-radio-button value="name">按演出名称</a-radio-button>
+        </a-radio-group>
+        <a-input-number
+          v-if="filterMode === 'id'"
+          v-model:value="filterEventIdInput"
+          :min="1"
+          placeholder="输入演出 ID"
+          style="width: 200px"
+        />
+        <a-select
+          v-else
+          v-model:value="filterEventIdInput"
+          show-search
+          allow-clear
+          placeholder="输入或选择演出名称"
+          style="width: 320px"
+          :options="eventOptions"
+          :filter-option="filterEventOption"
+          :not-found-content="eventOptions.length === 0 ? '演出列表为空，请确认 merchant-admin 服务已启动' : '无匹配项'"
+        />
         <a-button type="primary" @click="onFilter">查询</a-button>
         <a-button @click="onClearFilter">重置</a-button>
       </div>
       <a-table :columns="columns" :data-source="list" :loading="loading" row-key="id" :pagination="pagination" @change="onTableChange">
         <template #bodyCell="{ column, record }">
+          <template v-if="column.key === 'event'">
+            <div style="display: flex; flex-direction: column; line-height: 1.4">
+              <span style="font-weight: 600">{{ eventTitleMap[record.eventId] || '未知演出' }}</span>
+              <span style="font-size: 11px; color: #8c8c8c">ID: {{ record.eventId }}</span>
+            </div>
+          </template>
           <template v-if="column.key === 'stock'">
             <a-progress
               :percent="record.totalStock ? Math.round((record.remainingStock / record.totalStock) * 100) : 0"
@@ -43,7 +70,15 @@
 
     <a-modal v-model:open="formVisible" :title="editingId ? '编辑票档' : '新增票档'" :confirm-loading="submitting" @ok="onSubmit" width="500px">
       <a-form :model="formData" :label-col="{ span: 5 }" :wrapper-col="{ span: 18 }">
-        <a-form-item label="演出 ID" required><a-input-number v-model:value="formData.eventId" :min="1" style="width: 100%" /></a-form-item>
+        <a-form-item label="演出" required>
+          <a-select
+            v-model:value="formData.eventId"
+            show-search
+            placeholder="选择或搜索演出"
+            :options="eventOptions"
+            :filter-option="filterEventOption"
+          />
+        </a-form-item>
         <a-form-item label="票种名称" required><a-input v-model:value="formData.title" placeholder="如：VIP票" /></a-form-item>
         <a-form-item label="原价"><a-input-number v-model:value="formData.originalPrice" :min="0" :precision="2" prefix="¥" style="width: 100%" /></a-form-item>
         <a-form-item label="售价" required><a-input-number v-model:value="formData.sellingPrice" :min="0" :precision="2" prefix="¥" style="width: 100%" /></a-form-item>
@@ -59,11 +94,12 @@ import { ref, reactive, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { ticketSkuApi } from '@/api/ticketSku'
-import type { TicketSkuItem } from '@/types'
+import { eventApi } from '@/api/event'
+import type { TicketSkuItem, EventItem } from '@/types'
 
 const columns = [
   { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '演出 ID', dataIndex: 'eventId', key: 'eventId', width: 90 },
+  { title: '关联演出', key: 'event', width: 280 },
   { title: '票种名称', dataIndex: 'title', key: 'title' },
   { title: '价格', key: 'price', width: 170 },
   { title: '库存', key: 'stock', width: 200 },
@@ -73,7 +109,37 @@ const columns = [
 
 const loading = ref(false)
 const list = ref<TicketSkuItem[]>([])
-const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
+const pagination = reactive({
+  current: 1,
+  pageSize: 10,
+  total: 0,
+  showSizeChanger: true,
+  pageSizeOptions: ['10', '20', '50', '100'],
+  showTotal: (total: number) => `共 ${total} 条`,
+})
+
+const eventOptions = ref<{ label: string; value: number }[]>([])
+const eventTitleMap = reactive<Record<number, string>>({})
+
+function filterEventOption(input: string, option: { label: string; value: number }) {
+  return (option.label || '').toLowerCase().includes(input.toLowerCase())
+    || String(option.value).includes(input)
+}
+
+async function fetchEventOptions() {
+  try {
+    const res = await eventApi.page({ current: 1, size: 500 })
+    const records = res?.records || []
+    eventOptions.value = records.map((e: EventItem) => ({ label: `${e.title} (ID: ${e.id})`, value: e.id }))
+    records.forEach((e: EventItem) => { eventTitleMap[e.id] = e.title })
+    if (records.length === 0) {
+      message.warning('演出列表为空，请先在「演出管理」中创建演出')
+    }
+  } catch (err) {
+    console.error('拉取演出列表失败', err)
+    message.error('演出列表加载失败，请确认 merchant-admin 服务已启动')
+  }
+}
 
 async function fetchList() {
   loading.value = true
@@ -84,16 +150,32 @@ async function fetchList() {
   } finally { loading.value = false }
 }
 
-function onTableChange(pag: any) { pagination.current = pag.current; fetchList() }
+function onTableChange(pag: any) {
+  pagination.current = pag.current
+  pagination.pageSize = pag.pageSize
+  fetchList()
+}
 
 const formVisible = ref(false)
 const submitting = ref(false)
 const editingId = ref<number | null>(null)
 const formData = reactive({ eventId: 0, title: '', originalPrice: 0, sellingPrice: 0, totalStock: 0, limitNum: 4 })
 
+const filterMode = ref<'id' | 'name'>('id')
+const filterEventIdInput = ref<number | null>(null)
 const filterEventId = ref<number | null>(null)
-function onFilter() { pagination.current = 1; fetchList() }
-function onClearFilter() { filterEventId.value = null; pagination.current = 1; fetchList() }
+
+function onFilter() {
+  filterEventId.value = filterEventIdInput.value
+  pagination.current = 1
+  fetchList()
+}
+function onClearFilter() {
+  filterEventIdInput.value = null
+  filterEventId.value = null
+  pagination.current = 1
+  fetchList()
+}
 
 function openForm(record?: TicketSkuItem) {
   if (record) { editingId.value = record.id; Object.assign(formData, record) }
@@ -103,6 +185,7 @@ function openForm(record?: TicketSkuItem) {
 
 async function onSubmit() {
   if (!formData.title || !formData.sellingPrice) { message.warning('请填写必填项'); return }
+  if (!formData.eventId) { message.warning('请选择关联演出'); return }
   submitting.value = true
   try {
     if (editingId.value) { await ticketSkuApi.update({ id: editingId.value, ...formData } as any); message.success('更新成功') }
@@ -113,5 +196,8 @@ async function onSubmit() {
 
 async function onDelete(id: number) { await ticketSkuApi.delete(id); message.success('已删除'); fetchList() }
 
-onMounted(fetchList)
+onMounted(() => {
+  fetchEventOptions()
+  fetchList()
+})
 </script>

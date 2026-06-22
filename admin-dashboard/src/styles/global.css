@@ -252,15 +252,34 @@ body {
   color: rgba(255, 255, 255, 0.8) !important;
 }
 
-.login-wrapper .ant-input, 
+.login-wrapper .ant-input-affix-wrapper,
+.login-wrapper .ant-input,
 .login-wrapper .ant-input-password {
-  background: rgba(255, 255, 255, 0.04) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  color: #fff !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.25) !important;
+  color: #000000 !important;
   border-radius: 6px !important;
 }
 
-.login-wrapper .ant-input:focus, 
+/* 输入框内部的真正 input 元素需要透明背景与黑色字 */
+.login-wrapper .ant-input-affix-wrapper > input.ant-input {
+  background: transparent !important;
+  color: #000000 !important;
+}
+
+/* 前缀图标颜色调整为深灰色 */
+.login-wrapper .ant-input-prefix .anticon {
+  color: rgba(0, 0, 0, 0.45) !important;
+}
+
+/* 输入框 placeholder 文字 */
+.login-wrapper .ant-input::placeholder,
+.login-wrapper .ant-input-affix-wrapper input::placeholder,
+.login-wrapper .ant-input-password input::placeholder {
+  color: rgba(0, 0, 0, 0.35) !important;
+}
+
+.login-wrapper .ant-input:focus,
 .login-wrapper .ant-input-affix-wrapper-focused {
   border-color: #3b82f6 !important;
   box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
@@ -272,11 +291,11 @@ body {
 }
 
 .login-wrapper .ant-input-password .anticon {
-  color: rgba(255, 255, 255, 0.45) !important;
+  color: rgba(0, 0, 0, 0.45) !important;
 }
 
 .login-wrapper .ant-input-password .anticon:hover {
-  color: #fff !important;
+  color: #000000 !important;
 }
 
 /* 按钮区域 */
