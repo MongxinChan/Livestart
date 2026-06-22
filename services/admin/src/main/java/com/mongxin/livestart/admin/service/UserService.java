@@ -36,11 +36,12 @@ public interface UserService extends IService<UserDO> {
     Boolean availablePhone(String phone);
 
     /**
-     * 注册用户
+     * 注册用户（注册成功后立即签发 token，调用方拿到即视为已登录）
      *
      * @param requestParam 注册用户请求参数
+     * @return 登录结果（含 token）
      */
-    void register(UserRegisterReqDTO requestParam);
+    UserLoginRespDTO register(UserRegisterReqDTO requestParam);
 
     /**
      * 修改用户
@@ -105,4 +106,12 @@ public interface UserService extends IService<UserDO> {
      * @return 登录结果（含 token）
      */
     UserLoginRespDTO loginByCode(String phone, String code);
+
+    /**
+     * 更新用户类型（临时管理接口，用于提升用户为管理员）
+     *
+     * @param phone 手机号
+     * @param userType 用户类型（1=乐迷 2=艺人 3=场地管理员 4=超管）
+     */
+    void updateUserType(String phone, Integer userType);
 }

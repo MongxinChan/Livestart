@@ -1,6 +1,7 @@
 package com.mongxin.livestart.admin.dto.resp;
 
 import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import com.mongxin.livestart.admin.common.serialize.IdCardDesensitizationSerializer;
 import lombok.Data;
 
@@ -15,11 +16,13 @@ public class VisitorRespDTO {
     /**
      * 观演人 ID
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     /**
      * 所属用户 ID
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long userId;
 
     /**

@@ -41,4 +41,9 @@ public class UserRegisterReqDTO {
      * 身份证号
      */
     private String idCard;
+
+    /**
+     * 验证码（可选，若传入则校验 Redis 中的验证码，用于前端验证码注册场景）
+     */
+    private String code;
 }

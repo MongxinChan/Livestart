@@ -54,12 +54,11 @@ public class UserController {
     }
 
     /**
-     * 注册用户
+     * 注册用户（注册成功直接返回 token，前端拿到即视为已登录）
      */
     @PostMapping("/api/live-start/admin/v1/user")
-    public Result<Void> register(@RequestBody @Validated UserRegisterReqDTO requestParam) {
-        userService.register(requestParam);
-        return Results.success();
+    public Result<UserLoginRespDTO> register(@RequestBody @Validated UserRegisterReqDTO requestParam) {
+        return Results.success(userService.register(requestParam));
     }
 
     /**
@@ -87,6 +86,20 @@ public class UserController {
     public Result<Boolean> checkLogin(@RequestParam("phone") String phone,
             @RequestParam("token") String token) {
         return Results.success(userService.checkLogin(phone, token));
+    }
+
+    /**
+     * 获取当前登录用户的完整画像（含 userType，用于前端按角色过滤菜单/路由）
+     * <p>
+     * 必须在登录后调用，依赖网关或本地 UserTransmitFilter 注入的 phone 头。
+     */
+    @GetMapping("/api/live-start/admin/v1/user/me")
+    public Result<UserRespDTO> getMyself() {
+        String phone = com.mongxin.livestart.admin.common.biz.user.UserContext.getPhone();
+        if (phone == null || phone.isBlank()) {
+            throw new com.mongxin.livestart.admin.common.convention.exception.ClientException("当前用户未登录");
+        }
+        return Results.success(userService.getUserByPhone(phone));
     }
 
     /**
@@ -142,5 +155,17 @@ public class UserController {
             @RequestParam("phone") String phone,
             @RequestParam("code") String code) {
         return Results.success(userService.loginByCode(phone, code));
+    }
+
+    /**
+     * 临时管理接口：提升用户为管理员（仅用于开发测试）
+     * TODO: 生产环境应删除此接口或增加严格的权限校验
+     */
+    @PutMapping("/api/live-start/admin/v1/user/promote-admin")
+    public Result<Void> promoteToAdmin(
+            @RequestParam("phone") String phone,
+            @RequestParam("userType") Integer userType) {
+        userService.updateUserType(phone, userType);
+        return Results.success();
     }
 }

@@ -143,6 +143,8 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
     @Override
     public void removeVisitor(Long id) {
         Long userId = getCurrentUserId();
+        log.info("[Visitor] 删除观演人: id={}, userId={}", id, userId);
+
         // 鉴权：确认该观演人属于当前用户
         getAndCheckOwnership(id, userId);
 
@@ -151,7 +153,12 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
                 .eq(UserVisitorDO::getId, id)
                 .eq(UserVisitorDO::getUserId, userId)
                 .set(UserVisitorDO::getDelFlag, 1);
-        baseMapper.update(null, updateWrapper);
+        int affectedRows = baseMapper.update(null, updateWrapper);
+        log.info("[Visitor] 删除观演人结果: id={}, affectedRows={}", id, affectedRows);
+
+        if (affectedRows == 0) {
+            throw new ClientException("删除失败，观演人不存在或已被删除");
+        }
     }
 
     @Override
@@ -191,14 +198,13 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
     private UserVisitorDO getAndCheckOwnership(Long id, Long userId) {
         LambdaQueryWrapper<UserVisitorDO> queryWrapper = Wrappers.lambdaQuery(UserVisitorDO.class)
                 .eq(UserVisitorDO::getId, id)
+                .eq(UserVisitorDO::getUserId, userId)  // 必须指定分片键
                 .eq(UserVisitorDO::getDelFlag, 0);
         UserVisitorDO visitorDO = baseMapper.selectOne(queryWrapper);
         if (visitorDO == null) {
             throw new ClientException(VisitorErrorCodeEnum.VISITOR_NOT_FOUND);
         }
-        if (!userId.equals(visitorDO.getUserId())) {
-            throw new ClientException(VisitorErrorCodeEnum.VISITOR_NOT_BELONG_TO_USER);
-        }
+        // userId 已经在查询条件中了，不需要再次校验
         return visitorDO;
     }
 

@@ -1,7 +1,6 @@
 package com.mongxin.livestart.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
-import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
@@ -42,12 +41,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 
-import java.util.Map;
-
 import java.util.concurrent.TimeUnit;
 
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
+import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.USER_LOGIN_PHONE_INDEX_KEY;
 import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.*;
 
 /**
@@ -92,10 +90,21 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Transactional(rollbackFor = Exception.class)
     @Override
-    public void register(UserRegisterReqDTO requestParam) {
+    public UserLoginRespDTO register(UserRegisterReqDTO requestParam) {
         if (!availablePhone(requestParam.getPhone())) {
             throw new ClientException(UserErrorCodeEnum.PHONE_EXIST);
         }
+
+        // 可选验证码校验：前端 client 端注册时传 code，后台管理端不传时跳过
+        if (StrUtil.isNotBlank(requestParam.getCode())) {
+            String cacheCode = stringRedisTemplate.opsForValue().get("login_code:" + requestParam.getPhone());
+            if (cacheCode == null || !cacheCode.equals(requestParam.getCode())) {
+                throw new ClientException("验证码错误或已失效");
+            }
+            // 校验通过，清理验证码缓存
+            stringRedisTemplate.delete("login_code:" + requestParam.getPhone());
+        }
+
         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getPhone());
         if (!lock.tryLock()) {
             throw new ClientException(PHONE_EXIST);
@@ -104,12 +113,12 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         try {
             UserDO userDO = BeanUtil.toBean(requestParam, UserDO.class);
-            
+
             // 盲盒逻辑：如果未传网名，系统默认按 Live_随机数 分发
             if (StrUtil.isBlank(userDO.getUsername())) {
                 userDO.setUsername("Live_" + RandomUtil.randomString(4));
             }
-            
+
             // 改写：生产级密文哈希加盐入库
             userDO.setPassword(BCrypt.hashpw(requestParam.getPassword(), BCrypt.gensalt()));
             int inserted = baseMapper.insert(userDO);
@@ -122,6 +131,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             userProfileMapper.insert(userProfileDO);
 
             userRegisterCachePenetrationBloomFilter.add(requestParam.getPhone());
+            // 注册即登录：直接为新用户签发 token
+            return issueToken(userDO, requestParam.getPhone());
         } catch (DuplicateKeyException ex) {
             throw new ClientException(USER_EXIST);
         } finally {
@@ -161,45 +172,39 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (userDO == null || !BCrypt.checkpw(requestParam.getPassword(), userDO.getPassword())) {
             throw new ClientException("该手机号绑定的用户不存在或密文校验失败！！！！");
         }
-        Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash()
-                .entries(USER_LOGIN_KEY + requestParam.getPhone());
-        if (CollUtil.isNotEmpty(hasLoginMap)) {
-            stringRedisTemplate.expire(USER_LOGIN_KEY + requestParam.getPhone(), 30L,
-                    TimeUnit.MINUTES);
-            String token = hasLoginMap.keySet().stream()
-                    .findFirst()
-                    .map(Object::toString)
-                    .orElseThrow(() -> new ClientException("用户登陆错误"));
-            return new UserLoginRespDTO(token);
+        // 复用未过期的旧会话：通过反向索引查到 token 后，确认主存仍存在再续期
+        String existingToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + requestParam.getPhone());
+        if (StrUtil.isNotBlank(existingToken)
+                && Boolean.TRUE.equals(stringRedisTemplate.hasKey(USER_LOGIN_KEY + existingToken))) {
+            stringRedisTemplate.expire(USER_LOGIN_KEY + existingToken, 30L, TimeUnit.MINUTES);
+            stringRedisTemplate.expire(USER_LOGIN_PHONE_INDEX_KEY + requestParam.getPhone(), 30L, TimeUnit.MINUTES);
+            return new UserLoginRespDTO(existingToken);
         }
-        /**
-         * Hash
-         * Key：login_用户名
-         * Value：
-         * Key：token标识
-         * Val：JSON 字符串（用户信息）
-         */
-        String uuid = UUID.randomUUID().toString();
-        stringRedisTemplate.opsForHash()
-                .put(USER_LOGIN_KEY + requestParam.getPhone(), uuid,
-                        JSON.toJSONString(userDO));
-        stringRedisTemplate.expire(USER_LOGIN_KEY + requestParam.getPhone(), 30L,
-                TimeUnit.DAYS);
-        return new UserLoginRespDTO(uuid);
+        return issueToken(userDO, requestParam.getPhone());
     }
 
     @Override
     public Boolean checkLogin(String phone, String token) {
-        return stringRedisTemplate.opsForHash().get(USER_LOGIN_KEY + phone, token) != null;
+        if (StrUtil.isBlank(token)) {
+            return false;
+        }
+        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(USER_LOGIN_KEY + token));
     }
 
     @Override
     public void logout(String phone, String token) {
-        if (checkLogin(phone, token)) {
-            stringRedisTemplate.delete(USER_LOGIN_KEY + phone);
-            return;
+        // 幂等退出：优先清理 token 维度主存，再清理反向索引；token 缺失时回退到反向索引查询
+        if (StrUtil.isNotBlank(token)) {
+            stringRedisTemplate.delete(USER_LOGIN_KEY + token);
+        } else if (StrUtil.isNotBlank(phone)) {
+            String existingToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + phone);
+            if (StrUtil.isNotBlank(existingToken)) {
+                stringRedisTemplate.delete(USER_LOGIN_KEY + existingToken);
+            }
         }
-        throw new ClientException("用户的缓存登录态存在异常或已下线");
+        if (StrUtil.isNotBlank(phone)) {
+            stringRedisTemplate.delete(USER_LOGIN_PHONE_INDEX_KEY + phone);
+        }
     }
 
     @Override
@@ -305,20 +310,53 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
 
         // 签发 Token (复用之前的 Hash Token 设计)
-        java.util.Map<Object, Object> hasLoginMap = stringRedisTemplate.opsForHash()
-                .entries(USER_LOGIN_KEY + phone);
-        if (CollUtil.isNotEmpty(hasLoginMap)) {
-            stringRedisTemplate.expire(USER_LOGIN_KEY + phone, 30L, TimeUnit.MINUTES);
-            String token = hasLoginMap.keySet().stream()
-                    .findFirst()
-                    .map(Object::toString)
-                    .orElseThrow(() -> new ClientException("登录会话生成失败"));
-            return new UserLoginRespDTO(token);
+        return issueToken(userDO, phone);
+    }
+
+    /**
+     * 为已存在的用户签发 token：每次登录生成新 token，覆盖旧会话，确保单设备登录或多设备使用最新会话。
+     */
+    private UserLoginRespDTO issueToken(UserDO userDO, String phone) {
+        // 删除旧会话（如果存在），确保每次登录都是全新的 token
+        String oldToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + phone);
+        if (StrUtil.isNotBlank(oldToken)) {
+            stringRedisTemplate.delete(USER_LOGIN_KEY + oldToken);
         }
 
+        // 生成新的 UUID token，主存 token→用户 JSON，反向索引 phone→token
         String uuid = UUID.randomUUID().toString();
-        stringRedisTemplate.opsForHash().put(USER_LOGIN_KEY + phone, uuid, JSON.toJSONString(userDO));
-        stringRedisTemplate.expire(USER_LOGIN_KEY + phone, 30L, TimeUnit.DAYS);
+        stringRedisTemplate.opsForValue().set(USER_LOGIN_KEY + uuid, JSON.toJSONString(userDO), 30L, TimeUnit.DAYS);
+        stringRedisTemplate.opsForValue().set(USER_LOGIN_PHONE_INDEX_KEY + phone, uuid, 30L, TimeUnit.DAYS);
         return new UserLoginRespDTO(uuid);
+    }
+
+    @Override
+    public void updateUserType(String phone, Integer userType) {
+        if (StrUtil.isBlank(phone) || userType == null) {
+            throw new ClientException("手机号和用户类型不能为空");
+        }
+        if (userType < 1 || userType > 4) {
+            throw new ClientException("用户类型必须在 1-4 之间");
+        }
+
+        LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class)
+                .eq(UserDO::getPhone, phone)
+                .eq(UserDO::getDelFlag, 0);
+
+        UserDO userDO = new UserDO();
+        userDO.setUserType(userType);
+
+        int updated = baseMapper.update(userDO, updateWrapper);
+        if (updated < 1) {
+            throw new ClientException("用户不存在或更新失败");
+        }
+
+        // 更新后强制下次重新登录：通过反向索引清除 token 主存与索引本身
+        String oldToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + phone);
+        if (StrUtil.isNotBlank(oldToken)) {
+            stringRedisTemplate.delete(USER_LOGIN_KEY + oldToken);
+        }
+        stringRedisTemplate.delete(USER_LOGIN_PHONE_INDEX_KEY + phone);
+        log.info("已将手机号 {} 的用户类型更新为 {}，并清除登录缓存", phone, userType);
     }
 }
