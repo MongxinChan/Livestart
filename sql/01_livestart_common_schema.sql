@@ -13,7 +13,8 @@
  确保在分布式微服务架构及后续分库分表迁移中的数据唯一性与扩展安全。
 */
 
-CREATE DATABASE IF NOT EXISTS `live_start` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `live_start`;
+CREATE DATABASE `live_start` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `live_start`;
 
 SET NAMES utf8mb4;
@@ -30,7 +31,9 @@ CREATE TABLE `t_venue` (
   `city` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '城市',
   `address` varchar(512) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '详细地址',
   `capacity` int DEFAULT NULL COMMENT '场馆总容纳人数',
-  PRIMARY KEY (`id`)
+  `owner_user_id` bigint DEFAULT NULL COMMENT '归属场地管理员用户ID（关联 t_user.id, user_type=3），NULL 表示无归属（公共场馆/超管管理）',
+  PRIMARY KEY (`id`),
+  KEY `idx_owner_user_id` (`owner_user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='场馆信息表';
 
 -- ----------------------------
@@ -127,11 +130,11 @@ CREATE TABLE `t_event_config` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出业务配置及退票策略表';
 
 -- ----------------------------
--- Table structure for ticket_skus
+-- Table structure for t_ticket_sku
 -- 演出票档库存表
 -- ----------------------------
-DROP TABLE IF EXISTS `ticket_skus`;
-CREATE TABLE `ticket_skus` (
+DROP TABLE IF EXISTS `t_ticket_sku`;
+CREATE TABLE `t_ticket_sku` (
   `id` bigint NOT NULL AUTO_INCREMENT COMMENT '票档主键ID(分布式雪花/自增安全)',
   `event_id` bigint NOT NULL COMMENT '关联演出ID',
   `title` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '票种名称: 如 680元档/VIP区/早鸟',

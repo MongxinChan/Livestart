@@ -8,7 +8,8 @@
  用于管理演唱会售票平台的票务库存准点预热、超时订单核对等各种后台定时任务。
 */
 
-CREATE DATABASE IF NOT EXISTS `xxl_job` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `xxl_job`;
+CREATE DATABASE `xxl_job` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE `xxl_job`;
 
 SET NAMES utf8mb4;

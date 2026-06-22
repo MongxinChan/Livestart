@@ -13,7 +13,7 @@
  【防跨库关联核心设计】
  - 采用 "Binding Table" 绑定表设计：t_order 和 t_order_item 共享相同的分片键（user_id），
    这保证了同一用户的订单及电子票子项百分之百会被存放在同一个物理库与分片表中，跨库 Join 开销直接降为 0。
- - 用户、订单、座位库中均冗余了常用的公共广播表副本（如 t_event, ticket_skus），以便底层驱动能本地高效执行关联查询。
+ - 用户、订单、座位库中均冗余了常用的公共广播表副本（如 t_event, t_ticket_sku），以便底层驱动能本地高效执行关联查询。
 */
 
 SET NAMES utf8mb4;
@@ -22,12 +22,18 @@ SET FOREIGN_KEY_CHECKS = 0;
 -- =========================================================================
 -- 1. 初始化 6 个分布式物理分库
 -- =========================================================================
-CREATE DATABASE IF NOT EXISTS `ds_user_0` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS `ds_user_1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS `ds_order_0` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS `ds_order_1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS `ds_seat_0` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE DATABASE IF NOT EXISTS `ds_seat_1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `ds_user_0`;
+CREATE DATABASE `ds_user_0` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `ds_user_1`;
+CREATE DATABASE `ds_user_1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `ds_order_0`;
+CREATE DATABASE `ds_order_0` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `ds_order_1`;
+CREATE DATABASE `ds_order_1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `ds_seat_0`;
+CREATE DATABASE `ds_seat_0` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+DROP DATABASE IF EXISTS `ds_seat_1`;
+CREATE DATABASE `ds_seat_1` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 
 -- =========================================================================
@@ -62,6 +68,8 @@ CREATE TABLE `t_user_profile_template` (
   `gender` tinyint(1) DEFAULT '0' COMMENT '性别 0:保密 1:男 2:女',
   `signature` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '个性签名',
   `birthday` date DEFAULT NULL COMMENT '生日',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
   PRIMARY KEY (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户社交资料模板';
 
@@ -204,7 +212,7 @@ CREATE TABLE `t_order_item_template` (
 -- 广播表副本，极速联查票价
 CREATE TABLE `t_event` SELECT * FROM `ds_user_0`.`t_event` WHERE 1=0;
 
-CREATE TABLE `ticket_skus` (
+CREATE TABLE `t_ticket_sku` (
   `id` bigint NOT NULL COMMENT '票档主键ID',
   `event_id` bigint NOT NULL COMMENT '关联演出ID',
   `title` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -257,6 +265,43 @@ CREATE TABLE `t_order_item_15` SELECT * FROM `t_order_item_template` WHERE 1=0;
 DROP TABLE IF EXISTS `t_order_template`;
 DROP TABLE IF EXISTS `t_order_item_template`;
 
+-- 用户票务分片表模板（按 user_id % 16 分表，与 t_order 共享分片键）
+CREATE TABLE `t_user_ticket_template` (
+  `id` bigint NOT NULL COMMENT '票务主键ID(分布式Snowflake)',
+  `user_id` bigint NOT NULL COMMENT '用户ID(Sharding Key)',
+  `ticket_sku_id` bigint NOT NULL COMMENT '关联票档ID',
+  `event_id` bigint NOT NULL COMMENT '演出ID',
+  `status` int NOT NULL DEFAULT '0' COMMENT '状态 0:未使用 1:已核销',
+  `check_code` varchar(128) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '唯一核销码',
+  `artist_promo_code` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '艺人推广码',
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '修改时间',
+  `del_flag` int NOT NULL DEFAULT '0' COMMENT '逻辑删除 0:正常 1:删除',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `idx_unique_check_code` (`check_code`),
+  KEY `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户电子票模板';
+
+-- 物理克隆分片用户票务表 t_user_ticket_0..15
+CREATE TABLE `t_user_ticket_0` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_1` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_2` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_3` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_4` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_5` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_6` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_7` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_8` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_9` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_10` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_11` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_12` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_13` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_14` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_15` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+
+DROP TABLE IF EXISTS `t_user_ticket_template`;
+
 
 -- 订单分片库 1
 USE `ds_order_1`;
@@ -264,7 +309,7 @@ USE `ds_order_1`;
 CREATE TABLE `t_order_template` SELECT * FROM `ds_order_0`.`t_order_0` WHERE 1=0;
 CREATE TABLE `t_order_item_template` SELECT * FROM `ds_order_0`.`t_order_item_0` WHERE 1=0;
 CREATE TABLE `t_event` SELECT * FROM `ds_order_0`.`t_event` WHERE 1=0;
-CREATE TABLE `ticket_skus` SELECT * FROM `ds_order_0`.`ticket_skus` WHERE 1=0;
+CREATE TABLE `t_ticket_sku` SELECT * FROM `ds_order_0`.`t_ticket_sku` WHERE 1=0;
 
 CREATE TABLE `t_order_0` SELECT * FROM `t_order_template` WHERE 1=0;
 CREATE TABLE `t_order_1` SELECT * FROM `t_order_template` WHERE 1=0;
@@ -303,6 +348,28 @@ CREATE TABLE `t_order_item_15` SELECT * FROM `t_order_item_template` WHERE 1=0;
 DROP TABLE IF EXISTS `t_order_template`;
 DROP TABLE IF EXISTS `t_order_item_template`;
 
+-- 用户票务分片表（从 ds_order_0 克隆结构）
+CREATE TABLE `t_user_ticket_template` SELECT * FROM `ds_order_0`.`t_user_ticket_0` WHERE 1=0;
+
+CREATE TABLE `t_user_ticket_0` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_1` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_2` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_3` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_4` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_5` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_6` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_7` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_8` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_9` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_10` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_11` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_12` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_13` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_14` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+CREATE TABLE `t_user_ticket_15` SELECT * FROM `t_user_ticket_template` WHERE 1=0;
+
+DROP TABLE IF EXISTS `t_user_ticket_template`;
+
 
 -- =========================================================================
 -- 4. 构建 ds_seat_0 和 ds_seat_1 (物理座位表：按 event_id % 8 分表)
@@ -325,7 +392,7 @@ CREATE TABLE `t_seat_template` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='座位模板表';
 
 CREATE TABLE `t_event` SELECT * FROM `ds_user_0`.`t_event` WHERE 1=0;
-CREATE TABLE `ticket_skus` SELECT * FROM `ds_order_0`.`ticket_skus` WHERE 1=0;
+CREATE TABLE `t_ticket_sku` SELECT * FROM `ds_order_0`.`t_ticket_sku` WHERE 1=0;
 
 -- 物理克隆分片座位表 t_seat_0..7
 CREATE TABLE `t_seat_0` SELECT * FROM `t_seat_template` WHERE 1=0;
@@ -345,7 +412,7 @@ USE `ds_seat_1`;
 
 CREATE TABLE `t_seat_template` SELECT * FROM `ds_seat_0`.`t_seat_0` WHERE 1=0;
 CREATE TABLE `t_event` SELECT * FROM `ds_order_0`.`t_event` WHERE 1=0;
-CREATE TABLE `ticket_skus` SELECT * FROM `ds_order_0`.`ticket_skus` WHERE 1=0;
+CREATE TABLE `t_ticket_sku` SELECT * FROM `ds_order_0`.`t_ticket_sku` WHERE 1=0;
 
 CREATE TABLE `t_seat_0` SELECT * FROM `t_seat_template` WHERE 1=0;
 CREATE TABLE `t_seat_1` SELECT * FROM `t_seat_template` WHERE 1=0;
