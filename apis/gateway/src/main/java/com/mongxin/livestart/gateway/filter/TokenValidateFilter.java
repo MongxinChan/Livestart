@@ -34,8 +34,11 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
             "/api/live-start/admin/v1/user/login/code",
             "/api/live-start/admin/v1/user/send-code",
             "/api/live-start/admin/v1/user",
+            "/api/live-start/admin/v1/user/*",
             "/api/live-start/admin/v1/has-phone/**",
+            "/api/live-start/admin/v1/actual/**",
             "/api/live-start/admin/v1/user/check-login",
+            "/api/live-start/admin/v1/user/promote-admin",
             "/api/live-start/engine/order/pay/alipay/notify",
             "/api/engine/order/pay/alipay/notify",
             "/api/live-start/engine/event/**",
@@ -55,19 +58,22 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
             return chain.filter(stripTrustedHeaders(exchange));
         }
 
-        String phone = exchange.getRequest().getHeaders().getFirst("phone");
         String token = exchange.getRequest().getHeaders().getFirst("token");
-        if (StrUtil.isBlank(phone) || StrUtil.isBlank(token)) {
-            log.warn("[Gateway-Auth] Missing auth header, path={}, phone={}", requestPath, phone);
+        if (StrUtil.isBlank(token)) {
+            log.warn("[Gateway-Auth] Missing token header, path={}", requestPath);
             return writeUnauthorized(exchange, "请求缺少认证信息，请先登录");
         }
 
-        String redisKey = USER_LOGIN_KEY + phone;
-        return reactiveStringRedisTemplate.opsForHash().get(redisKey, token)
-                .flatMap(userJson -> {
-                    String userPayload = (String) userJson;
-                    if (StrUtil.isBlank(userPayload)) {
-                        log.warn("[Gateway-Auth] Invalid token, phone={}", phone);
+        String redisKey = USER_LOGIN_KEY + token;
+        log.info("[Gateway-Auth] Checking Redis: key={}", redisKey);
+        return reactiveStringRedisTemplate.opsForValue().get(redisKey)
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("[Gateway-Auth] Login record not found in redis, token={}", token);
+                    return Mono.error(new RuntimeException("Login record not found"));
+                }))
+                .flatMap(userPayload -> {
+                    if (StrUtil.isBlank(userPayload) || "null".equals(userPayload)) {
+                        log.warn("[Gateway-Auth] Invalid token, payload={}", userPayload);
                         return writeUnauthorized(exchange, "登录态已失效，请重新登录");
                     }
 
@@ -75,16 +81,20 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
                     ServerHttpRequest mutatedRequest = stripTrustedHeaders(exchange).getRequest().mutate()
                             .header("userId", valueOrEmpty(userInfo.getString("id")))
                             .header("username", valueOrEmpty(userInfo.getString("username")))
-                            .header("phone", phone)
+                            .header("phone", valueOrEmpty(userInfo.getString("phone")))
                             .header("realName", valueOrEmpty(userInfo.getString("realName")))
                             .build();
 
+                    log.info("[Gateway-Auth] Auth success, userId={}, username={}", userInfo.getString("id"), userInfo.getString("username"));
                     return chain.filter(exchange.mutate().request(mutatedRequest).build());
                 })
-                .switchIfEmpty(Mono.defer(() -> {
-                    log.warn("[Gateway-Auth] Login record not found in redis, phone={}", phone);
-                    return writeUnauthorized(exchange, "登录态已失效，请重新登录");
-                }));
+                .onErrorResume(e -> {
+                    if ("Login record not found".equals(e.getMessage())) {
+                        return writeUnauthorized(exchange, "登录态已失效，请重新登录");
+                    }
+                    log.error("[Gateway-Auth] Unexpected error: {}", e.getMessage(), e);
+                    return writeUnauthorized(exchange, "认证异常，请重试");
+                });
     }
 
     @Override
