@@ -68,7 +68,7 @@ rules:
     broadcastTables:
       - t_event
       - t_event_config
-      - ticket_skus
+      - t_ticket_sku
       - t_refund_policy
 
   - !SINGLE

@@ -96,7 +96,7 @@ public class SettlementServiceImpl implements SettlementService {
             String queryOrdersSql = String.format("""
                     SELECT COUNT(*) as ticket_count, SUM(sku.selling_price) as revenue
                     FROM ds_order.t_order_item_%d oi
-                    JOIN live_start.ticket_skus sku ON oi.sku_id = sku.id
+                    JOIN live_start.t_ticket_sku sku ON oi.sku_id = sku.id
                     JOIN ds_order.t_order_%d o ON oi.order_no = o.order_no
                     WHERE oi.event_id = ? AND (o.status = 1 OR o.status = 2)
                     """, i, i);

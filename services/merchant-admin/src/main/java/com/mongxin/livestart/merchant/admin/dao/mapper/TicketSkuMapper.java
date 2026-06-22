@@ -19,6 +19,6 @@ public interface TicketSkuMapper extends BaseMapper<TicketSkuDO> {
      * @param count 增发数量
      * @return 影响行数
      */
-    @Update("UPDATE ticket_skus SET total_stock = total_stock + #{count}, remaining_stock = remaining_stock + #{count} WHERE id = #{skuId}")
+    @Update("UPDATE t_ticket_sku SET total_stock = total_stock + #{count}, remaining_stock = remaining_stock + #{count} WHERE id = #{skuId}")
     int increaseStock(@Param("skuId") Long skuId, @Param("count") Integer count);
 }

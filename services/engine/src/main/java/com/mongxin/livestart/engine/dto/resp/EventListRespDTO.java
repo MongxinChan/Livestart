@@ -1,6 +1,8 @@
 package com.mongxin.livestart.engine.dto.resp;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -16,6 +18,7 @@ import java.util.List;
 public class EventListRespDTO {
 
     @Schema(description = "演出 ID")
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     @Schema(description = "演出标题")

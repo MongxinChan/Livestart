@@ -10,10 +10,10 @@ import java.math.BigDecimal;
 
 /**
  * 票种/档位持久层实体
- * 对应表：ticket_skus
+ * 对应表：t_ticket_sku
  */
 @Data
-@TableName("ticket_skus")
+@TableName("t_ticket_sku")
 public class TicketSkuDO {
 
     /**
