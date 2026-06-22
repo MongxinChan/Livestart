@@ -14,10 +14,8 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'User-Id': apiState.userId,
-    Authorization: apiState.token,
     token: apiState.token,
-    phone: apiState.currentUser?.phone || '',
+    phone: apiState.phone || apiState.currentUser?.phone || '',
     ...((options.headers as Record<string, string>) || {}),
   }
 

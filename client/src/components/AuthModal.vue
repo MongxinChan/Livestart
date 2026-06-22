@@ -11,14 +11,14 @@
       已支持手机验证码快捷登录。未注册手机号将自动在后台进行隐式自动注册及社交资料建档。
     </a-typography-paragraph>
 
-    <a-form layout="vertical" @finish="handleAuthSubmit">
-      <a-form-item label="手机号" required>
+    <a-form layout="vertical" @submit.prevent="handleAuthSubmit">
+      <a-form-item label="手机号">
         <a-input v-model:value="authForm.phone" placeholder="请输入11位登录手机号" size="large" maxlength="11">
           <template #prefix><MobileOutlined style="color: rgba(255,255,255,0.25)" /></template>
         </a-input>
       </a-form-item>
 
-      <a-form-item label="短信验证码" required>
+      <a-form-item label="短信验证码">
         <a-space style="width: 100%">
           <a-input v-model:value="authForm.code" placeholder="请输入6位验证码" size="large" maxlength="6" style="flex: 1">
             <template #prefix><SafetyOutlined style="color: rgba(255,255,255,0.25)" /></template>

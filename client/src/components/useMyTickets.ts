@@ -9,7 +9,7 @@ export function useMyTickets() {
 
   async function fetchOrders() {
     try {
-      const data = await request<{ records: Order[] }>('/api/engine/order/page?current=1&size=50')
+      const data = await request<{ records: Order[] }>('/api/live-start/engine/order/page?current=1&size=50')
       orders.value = data.records
     } catch (err) {
       console.error('拉取订单失败', err)
@@ -50,7 +50,7 @@ export function useMyTickets() {
     // 支付宝真实/联调支付跳转
     if (payMethod.value === 'alipay' && !apiState.isMock) {
       try {
-        const payFormHtml = await request<string>('/api/engine/order/pay/alipay?orderNo=' + payingOrder.value.orderNo)
+        const payFormHtml = await request<string>('/api/live-start/engine/order/pay/alipay?orderNo=' + payingOrder.value.orderNo)
         const div = document.createElement('div')
         div.innerHTML = payFormHtml
         document.body.appendChild(div)
@@ -69,7 +69,7 @@ export function useMyTickets() {
 
     // 微信或 Mock 模式下的支付流程
     try {
-      await request('/api/engine/order/pay-callback', {
+      await request('/api/live-start/engine/order/pay-callback', {
         method: 'POST',
         body: JSON.stringify({
           orderNo: payingOrder.value.orderNo,
@@ -87,7 +87,7 @@ export function useMyTickets() {
 
   async function cancelOrder(orderNo: string) {
     try {
-      await request('/api/engine/order/cancel', { method: 'POST', body: JSON.stringify({ orderNo }) })
+      await request('/api/live-start/engine/order/cancel', { method: 'POST', body: JSON.stringify({ orderNo }) })
       message.success('取消成功！Redis/DB 物理库存已双向回流归还！')
       fetchOrders()
     } catch (err: any) {
@@ -101,7 +101,7 @@ export function useMyTickets() {
       content: '资金与门票库存都将退回。',
       async onOk() {
         try {
-          await request('/api/engine/order/refund', { method: 'POST', body: JSON.stringify({ orderNo }) })
+          await request('/api/live-start/engine/order/refund', { method: 'POST', body: JSON.stringify({ orderNo }) })
           message.success('退票成功！库存已在 JVM Map 与 Redis 中双向归还。')
           fetchOrders()
         } catch (err: any) {

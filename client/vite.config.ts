@@ -41,9 +41,14 @@ export default defineConfig({
         target: 'http://127.0.0.1:8002',
         changeOrigin: true,
       },
-      // C端用户服务 → 端口 8002
+      // C端用户服务 → 经 Gateway(8888) 做 token 校验后路由至 8002
       '/api/live-start/admin': {
-        target: 'http://127.0.0.1:8002',
+        target: 'http://127.0.0.1:8888',
+        changeOrigin: true,
+      },
+      // 购票引擎服务 → 经 Gateway(8888) 做 token 校验后路由至 8004
+      '/api/live-start/engine': {
+        target: 'http://127.0.0.1:8888',
         changeOrigin: true,
       },
     },

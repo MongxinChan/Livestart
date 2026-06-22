@@ -66,6 +66,7 @@ async function handleAuthSubmit() {
 
       apiState.userId = '20099'
       apiState.token = `mock-session-token-${authForm.phone}`
+      apiState.phone = authForm.phone
       apiState.currentUser = {
         username: `Live_${authForm.phone.substring(7)}`,
         realName: `新用户(${authForm.phone.substring(7)})`,
@@ -79,16 +80,42 @@ async function handleAuthSubmit() {
       return
     }
 
-    const data = await request<{ token: string }>(
-      `/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`,
-      { method: 'POST' }
-    )
+    // 先判断手机号是否已注册
+    const isAvailable = await request<boolean>(`/api/live-start/admin/v1/has-phone/${authForm.phone}`)
+
+    let data: { token: string }
+
+    if (isAvailable) {
+      // 未注册 → 调用 register（传验证码 + 占位密码）
+      data = await request<{ token: string }>(
+        `/api/live-start/admin/v1/user`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            phone: authForm.phone,
+            password: 'LiveStart123',
+            code: authForm.code,
+          }),
+        }
+      )
+    } else {
+      // 已注册 → 调用 loginByCode
+      data = await request<{ token: string }>(
+        `/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`,
+        { method: 'POST' }
+      )
+    }
 
     apiState.token = data.token
+    apiState.phone = authForm.phone
 
     const userRes = await request<any>(`/api/live-start/admin/v1/user/${authForm.phone}`)
     apiState.userId = String(userRes.id)
-    apiState.currentUser = userRes
+    // 保存用户信息，但用原始手机号覆盖后端返回的脱敏手机号
+    apiState.currentUser = {
+      ...userRes,
+      phone: authForm.phone, // 使用原始手机号，不用脱敏后的
+    }
     persistSession()
 
     message.success('验证成功，登录完成')
@@ -107,7 +134,7 @@ async function handleLogout() {
   if (!apiState.isMock && apiState.currentUser) {
     try {
       await request(
-        `/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}`,
+        `/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}&token=${apiState.token || ''}`,
         { method: 'DELETE' }
       )
     } catch {

@@ -82,7 +82,7 @@ export function useTicketOrderCabin(
 
     setTimeout(async () => {
       try {
-        pathToken.value = await request<string>('/api/engine/order/token?skuId=' + activeSku.value!.id)
+        pathToken.value = await request<string>('/api/live-start/engine/order/token?skuId=' + activeSku.value!.id)
         grabStatus.value = 'grabbing'
         grabProgress.value = 15
 
@@ -91,7 +91,7 @@ export function useTicketOrderCabin(
         }, 250)
 
         try {
-          const orderNo = await request<string>('/api/engine/order/create/' + pathToken.value, {
+          const orderNo = await request<string>('/api/live-start/engine/order/create/' + pathToken.value, {
             method: 'POST',
             body: JSON.stringify({
               skuId: activeSku.value!.id,
@@ -225,7 +225,7 @@ export function useTicketOrderCabin(
       // 3. 正常发起接口流程 (获取 Token -> 异步下单)
       try {
         // 获取 Path Token
-        const token = await request<string>('/api/engine/order/token?skuId=' + activeSku.value!.id)
+        const token = await request<string>('/api/live-start/engine/order/token?skuId=' + activeSku.value!.id)
         addLog(`⚡ 请求 #${index} -> 盾安全验证通过。Path Token: [${token.substring(0, 16)}...]`)
 
         if (!stressRunning.value) return
@@ -233,7 +233,7 @@ export function useTicketOrderCabin(
         addLog(`⏳ 请求 #${index} -> 已投递至 RocketMQ 异步队列，等待排队落库...`)
 
         // 创建订单
-        const orderNo = await request<string>('/api/engine/order/create/' + token, {
+        const orderNo = await request<string>('/api/live-start/engine/order/create/' + token, {
           method: 'POST',
           body: JSON.stringify({
             skuId: activeSku.value!.id,

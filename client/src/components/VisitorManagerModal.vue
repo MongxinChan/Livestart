@@ -72,7 +72,7 @@
           </a-col>
           <a-col :span="12">
             <a-form-item label="手机号码">
-              <a-input v-model:value="form.mobile" placeholder="选填 手机号" maxlength="11" />
+              <a-input v-model:value="form.mobile" placeholder="选填 手机号" :maxlength="11" />
             </a-form-item>
           </a-col>
         </a-row>
@@ -81,7 +81,7 @@
           <a-input
             v-model:value="form.cardNo"
             placeholder="请输入18位二代身份证"
-            maxlength="18"
+            :maxlength="18"
             :disabled="isEditMode"
             style="font-family: monospace"
           />

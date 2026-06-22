@@ -123,7 +123,7 @@ export function useEventSquare(emit: any) {
         const res = await request<any>('/api/search/event?' + buildSearchQueryString())
         events.value = Array.isArray(res) ? res : (res?.records || [])
       } else {
-        events.value = await request<LiveEvent[]>('/api/engine/event/list')
+        events.value = await request<LiveEvent[]>('/api/live-start/engine/event/list')
       }
     } catch (err) {
       console.error('拉取演出失败', err)
