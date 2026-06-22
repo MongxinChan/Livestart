@@ -58,6 +58,8 @@ rocketmq:
 
 xxl:
   job:
+    # 设置 false 可在本地未启动 XXL-JOB Admin 时跳过执行器初始化（票务延迟任务相关功能将不可用）
+    enabled: ${XXL_JOB_ENABLED:true}
     admin:
       addresses: http://127.0.0.1:8080/xxl-job-admin
       username: admin
