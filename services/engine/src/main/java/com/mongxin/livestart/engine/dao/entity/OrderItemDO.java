@@ -21,7 +21,7 @@ public class OrderItemDO {
     /**
      * 电子票ID（雪花算法生成）
      */
-    @TableId(type = IdType.INPUT)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
