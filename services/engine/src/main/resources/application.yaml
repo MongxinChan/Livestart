@@ -5,7 +5,6 @@ spring:
   application:
     name: Livestart-engine
   datasource:
-    # ShardingSphere 接管数据源
     driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
     url: jdbc:shardingsphere:classpath:shardingsphere-config.yaml
   cloud:
@@ -19,7 +18,6 @@ spring:
     redis:
       host: 127.0.0.1
       port: 6379
-      # password: 123456
 
 mybatis-plus:
   configuration:
@@ -58,10 +56,12 @@ rocketmq:
 
 livestart:
   engine:
-    # 订单超时关单时间（分钟）
     order-close-delay-minutes: 15
+    local-order-mode: true
+    auto-warm-stock-on-miss: true
+    mq:
+      enabled: false
 
-# 支付宝沙箱环境配置项
 alipay:
   app-id: ${ALIPAY_APP_ID:9021000164662769}
   private-key: ${ALIPAY_PRIVATE_KEY:xxx}

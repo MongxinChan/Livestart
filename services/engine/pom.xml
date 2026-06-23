@@ -13,6 +13,10 @@
     <artifactId>Livestart-engine</artifactId>
 
     <dependencies>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+        </dependency>
         <!-- Web 支持 -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
