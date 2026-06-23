@@ -11,6 +11,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
+import java.util.List;
 
 /**
  * 用户接口层
@@ -114,4 +115,6 @@ public interface UserService extends IService<UserDO> {
      * @param userType 用户类型（1=乐迷 2=艺人 3=场地管理员 4=超管）
      */
     void updateUserType(String phone, Integer userType);
+
+    List<UserRespDTO> listSimpleUsersByIds(List<Long> userIds);
 }

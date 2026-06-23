@@ -14,6 +14,7 @@ import org.springframework.validation.annotation.Validated;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
 
 /**
  * @author Mongxin
@@ -167,5 +168,10 @@ public class UserController {
             @RequestParam("userType") Integer userType) {
         userService.updateUserType(phone, userType);
         return Results.success();
+    }
+
+    @GetMapping("/api/live-start/admin/v1/user/simple/list")
+    public Result<List<UserRespDTO>> listSimpleUsersByIds(@RequestParam("userIds") List<Long> userIds) {
+        return Results.success(userService.listSimpleUsersByIds(userIds));
     }
 }

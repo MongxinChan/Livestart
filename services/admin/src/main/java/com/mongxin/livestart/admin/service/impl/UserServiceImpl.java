@@ -41,6 +41,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
@@ -358,5 +360,22 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         stringRedisTemplate.delete(USER_LOGIN_PHONE_INDEX_KEY + phone);
         log.info("已将手机号 {} 的用户类型更新为 {}，并清除登录缓存", phone, userType);
+    }
+
+    @Override
+    public List<UserRespDTO> listSimpleUsersByIds(List<Long> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        return baseMapper.selectBatchIds(userIds).stream().map(userDO -> {
+            UserRespDTO resp = new UserRespDTO();
+            resp.setId(userDO.getId());
+            resp.setUsername(userDO.getUsername());
+            resp.setRealName(userDO.getRealName());
+            resp.setPhone(userDO.getPhone());
+            resp.setUserType(userDO.getUserType());
+            resp.setStatus(userDO.getStatus());
+            return resp;
+        }).toList();
     }
 }
