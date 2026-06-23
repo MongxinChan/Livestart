@@ -60,7 +60,19 @@ build/
 CLAUDE.md
 docs/
 
+### codex ###
+.codex/
+
 ### Key files ###
 *私钥*.txt
 应用公钥*.txt
 支付宝公钥.txt
+
+### Runtime logs ###
+*.log
+*.out
+*.err
+*.pid
+logs/
+**/logs/
+
