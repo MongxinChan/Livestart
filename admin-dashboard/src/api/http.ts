@@ -93,6 +93,9 @@ http.interceptors.request.use((config) => {
     config.headers.username = adminUser.username
     config.headers.userId = adminUser.userId
     config.headers.realName = adminUser.realName
+    if (adminUser.userType !== undefined) {
+      config.headers.userType = String(adminUser.userType)
+    }
     if (adminUser.phone) {
       config.headers.phone = adminUser.phone
     }

@@ -14,6 +14,6 @@ export const ticketSkuApi = {
   delete: (id: number) =>
     http.delete<any, void>(`/api/merchant-admin/ticket-sku/delete/${id}`),
 
-  increaseStock: (data: { skuId: number; amount: number }) =>
+  increaseStock: (data: { skuId: number; count: number }) =>
     http.post<any, void>('/api/merchant-admin/ticket-sku/increase-stock', data),
 }

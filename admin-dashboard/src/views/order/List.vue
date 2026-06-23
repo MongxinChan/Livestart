@@ -35,7 +35,7 @@ const statusLabels: Record<number, string> = { 1: '待支付', 2: '已出票', 3
 const statusColors: Record<number, string> = { 1: 'orange', 2: 'green', 3: 'default', 4: 'red' }
 
 const columns = [
-  { title: '订单号', dataIndex: 'orderSn', key: 'orderSn', width: 200 },
+  { title: '订单号', dataIndex: 'orderNo', key: 'orderNo', width: 200 },
   { title: '用户', dataIndex: 'username', key: 'username', width: 100 },
   { title: '演出', dataIndex: 'eventTitle', key: 'eventTitle', ellipsis: true },
   { title: '票种', dataIndex: 'skuName', key: 'skuName', width: 120 },

@@ -47,6 +47,9 @@ export interface TicketSkuItem {
   originalPrice: number
   sellingPrice: number
   totalStock: number
+  stage1Stock?: number
+  stage2Stock?: number
+  stage2Released?: number
   remainingStock: number
   limitNum: number
   version: number
@@ -58,6 +61,8 @@ export interface TicketSkuSaveReq {
   originalPrice: number
   sellingPrice: number
   totalStock: number
+  stage1Stock?: number
+  stage2Stock?: number
   limitNum: number
 }
 
