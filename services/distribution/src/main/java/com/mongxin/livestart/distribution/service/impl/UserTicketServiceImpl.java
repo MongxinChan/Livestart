@@ -21,6 +21,8 @@ import com.mongxin.livestart.distribution.dao.mapper.TicketSkuMapper;
 import com.mongxin.livestart.distribution.dao.mapper.UserTicketMapper;
 import com.mongxin.livestart.distribution.dto.req.TicketGrabReqDTO;
 import com.mongxin.livestart.distribution.dto.resp.UserTicketRespDTO;
+import com.mongxin.livestart.distribution.feign.MerchantAdminRemoteService;
+import com.mongxin.livestart.distribution.feign.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.distribution.service.UserTicketService;
 import com.mongxin.livestart.distribution.toolkit.StockDecrementReturnCombinedUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
@@ -35,6 +37,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -51,6 +54,7 @@ public class UserTicketServiceImpl extends ServiceImpl<UserTicketMapper, UserTic
     private final TicketSkuMapper ticketSkuMapper;
     private final EventMapper eventMapper;
     private final StringRedisTemplate stringRedisTemplate;
+    private final MerchantAdminRemoteService merchantAdminRemoteService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
@@ -155,6 +159,7 @@ public class UserTicketServiceImpl extends ServiceImpl<UserTicketMapper, UserTic
                 .collect(Collectors.toMap(TicketSkuDO::getId, item -> item));
         Map<Long, EventDO> eventMap = eventMapper.selectBatchIds(eventIds).stream()
                 .collect(Collectors.toMap(EventDO::getId, item -> item));
+        Map<Long, MerchantVenueRespDTO> venueCache = new HashMap<>();
 
         return pageResult.convert(item -> {
             UserTicketRespDTO dto = new UserTicketRespDTO();
@@ -177,7 +182,22 @@ public class UserTicketServiceImpl extends ServiceImpl<UserTicketMapper, UserTic
             if (event != null) {
                 dto.setEventTitle(event.getTitle());
                 dto.setEventTime(event.getEventTime());
-                dto.setAddress(event.getAddress());
+                if (event.getVenueId() != null) {
+                    MerchantVenueRespDTO venueDTO = venueCache.computeIfAbsent(event.getVenueId(), id -> {
+                        try {
+                            var venueResult = merchantAdminRemoteService.getVenue(id);
+                            if (venueResult.isSuccess() && venueResult.getData() != null) {
+                                return venueResult.getData();
+                            }
+                        } catch (Exception e) {
+                            log.error("[distribution] failed to query venue detail, venueId={}", id, e);
+                        }
+                        return null;
+                    });
+                    if (venueDTO != null) {
+                        dto.setAddress(venueDTO.getAddress());
+                    }
+                }
             }
             return dto;
         });

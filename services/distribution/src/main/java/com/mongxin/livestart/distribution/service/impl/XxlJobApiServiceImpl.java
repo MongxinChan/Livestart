@@ -6,7 +6,10 @@ import com.mongxin.livestart.distribution.service.XxlJobApiService;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -16,10 +19,7 @@ import java.net.HttpCookie;
 import java.util.List;
 
 /**
- * XXL-JOB Admin OpenAPI 客户端实现
- * <p>
- * 通过 HTTP 调用 xxl-job-admin 的 REST 接口，动态注册/移除一次性定时任务。
- * XXL-JOB 2.x 的 API 需要先登录获取 Cookie，再携带 Cookie 调用业务接口。
+ * HTTP client for xxl-job-admin APIs.
  */
 @Slf4j
 @Service
@@ -37,10 +37,13 @@ public class XxlJobApiServiceImpl implements XxlJobApiService {
     @Value("${xxl.job.executor.appname}")
     private String executorAppname;
 
+    @Value("${xxl.job.executor.group-id:1}")
+    private String jobGroupId;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     /**
-     * 登录 xxl-job-admin 获取会话 Cookie
+     * Login to xxl-job-admin and extract the session cookie.
      */
     private String login() {
         String loginUrl = adminAddresses + "/login";
@@ -56,8 +59,7 @@ public class XxlJobApiServiceImpl implements XxlJobApiService {
 
         if (response.getStatusCode().is2xxSuccessful()) {
             List<String> cookies = response.getHeaders().get(HttpHeaders.SET_COOKIE);
-            if (cookies != null && !cookies.isEmpty()) {
-                // 解析 XXL_JOB_LOGIN_IDENTITY cookie
+            if (cookies != null) {
                 for (String cookieStr : cookies) {
                     List<HttpCookie> parsed = HttpCookie.parse(cookieStr);
                     for (HttpCookie cookie : parsed) {
@@ -69,47 +71,26 @@ public class XxlJobApiServiceImpl implements XxlJobApiService {
             }
         }
 
-        log.error("[XXL-JOB API] 登录 xxl-job-admin 失败，地址={}", adminAddresses);
-        throw new ServiceException("XXL-JOB 调度中心登录失败");
+        log.error("[XXL-JOB API] Failed to log in to xxl-job-admin. adminAddresses={}", adminAddresses);
+        throw new ServiceException("Failed to log in to xxl-job-admin");
     }
 
     @Override
     public int addTicketReleaseJob(Long eventId, String eventTitle, String cronExpression) {
-        String cookie = login();
-        String url = adminAddresses + "/jobinfo/add";
+        int jobId = addOneShotJob("Ticket release - " + eventTitle, "ticketReleaseJobHandler",
+                String.valueOf(eventId), cronExpression);
+        log.info("[XXL-JOB API] Registered ticket release job. eventId={}, jobId={}, cron={}, executorAppname={}",
+                eventId, jobId, cronExpression, executorAppname);
+        return jobId;
+    }
 
-        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-        params.add("jobGroup", "1");                                          // 执行器分组ID（默认1，首个注册的执行器）
-        params.add("jobDesc", "门票开售-" + eventTitle);                       // 任务描述
-        params.add("scheduleType", "CRON");                                   // 调度类型
-        params.add("scheduleConf", cronExpression);                           // Cron 表达式
-        params.add("glueType", "BEAN");                                       // 运行模式
-        params.add("executorHandler", "ticketReleaseJobHandler");             // JobHandler 名称
-        params.add("executorParam", String.valueOf(eventId));                 // 执行参数（演出ID）
-        params.add("executorRouteStrategy", "FIRST");                         // 路由策略
-        params.add("misfireStrategy", "FIRE_ONCE_NOW");                       // 错过触发：立即补偿执行一次
-        params.add("executorBlockStrategy", "SERIAL_EXECUTION");              // 阻塞策略
-        params.add("executorTimeout", "60");                                  // 超时时间（秒）
-        params.add("executorFailRetryCount", "2");                            // 失败重试次数
-        params.add("triggerStatus", "1");                                     // 创建后立即启用
-        params.add("author", "SYSTEM");                                       // 负责人
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        headers.add(HttpHeaders.COOKIE, cookie);
-
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
-        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
-
-        JSONObject result = JSON.parseObject(response.getBody());
-        if (result != null && result.getIntValue("code") == 200) {
-            int jobId = result.getIntValue("content");
-            log.info("[XXL-JOB API] 动态注册门票开售任务成功，eventId={}，jobId={}，cron={}", eventId, jobId, cronExpression);
-            return jobId;
-        }
-
-        log.error("[XXL-JOB API] 注册任务失败，响应={}", response.getBody());
-        throw new ServiceException("XXL-JOB 定时任务注册失败");
+    @Override
+    public int addTicketReminderJob(Long reminderId, String eventTitle, String cronExpression) {
+        int jobId = addOneShotJob("Ticket reminder - " + eventTitle, "ticketReminderJobHandler",
+                String.valueOf(reminderId), cronExpression);
+        log.info("[XXL-JOB API] Registered ticket reminder job. reminderId={}, jobId={}, cron={}, executorAppname={}",
+                reminderId, jobId, cronExpression, executorAppname);
+        return jobId;
     }
 
     @Override
@@ -124,10 +105,45 @@ public class XxlJobApiServiceImpl implements XxlJobApiService {
             HttpEntity<Void> request = new HttpEntity<>(headers);
             restTemplate.postForEntity(url, request, String.class);
 
-            log.info("[XXL-JOB API] 移除已完成的一次性任务成功，jobId={}", jobId);
+            log.info("[XXL-JOB API] Removed completed one-shot job. jobId={}", jobId);
         } catch (Exception e) {
-            // 移除失败不影响主流程，仅记录日志
-            log.warn("[XXL-JOB API] 移除任务异常（不影响业务），jobId={}", jobId, e);
+            log.warn("[XXL-JOB API] Failed to remove job. jobId={}", jobId, e);
         }
+    }
+
+    private int addOneShotJob(String jobDesc, String executorHandler, String executorParam, String cronExpression) {
+        String cookie = login();
+        String url = adminAddresses + "/jobinfo/add";
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("jobGroup", jobGroupId);
+        params.add("jobDesc", jobDesc);
+        params.add("scheduleType", "CRON");
+        params.add("scheduleConf", cronExpression);
+        params.add("glueType", "BEAN");
+        params.add("executorHandler", executorHandler);
+        params.add("executorParam", executorParam);
+        params.add("executorRouteStrategy", "FIRST");
+        params.add("misfireStrategy", "FIRE_ONCE_NOW");
+        params.add("executorBlockStrategy", "SERIAL_EXECUTION");
+        params.add("executorTimeout", "60");
+        params.add("executorFailRetryCount", "2");
+        params.add("triggerStatus", "1");
+        params.add("author", "SYSTEM");
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        headers.add(HttpHeaders.COOKIE, cookie);
+
+        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
+        ResponseEntity<String> response = restTemplate.postForEntity(url, request, String.class);
+
+        JSONObject result = JSON.parseObject(response.getBody());
+        if (result != null && result.getIntValue("code") == 200) {
+            return result.getIntValue("content");
+        }
+
+        log.error("[XXL-JOB API] Failed to register job. response={}", response.getBody());
+        throw new ServiceException("Failed to register XXL-JOB task");
     }
 }
