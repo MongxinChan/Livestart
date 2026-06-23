@@ -167,7 +167,7 @@ CREATE TABLE `xxl_job_user` (
 -- 初始化默认数据
 -- ----------------------------
 INSERT INTO `xxl_job_group`(`id`, `app_name`, `title`, `address_type`, `address_list`, `update_time`)
-    VALUES (1, 'xxl-job-executor-sample', '通用执行器Sample', 0, NULL, now());
+    VALUES (1, 'livestart-distribution-executor', 'Livestart Distribution Executor', 0, NULL, now());
 
 INSERT INTO `xxl_job_info`(`id`, `job_group`, `job_desc`, `add_time`, `update_time`, `author`, `alarm_email`,
                            `schedule_type`, `schedule_conf`, `misfire_strategy`, `executor_route_strategy`,
@@ -179,7 +179,7 @@ VALUES (1, 1, '示例任务01', now(), now(), 'XXL', '', 'CRON', '0 0 0 * * ? *'
         now(), '');
 
 INSERT INTO `xxl_job_user`(`id`, `username`, `password`, `role`, `permission`)
-VALUES (1, 'admin', '8d969eef6ecad3c29a3a629280e686cf0c3f5d5a86aff3ca12020c923adc6c92', 1, NULL);
+VALUES (1, 'admin', 'e10adc3949ba59abbe56e057f20f883e', 1, NULL);
 
 INSERT INTO `xxl_job_lock` (`lock_name`)
 VALUES ('schedule_lock');
