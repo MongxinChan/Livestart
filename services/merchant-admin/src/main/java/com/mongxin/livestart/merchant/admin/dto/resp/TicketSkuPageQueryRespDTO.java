@@ -27,6 +27,12 @@ public class TicketSkuPageQueryRespDTO {
     @Schema(description = "总库存")
     private Integer totalStock;
 
+    @Schema(description = "一开释放库存")
+    private Integer stage1Stock;
+
+    @Schema(description = "二开释放库存")
+    private Integer stage2Stock;
+
     @Schema(description = "当前剩余库存")
     private Integer remainingStock;
 }

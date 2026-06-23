@@ -48,6 +48,18 @@ public class TicketSkuDO {
     private Integer totalStock;
 
     /**
+     * 一开释放库存
+     */
+    private Integer stage1Stock;
+
+    /**
+     * 二开释放库存
+     */
+    private Integer stage2Stock;
+
+    private Integer stage2Released;
+
+    /**
      * 当前剩余库存 (扣减锚点)
      */
     private Integer remainingStock;

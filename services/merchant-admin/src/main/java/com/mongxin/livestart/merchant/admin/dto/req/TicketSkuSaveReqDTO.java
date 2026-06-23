@@ -27,6 +27,12 @@ public class TicketSkuSaveReqDTO {
     @Schema(description = "总库存", example = "500", required = true)
     private Integer totalStock;
 
+    @Schema(description = "一开释放库存", example = "300")
+    private Integer stage1Stock;
+
+    @Schema(description = "二开释放库存", example = "200")
+    private Integer stage2Stock;
+
     @Schema(description = "单人限购数量", example = "4")
     private Integer limitNum;
 }

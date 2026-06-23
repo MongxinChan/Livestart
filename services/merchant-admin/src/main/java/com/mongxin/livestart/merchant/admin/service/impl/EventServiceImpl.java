@@ -15,9 +15,11 @@ import com.mongxin.livestart.merchant.admin.dao.entity.EventConfigDO;
 import com.mongxin.livestart.merchant.admin.dao.entity.EventDO;
 import com.mongxin.livestart.merchant.admin.dao.entity.EventStyleRelationDO;
 import com.mongxin.livestart.merchant.admin.dao.entity.StyleDO;
+import com.mongxin.livestart.merchant.admin.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.EventMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.EventStyleRelationMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.StyleMapper;
+import com.mongxin.livestart.merchant.admin.dao.mapper.TicketSkuMapper;
 import com.mongxin.livestart.merchant.admin.dto.req.EventPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventSaveReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventUpdateReqDTO;
@@ -53,12 +55,15 @@ import static com.mongxin.livestart.merchant.admin.common.enums.ChainBizMarkEnum
 @Slf4j
 public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implements EventService {
 
+    private static final String ENGINE_TICKET_STOCK_KEY = "engine:stock:sku:%d";
+
     private final EventConfigService eventConfigService;
     private final StringRedisTemplate stringRedisTemplate;
     private final MerchantAdminChainContext merchantAdminChainContext;
     private final JdbcTemplate jdbcTemplate;
     private final EventStyleRelationMapper eventStyleRelationMapper;
     private final StyleMapper styleMapper;
+    private final TicketSkuMapper ticketSkuMapper;
 
     /**
      * 启动时自动用 JDBC 校验并生成多对多关联单表 t_event_performer，规避修改 ShardingSphere 广播表
@@ -281,6 +286,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
     public void updateEvent(EventUpdateReqDTO requestParam) {
         // 保存修改前的原始数据到日志上下文
         EventDO originalEvent = getById(requestParam.getId());
+        Integer originalTicketStage = getTicketStage(requestParam.getId());
         if (originalEvent != null) {
             LogRecordContext.putVariable("originalData", JSON.toJSONString(originalEvent));
         }
@@ -300,6 +306,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             jdbcTemplate.update("DELETE FROM t_event_ticket_stage WHERE event_id = ?", requestParam.getId());
             jdbcTemplate.update("INSERT IGNORE INTO t_event_ticket_stage (event_id, ticket_stage) VALUES (?, ?)",
                     requestParam.getId(), requestParam.getTicketStage());
+            releaseStage2StockIfNeeded(requestParam.getId(), originalTicketStage, requestParam.getTicketStage());
         }
 
         // 级联更新音乐风格关联（先删后增）
@@ -452,6 +459,50 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
     /**
      * 演出详情缓存预热/全量刷新（Create 和 Update 共用）
      */
+    private Integer getTicketStage(Long eventId) {
+        try {
+            List<Integer> stages = jdbcTemplate.queryForList(
+                    "SELECT ticket_stage FROM t_event_ticket_stage WHERE event_id = ?",
+                    Integer.class,
+                    eventId
+            );
+            return CollUtil.isNotEmpty(stages) ? stages.get(0) : 1;
+        } catch (Exception e) {
+            log.error("鏌ヨ婕斿嚭寮€绁ㄩ樁娈靛け璐? eventId={}", eventId, e);
+            return 1;
+        }
+    }
+
+    private void releaseStage2StockIfNeeded(Long eventId, Integer originalTicketStage, Integer currentTicketStage) {
+        if (!ObjectUtil.equal(originalTicketStage, 1) || !ObjectUtil.equal(currentTicketStage, 2)) {
+            return;
+        }
+
+        int affected = ticketSkuMapper.releaseStage2StockByEventId(eventId);
+        if (affected <= 0) {
+            log.info("婕斿嚭鍒囨崲鍒颁簩寮€锛屾棤闇€閲婃斁浜屽紑搴撳瓨 | eventId={}", eventId);
+            return;
+        }
+
+        List<TicketSkuDO> ticketSkus = ticketSkuMapper.selectByEventId(eventId);
+        for (TicketSkuDO each : ticketSkus) {
+            syncTicketStockCache(each.getId(), each.getRemainingStock());
+        }
+        log.info("婕斿嚭鍒囨崲鍒颁簩寮€锛屽凡閲婃斁浜屽紑搴撳瓨 | eventId={} | releasedSkuCount={}", eventId, affected);
+    }
+
+    private void syncTicketStockCache(Long skuId, Integer stock) {
+        try {
+            String stockValue = String.valueOf(stock);
+            String merchantKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
+            String engineKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
+            stringRedisTemplate.opsForValue().set(merchantKey, stockValue);
+            stringRedisTemplate.opsForValue().set(engineKey, stockValue);
+        } catch (Exception e) {
+            log.error("鍚屾绁ㄧ搴撳瓨缂撳瓨澶辫触锛堥潪闃诲锛?| skuId={}", skuId, e);
+        }
+    }
+
     private void warmUpEventCache(EventDO event, EventConfigDO config) {
         try {
             String eventCacheKey = String.format(MerchantAdminRedisConstant.EVENT_DETAIL_KEY, event.getId());

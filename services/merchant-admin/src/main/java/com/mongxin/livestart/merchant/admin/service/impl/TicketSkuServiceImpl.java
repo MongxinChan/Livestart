@@ -39,6 +39,8 @@ import static com.mongxin.livestart.merchant.admin.common.enums.ChainBizMarkEnum
 @Slf4j
 public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSkuDO> implements TicketSkuService {
 
+    private static final String ENGINE_TICKET_STOCK_KEY = "engine:stock:sku:%d";
+
     private final StringRedisTemplate stringRedisTemplate;
     private final MerchantAdminChainContext merchantAdminChainContext;
 
@@ -60,14 +62,26 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         merchantAdminChainContext.handler(MERCHANT_ADMIN_CREATE_TICKET_SKU_KEY.name(), requestParam);
 
         TicketSkuDO ticketSkuDO = BeanUtil.toBean(requestParam, TicketSkuDO.class);
-        ticketSkuDO.setRemainingStock(requestParam.getTotalStock());
+        int totalStock = requestParam.getTotalStock();
+        int stage1Stock = requestParam.getStage1Stock() == null ? totalStock : requestParam.getStage1Stock();
+        int stage2Stock = requestParam.getStage2Stock() == null ? Math.max(totalStock - stage1Stock, 0) : requestParam.getStage2Stock();
+        if (stage1Stock < 0 || stage2Stock < 0) {
+            throw new ClientException("一开和二开放票数量不能为负数");
+        }
+        if (stage1Stock + stage2Stock > totalStock) {
+            throw new ClientException("一开和二开放票数量之和不能超过总库存");
+        }
+        ticketSkuDO.setStage1Stock(stage1Stock);
+        ticketSkuDO.setStage2Stock(stage2Stock);
+        ticketSkuDO.setStage2Released(0);
+        ticketSkuDO.setRemainingStock(stage1Stock);
         save(ticketSkuDO);
 
         // 库存缓存预热
         try {
-            String stockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, ticketSkuDO.getId());
-            stringRedisTemplate.opsForValue().set(stockCacheKey, String.valueOf(ticketSkuDO.getTotalStock()));
-            log.info("票种库存预热成功 | skuId={} | stock={}", ticketSkuDO.getId(), ticketSkuDO.getTotalStock());
+            syncStockCache(ticketSkuDO.getId(), ticketSkuDO.getRemainingStock());
+            log.info("票种库存预热成功 | skuId={} | stage1Stock={} | stage2Stock={} | releasedStock={}",
+                    ticketSkuDO.getId(), ticketSkuDO.getStage1Stock(), ticketSkuDO.getStage2Stock(), ticketSkuDO.getRemainingStock());
         } catch (Exception e) {
             log.error("票种库存缓存预热失败 | skuId={}", ticketSkuDO.getId(), e);
         }
@@ -128,8 +142,7 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
 
         // Redis 缓存原子递增
         try {
-            String stockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, requestParam.getSkuId());
-            stringRedisTemplate.opsForValue().increment(stockCacheKey, requestParam.getCount());
+            incrementStockCache(requestParam.getSkuId(), requestParam.getCount());
             log.info("票种库存增发成功 | skuId={} | +{} | DB总库存={}",
                     requestParam.getSkuId(), requestParam.getCount(), sku.getTotalStock() + requestParam.getCount());
         } catch (Exception e) {
@@ -153,8 +166,7 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         removeById(id);
 
         try {
-            String stockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, id);
-            stringRedisTemplate.delete(stockCacheKey);
+            deleteStockCache(id);
             log.info("票种删除完成 & 库存缓存已清除 | skuId={}", id);
         } catch (Exception e) {
             log.error("票种库存缓存清除失败（非阻塞） | skuId={}", id, e);
@@ -177,5 +189,26 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         oldSku.setSellingPrice(requestParam.getSellingPrice());
         oldSku.setLimitNum(requestParam.getLimitNum());
         updateById(oldSku);
+    }
+
+    private void syncStockCache(Long skuId, Integer stock) {
+        String merchantStockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
+        String engineStockCacheKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
+        String stockValue = String.valueOf(stock);
+        stringRedisTemplate.opsForValue().set(merchantStockCacheKey, stockValue);
+        stringRedisTemplate.opsForValue().set(engineStockCacheKey, stockValue);
+    }
+
+    private void incrementStockCache(Long skuId, Integer count) {
+        String merchantStockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
+        String engineStockCacheKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
+        stringRedisTemplate.opsForValue().increment(merchantStockCacheKey, count);
+        stringRedisTemplate.opsForValue().increment(engineStockCacheKey, count);
+    }
+
+    private void deleteStockCache(Long skuId) {
+        String merchantStockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
+        String engineStockCacheKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
+        stringRedisTemplate.delete(List.of(merchantStockCacheKey, engineStockCacheKey));
     }
 }
