@@ -1,5 +1,5 @@
-import { ref, onMounted, onUnmounted } from 'vue'
-import { SearchOutlined, ShoppingOutlined } from '@ant-design/icons-vue'
+import { onMounted, onUnmounted, ref } from 'vue'
+import { BellOutlined, SearchOutlined, ShoppingOutlined } from '@ant-design/icons-vue'
 import { request } from './useRequest'
 import type { LiveEvent, ViewId } from '../types'
 
@@ -8,12 +8,12 @@ export function useNav() {
   const selectedEvent = ref<LiveEvent | null>(null)
 
   const navOptions = [
-    { value: 'square', label: '演出发现', icon: SearchOutlined },
-    { value: 'orders', label: '电子票包', icon: ShoppingOutlined },
+    { value: 'square', label: '演出广场', icon: SearchOutlined },
+    { value: 'orders', label: '电子票夹', icon: ShoppingOutlined },
+    { value: 'reminders', label: '我的提醒', icon: BellOutlined },
   ]
 
-  /** 内部统一导航函数，消除 onNavChange / navigateTo 的重复逻辑 */
-  function _setView(view: ViewId) {
+  function setView(view: ViewId) {
     activeView.value = view
     if (view === 'square') {
       selectedEvent.value = null
@@ -21,11 +21,11 @@ export function useNav() {
   }
 
   function onNavChange(val: string | number) {
-    _setView(val as ViewId)
+    setView(val as ViewId)
   }
 
   function navigateTo(view: ViewId) {
-    _setView(view)
+    setView(view)
   }
 
   function selectEventForCabin(event: LiveEvent) {
@@ -33,14 +33,12 @@ export function useNav() {
     activeView.value = 'cabin'
   }
 
-  // ---- Scroll 感知 ----
   const isScrolled = ref(false)
 
   function handleScroll() {
     isScrolled.value = window.scrollY > 20
   }
 
-  // ---- 导航栏搜索框 ----
   const navSearchVisible = ref(false)
   const navSearchQuery = ref('')
   const navSuggest = ref<string[]>([])
