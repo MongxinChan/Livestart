@@ -6,6 +6,8 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Update;
 
+import java.util.Date;
+
 /**
  * 订单 Mapper
  */
@@ -26,4 +28,9 @@ public interface OrderMapper extends BaseMapper<OrderDO> {
                           @Param("userId") Long userId,
                           @Param("targetStatus") int targetStatus,
                           @Param("expectedStatus") int expectedStatus);
+
+    @Update("UPDATE t_order SET pay_time = #{payTime} WHERE id = #{id} AND user_id = #{userId}")
+    int updatePayTime(@Param("id") Long id,
+                      @Param("userId") Long userId,
+                      @Param("payTime") Date payTime);
 }

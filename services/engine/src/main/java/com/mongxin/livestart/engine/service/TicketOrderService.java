@@ -1,11 +1,13 @@
 package com.mongxin.livestart.engine.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.mongxin.livestart.engine.dto.req.AdminOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCreateReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPayCallbackReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
+import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 
@@ -86,6 +88,8 @@ public interface TicketOrderService {
      * @return 订单分页列表
      */
     IPage<TicketOrderPageQueryRespDTO> pageQueryOrders(TicketOrderPageQueryReqDTO requestParam);
+
+    IPage<AdminOrderPageQueryRespDTO> pageQueryAdminOrders(AdminOrderPageQueryReqDTO requestParam);
 
     /**
      * 订单详情查询

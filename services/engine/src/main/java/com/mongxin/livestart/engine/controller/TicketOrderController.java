@@ -4,11 +4,13 @@ import com.mongxin.livestart.engine.common.annotation.RateLimit;
 import com.mongxin.livestart.framework.idempotent.NoDuplicateSubmit;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.mongxin.livestart.engine.dto.req.AdminOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCreateReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPayCallbackReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
+import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.service.TicketOrderService;
@@ -164,6 +166,12 @@ public class TicketOrderController {
     @GetMapping("/page")
     public Result<IPage<TicketOrderPageQueryRespDTO>> pageQueryOrders(TicketOrderPageQueryReqDTO requestParam) {
         return Results.success(ticketOrderService.pageQueryOrders(requestParam));
+    }
+
+    @Operation(summary = "后台订单分页查询", description = "供管理后台使用，超管查看全量订单，场馆管理员查看所属场馆订单")
+    @GetMapping("/admin/page")
+    public Result<IPage<AdminOrderPageQueryRespDTO>> pageQueryAdminOrders(AdminOrderPageQueryReqDTO requestParam) {
+        return Results.success(ticketOrderService.pageQueryAdminOrders(requestParam));
     }
 
     /**
