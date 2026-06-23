@@ -68,6 +68,9 @@ rules:
     keyGenerators:
       snowflake:
         type: SNOWFLAKE
+    broadcastTables:
+      - t_event
+      - t_ticket_sku
 
   - !SINGLE
     defaultDataSource: ds_common
