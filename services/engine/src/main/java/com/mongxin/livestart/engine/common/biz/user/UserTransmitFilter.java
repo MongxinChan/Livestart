@@ -27,6 +27,7 @@ public class UserTransmitFilter implements Filter {
         String userId = request.getHeader("userId");
         String username = request.getHeader("username");
         String phone = request.getHeader("phone");
+        String userType = request.getHeader("userType");
 
         // 有 userId 才设置（白名单接口无 userId Header）
         if (StrUtil.isNotBlank(userId)) {
@@ -34,6 +35,7 @@ public class UserTransmitFilter implements Filter {
                     .userId(userId)
                     .username(username)
                     .phone(phone)
+                    .userType(StrUtil.isNotBlank(userType) ? Integer.valueOf(userType) : null)
                     .build();
             UserContext.setUser(userInfoDTO);
         }

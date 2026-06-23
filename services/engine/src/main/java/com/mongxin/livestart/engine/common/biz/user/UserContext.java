@@ -47,6 +47,12 @@ public final class UserContext {
     /**
      * 清理上下文（Filter 的 finally 块中调用）
      */
+    public static Integer getUserType() {
+        return Optional.ofNullable(USER_THREAD_LOCAL.get())
+                .map(UserInfoDTO::getUserType)
+                .orElse(null);
+    }
+
     public static void removeUser() {
         USER_THREAD_LOCAL.remove();
     }
