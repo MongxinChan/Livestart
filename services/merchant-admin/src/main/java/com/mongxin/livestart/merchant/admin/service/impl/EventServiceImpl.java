@@ -468,7 +468,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             );
             return CollUtil.isNotEmpty(stages) ? stages.get(0) : 1;
         } catch (Exception e) {
-            log.error("鏌ヨ婕斿嚭寮€绁ㄩ樁娈靛け璐? eventId={}", eventId, e);
+            log.error("查询演出开票阶段失败, eventId={}", eventId, e);
             return 1;
         }
     }
@@ -480,7 +480,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         int affected = ticketSkuMapper.releaseStage2StockByEventId(eventId);
         if (affected <= 0) {
-            log.info("婕斿嚭鍒囨崲鍒颁簩寮€锛屾棤闇€閲婃斁浜屽紑搴撳瓨 | eventId={}", eventId);
+            log.info("演出切换到二开，无需释放二开库存 | eventId={}", eventId);
             return;
         }
 
@@ -488,7 +488,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         for (TicketSkuDO each : ticketSkus) {
             syncTicketStockCache(each.getId(), each.getRemainingStock());
         }
-        log.info("婕斿嚭鍒囨崲鍒颁簩寮€锛屽凡閲婃斁浜屽紑搴撳瓨 | eventId={} | releasedSkuCount={}", eventId, affected);
+        log.info("演出切换到二开，已释放二开库存 | eventId={} | releasedSkuCount={}", eventId, affected);
     }
 
     private void syncTicketStockCache(Long skuId, Integer stock) {
@@ -499,7 +499,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             stringRedisTemplate.opsForValue().set(merchantKey, stockValue);
             stringRedisTemplate.opsForValue().set(engineKey, stockValue);
         } catch (Exception e) {
-            log.error("鍚屾绁ㄧ搴撳瓨缂撳瓨澶辫触锛堥潪闃诲锛?| skuId={}", skuId, e);
+            log.error("同步票种库存缓存失败（非阻塞）| skuId={}", skuId, e);
         }
     }
 
