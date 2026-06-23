@@ -1,6 +1,5 @@
 <template>
   <div class="event-square">
-    <!-- 1. 轮播 Banner -->
     <div class="carousel-container" style="margin-bottom: 28px">
       <a-carousel autoplay :dots="true" :autoplay-speed="5000" effect="fade">
         <div v-for="(slide, idx) in carouselSlides" :key="idx" class="carousel-slide-wrap">
@@ -18,7 +17,7 @@
                 </p>
                 <a-button type="primary" @click="clickBannerLink(slide.eventId)">
                   <template #icon><ThunderboltOutlined /></template>
-                  立即准点抢购
+                  立即查看
                 </a-button>
               </div>
             </div>
@@ -27,13 +26,12 @@
       </a-carousel>
     </div>
 
-    <!-- 2. 搜索 + 热搜词云 -->
     <a-card class="glass-panel" style="margin-bottom: 28px; text-align: center" :bordered="false">
       <h2 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 6px">
-        搜索您心仪的 <span class="text-gradient">明星 / 现场演出</span>
+        搜索你关注的 <span class="text-gradient">明星 / 演出</span>
       </h2>
       <p style="color: var(--ls-text-secondary); margin-bottom: 18px; font-size: 0.86rem">
-        内置 Redis ZSet 计分词云排行。每次点击与检索都将动态推升其全网热搜排名。
+        当前会直接展示一开、二开、待开售、抢票中还是已开演，不用再自己猜测。
       </p>
       <a-input-search
         v-model:value="searchQuery"
@@ -43,9 +41,8 @@
         style="max-width: 540px"
         @search="handleSearch"
       />
-      <!-- 热搜词云 -->
       <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px">
-        <span style="font-size: 12px; font-weight: 600; color: var(--ls-text-secondary); margin-right: 4px">🔥 实时热搜:</span>
+        <span style="font-size: 12px; font-weight: 600; color: var(--ls-text-secondary); margin-right: 4px">实时热搜:</span>
         <a-tag
           v-for="(hot, idx) in hotSearches"
           :key="idx"
@@ -60,11 +57,10 @@
       </div>
     </a-card>
 
-    <!-- 3. 推荐卡片 -->
     <div v-if="!searchQuery" style="margin-bottom: 28px">
       <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px">
         <FireOutlined style="color: var(--ant-color-primary)" />
-        🔥 答辩特设：高并发热门抢票推荐榜
+        热门推荐
       </h3>
       <a-row :gutter="[20, 20]">
         <a-col :xs="24" :md="12" v-for="rec in recommendCards" :key="rec.eventId">
@@ -86,10 +82,9 @@
       </a-row>
     </div>
 
-    <!-- 4. 统一过滤面板 -->
     <div class="filters-panel" style="margin-bottom: 24px; padding: 18px 24px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px">
       <div class="filter-row" style="margin-bottom: 14px; display: flex; align-items: center; gap: 16px">
-        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">城市：</span>
+        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">城市:</span>
         <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
           <span
             v-for="c in citiesList"
@@ -102,7 +97,7 @@
         </div>
       </div>
       <div class="filter-row" style="margin-bottom: 14px; display: flex; align-items: center; gap: 16px">
-        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">分类：</span>
+        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">分类:</span>
         <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
           <span
             v-for="cat in categoriesList"
@@ -115,7 +110,7 @@
         </div>
       </div>
       <div class="filter-row" style="display: flex; align-items: center; gap: 16px">
-        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">价格：</span>
+        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">价格:</span>
         <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
           <span
             v-for="p in priceRanges"
@@ -131,11 +126,10 @@
 
     <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 16px">
       <span style="font-size: 13px; color: var(--ls-text-secondary)">
-        已为您推荐 <span style="font-weight: 700; color: var(--ant-color-primary)">{{ filteredEvents.length }}</span> 场精彩演出
+        已为你找到 <span style="font-weight: 700; color: var(--ant-color-primary)">{{ filteredEvents.length }}</span> 场演出
       </span>
     </div>
 
-    <!-- 骨架屏 -->
     <a-row v-if="loading" :gutter="[24, 24]">
       <a-col :xs="24" :sm="12" :lg="8" :xl="6" v-for="i in 4" :key="i">
         <a-card :bordered="false">
@@ -144,12 +138,10 @@
       </a-col>
     </a-row>
 
-    <!-- 演出卡片网格 -->
     <a-row v-else :gutter="[24, 24]">
       <a-col :xs="24" :sm="12" :lg="8" :xl="6" v-for="event in filteredEvents" :key="event.id">
         <a-card hoverable class="glow-card" :bordered="false" :body-style="{ padding: '14px' }">
-          <!-- 封面 -->
-          <div class="event-cover-wrap" style="height: 180px; margin-bottom: 12px">
+          <div class="event-cover-wrap" style="height: 180px; margin-bottom: 12px; position: relative">
             <img :src="event.cover" :alt="event.title" style="width: 100%; height: 100%; object-fit: cover; border-radius: 10px" />
             <a-tag
               :color="event.type === '演唱会' ? 'magenta' : 'cyan'"
@@ -158,23 +150,24 @@
               {{ event.type }}
             </a-tag>
             <a-tag
-              v-if="event.ticketStage"
-              :color="event.ticketStage === 2 ? 'orange' : 'blue'"
+              :color="resolveEventStageMeta(event).stageColor"
               style="position: absolute; top: 10px; right: 10px; border-radius: 6px"
             >
-              {{ event.ticketStage === 2 ? '二开' : '一开' }}
+              {{ resolveEventStageMeta(event).stageLabel }}
             </a-tag>
           </div>
-          <!-- 信息 -->
+
           <h3 style="font-size: 0.9rem; font-weight: 700; line-height: 1.4; height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 8px">
             {{ event.title }}
           </h3>
           <div style="font-size: 12px; color: var(--ls-text-secondary); display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px">
             <span><CalendarOutlined /> {{ event.date }}</span>
-            <span><EnvironmentOutlined /> {{ event.venue }}</span>
+            <span><EnvironmentOutlined /> {{ event.venue }}<template v-if="event.city"> · {{ event.city }}</template></span>
             <span v-if="event.artist"><UserOutlined /> {{ event.artist }}</span>
+            <span style="font-weight: 600; color: var(--ant-color-primary)">{{ resolveEventStageMeta(event).statusText }}</span>
+            <span v-if="resolveEventStageMeta(event).timeText">{{ resolveEventStageMeta(event).timeText }}</span>
           </div>
-          <!-- 底部操作 -->
+
           <a-divider style="margin: 10px 0" />
           <div style="display: flex; justify-content: space-between; align-items: center">
             <div>
@@ -182,9 +175,20 @@
               <span style="font-size: 1.2rem; font-weight: 800">{{ event.minPrice }}</span>
               <span style="font-size: 11px; color: var(--ls-text-secondary)"> 起</span>
             </div>
-            <a-button type="primary" size="small" @click.stop="$emit('selectEvent', event)">
+            <a-button type="primary" size="small" :disabled="!resolveEventStageMeta(event).canGrab" @click.stop="$emit('selectEvent', event)">
               <template #icon><ThunderboltOutlined /></template>
-              立即抢票
+              {{ resolveEventStageMeta(event).canGrab ? '立即抢票' : '查看阶段' }}
+            </a-button>
+          </div>
+          <div style="margin-top: 10px">
+            <a-button
+              block
+              size="small"
+              ghost
+              :disabled="resolveEventStageMeta(event).canGrab || resolveEventStageMeta(event).hasStarted"
+              @click.stop="subscribeReminder(event)"
+            >
+              预约开售提醒
             </a-button>
           </div>
         </a-card>
@@ -194,17 +198,21 @@
 </template>
 
 <script setup lang="ts">
+import { message } from 'ant-design-vue'
 import {
-  ThunderboltOutlined,
-  FireOutlined,
   CalendarOutlined,
   EnvironmentOutlined,
+  FireOutlined,
+  ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
 import { useEventSquare } from './useEventSquare'
+import { resolveEventStageMeta } from '@/utils/eventStage'
+import { request } from '@/composables/useRequest'
+import type { LiveEvent } from '@/types'
 
 const emit = defineEmits<{
-  selectEvent: [event: any]
+  selectEvent: [event: LiveEvent]
 }>()
 
 const {
@@ -222,6 +230,18 @@ const {
   filteredEvents,
   handleSearch,
   clickHotWord,
-  clickBannerLink
+  clickBannerLink,
 } = useEventSquare(emit)
+
+async function subscribeReminder(event: LiveEvent) {
+  try {
+    await request('/api/live-start/distribution/v1/reminder/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ eventId: event.id }),
+    })
+    message.success(`已为《${event.title}》预约开售提醒`)
+  } catch (err: any) {
+    message.error(err.message || '预约提醒失败')
+  }
+}
 </script>

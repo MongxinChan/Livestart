@@ -1,6 +1,7 @@
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { request } from '@/composables/useRequest'
-import type { LiveEvent, HotSearch, CarouselSlide } from '@/types'
+import type { CarouselSlide, HotSearch, LiveEvent } from '@/types'
+import { resolveEventStageMeta } from '@/utils/eventStage'
 
 export interface PriceRangeOption {
   label: string
@@ -16,14 +17,7 @@ export const PRICE_RANGES: PriceRangeOption[] = [
   { label: '800 以上', minPrice: 800, maxPrice: null },
 ]
 
-const CATEGORY_TO_TYPE: Record<string, number | null> = {
-  '全部': null,
-  '演唱会': 1,
-  'Livehouse': 0,
-  '音乐节': 2,
-}
-
-export function useEventSquare(emit: any) {
+export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): void }) {
   const searchQuery = ref('')
   const activeCategory = ref('全部')
   const activeCity = ref('全国')
@@ -39,22 +33,22 @@ export function useEventSquare(emit: any) {
   const carouselSlides: CarouselSlide[] = [
     {
       title: '「周杰伦」嘉年华巡回演唱会',
-      desc: '阔别已久，万人狂欢现场。搭载 RocketMQ 异步落库，为您提供极致的物理削峰抢票保航！',
-      tag: '超级热门 ⚡ 抢购推荐',
+      desc: '面向高并发抢票场景，活动状态会实时展示是否待开售、是否已开抢。',
+      tag: '超热演出',
       image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=1200',
       eventId: 102,
     },
     {
       title: '万能青年旅店巡回音乐会 - 上海站',
-      desc: '独立摇滚金曲专场。配置高并发 Redis 滑动窗口限流防御，全线护卫售票体系健康！',
-      tag: '口碑推荐 🎵 Livehouse',
+      desc: 'Livehouse 场景同样支持阶段判断和开售提醒预约。',
+      tag: 'Livehouse 推荐',
       image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
       eventId: 101,
     },
     {
       title: '「重塑雕像的权利」特别专场',
-      desc: '后朋克美学极致。内置商户票房多表结算对账，可穿透统计 16 张物理订单分表！',
-      tag: '美学前沿 ⚡ 后朋克',
+      desc: '在演出广场就能看清当前是一开、二开还是已开演。',
+      tag: '先锋现场',
       image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=1200',
       eventId: 103,
     },
@@ -67,9 +61,9 @@ export function useEventSquare(emit: any) {
       venue: '杭州奥体中心体育场',
       cover: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=200',
       priceRange: '580 - 2000',
-      tag: '超火热万人抢票',
+      tag: '超热万人抢票',
       tagColor: 'volcano',
-      status: '极速抢票中 ⚡',
+      status: '正在热卖',
       statusColor: 'success',
     },
     {
@@ -80,53 +74,61 @@ export function useEventSquare(emit: any) {
       priceRange: '280 - 580',
       tag: '独立摇滚精选',
       tagColor: 'cyan',
-      status: '高口碑热卖 🎵',
+      status: '口碑推荐',
       statusColor: 'processing',
     },
   ]
 
-  const filteredEvents = computed(() => events.value)
-
-  function buildSearchQueryString(): string {
-    const params = new URLSearchParams()
-    if (searchQuery.value.trim()) {
-      params.set('keyword', searchQuery.value.trim())
-    }
-    const eventType = CATEGORY_TO_TYPE[activeCategory.value]
-    if (eventType !== null && eventType !== undefined) {
-      params.set('eventType', String(eventType))
-    }
-    if (activeCity.value !== '全国') {
-      params.set('city', activeCity.value)
-    }
+  const filteredEvents = computed(() => {
+    const keyword = searchQuery.value.trim().toLowerCase()
     const priceRange = priceRanges.find(p => p.label === activePriceLabel.value)
-    if (priceRange?.minPrice != null) {
-      params.set('minPrice', String(priceRange.minPrice))
-    }
-    if (priceRange?.maxPrice != null) {
-      params.set('maxPrice', String(priceRange.maxPrice))
-    }
-    params.set('pageNum', '1')
-    params.set('pageSize', '20')
-    return params.toString()
-  }
+
+    return events.value.filter((event) => {
+      if (activeCategory.value !== '全部' && event.type !== activeCategory.value) {
+        return false
+      }
+
+      if (activeCity.value !== '全国' && event.city !== activeCity.value) {
+        return false
+      }
+
+      if (priceRange) {
+        if (priceRange.minPrice != null && event.minPrice < priceRange.minPrice) {
+          return false
+        }
+        if (priceRange.maxPrice != null && event.minPrice > priceRange.maxPrice) {
+          return false
+        }
+      }
+
+      if (!keyword) {
+        return true
+      }
+
+      const stageMeta = resolveEventStageMeta(event)
+      const haystack = [
+        event.title,
+        event.artist,
+        event.venue,
+        event.city,
+        event.type,
+        stageMeta.statusText,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase()
+
+      return haystack.includes(keyword)
+    })
+  })
 
   async function fetchEvents() {
     loading.value = true
     try {
-      const hasFilter = activeCategory.value !== '全部'
-        || activeCity.value !== '全国'
-        || activePriceLabel.value !== '不限'
-        || searchQuery.value.trim() !== ''
-
-      if (hasFilter) {
-        const res = await request<any>('/api/search/event?' + buildSearchQueryString())
-        events.value = Array.isArray(res) ? res : (res?.records || [])
-      } else {
-        events.value = await request<LiveEvent[]>('/api/live-start/engine/event/list')
-      }
+      events.value = await request<LiveEvent[]>('/api/live-start/engine/event/list')
     } catch (err) {
       console.error('拉取演出失败', err)
+      events.value = []
     } finally {
       loading.value = false
     }
@@ -137,38 +139,40 @@ export function useEventSquare(emit: any) {
       hotSearches.value = await request<HotSearch[]>('/api/search/hot')
     } catch (err) {
       console.error('拉取热搜失败', err)
+      hotSearches.value = []
     }
   }
 
   async function handleSearch() {
-    await fetchEvents()
     if (searchQuery.value.trim()) {
       try {
         await request('/api/search/click?keyword=' + encodeURIComponent(searchQuery.value), { method: 'POST' })
         fetchHotSearches()
       } catch (err) {
-        console.error('点击热搜失败', err)
+        console.error('记录热搜点击失败', err)
       }
     }
   }
 
   watch([activeCategory, activeCity, activePriceLabel], () => {
-    fetchEvents()
+    void fetchEvents()
   })
 
   function clickHotWord(word: string) {
     searchQuery.value = word
-    handleSearch()
+    void handleSearch()
   }
 
   function clickBannerLink(eventId: number) {
     const target = events.value.find(e => e.id === eventId)
-    if (target) emit('selectEvent', target)
+    if (target) {
+      emit('selectEvent', target)
+    }
   }
 
   onMounted(() => {
-    fetchEvents()
-    fetchHotSearches()
+    void fetchEvents()
+    void fetchHotSearches()
   })
 
   return {
@@ -189,6 +193,6 @@ export function useEventSquare(emit: any) {
     fetchHotSearches,
     handleSearch,
     clickHotWord,
-    clickBannerLink
+    clickBannerLink,
   }
 }
