@@ -19,6 +19,9 @@ export interface LiveEvent {
   tags: string[]
   skus: EventSku[]
   ticketStage?: number
+  status?: number
+  statusText?: string
+  started?: boolean
 }
 
 export interface HotSearch {
@@ -95,5 +98,16 @@ export interface ThemeOption {
   icon: string
 }
 
-export type ViewId = 'square' | 'cabin' | 'orders'
+export interface TicketReminder {
+  id: number
+  eventId: number
+  eventTitle: string
+  ticketStage: number
+  status: number
+  statusDesc: string
+  saleStartTime: string
+  remindTime: string
+  reminderMessage: string
+}
 
+export type ViewId = 'square' | 'cabin' | 'orders' | 'reminders'
