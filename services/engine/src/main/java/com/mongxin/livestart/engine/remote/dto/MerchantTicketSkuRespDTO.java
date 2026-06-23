@@ -16,6 +16,8 @@ public class MerchantTicketSkuRespDTO {
     private BigDecimal originalPrice;
     private BigDecimal sellingPrice;
     private Integer totalStock;
+    private Integer stage1Stock;
+    private Integer stage2Stock;
     private Integer remainingStock;
     private Integer limitNum;
 }

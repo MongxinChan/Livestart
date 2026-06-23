@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -90,6 +91,9 @@ public class EventController {
             dto.setPerformerName(event.getPerformerName());
             dto.setArtist(event.getPerformerName());
             dto.setTicketStage(event.getTicketStage());
+            dto.setStatus(event.getStatus());
+            dto.setStarted(isStarted(event.getStartTime()));
+            dto.setStatusText(resolveStatusText(event));
 
             // 标签生成
             List<String> tags = new ArrayList<>();
@@ -112,6 +116,8 @@ public class EventController {
                 skuDto.setPrice(sku.getSellingPrice());
                 skuDto.setStock(sku.getRemainingStock());
                 skuDto.setTotal(sku.getTotalStock());
+                skuDto.setStage1Stock(sku.getStage1Stock());
+                skuDto.setStage2Stock(sku.getStage2Stock());
                 skuList.add(skuDto);
 
                 if (minPrice.compareTo(BigDecimal.ZERO) == 0 ||
@@ -152,5 +158,28 @@ public class EventController {
 
         log.info("[Engine] 演出列表聚合完成，共 {} 场在售演出", resultList.size());
         return Results.success(resultList);
+    }
+    private boolean isStarted(Date startTime) {
+        return startTime != null && startTime.getTime() <= System.currentTimeMillis();
+    }
+
+    private String resolveStatusText(MerchantEventRespDTO event) {
+        String stageLabel = event.getTicketStage() != null && event.getTicketStage() == 2 ? "二开" : "一开";
+        if (isStarted(event.getStartTime())) {
+            return "演唱会已开演";
+        }
+        if (event.getStatus() == null) {
+            return stageLabel + "待开售";
+        }
+        if (event.getStatus() == 2) {
+            return stageLabel + "抢票中";
+        }
+        if (event.getStatus() == 1) {
+            return stageLabel + "待开售";
+        }
+        if (event.getStatus() == 3) {
+            return stageLabel + "已售罄";
+        }
+        return "暂未开售";
     }
 }

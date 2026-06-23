@@ -29,4 +29,10 @@ public class TicketSkuRespDTO {
 
     @Schema(description = "总库存")
     private Integer total;
+
+    @Schema(description = "一开释放库存")
+    private Integer stage1Stock;
+
+    @Schema(description = "二开释放库存")
+    private Integer stage2Stock;
 }

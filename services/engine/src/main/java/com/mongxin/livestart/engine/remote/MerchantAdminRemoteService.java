@@ -1,6 +1,7 @@
 package com.mongxin.livestart.engine.remote;
 
 import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
+import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.framework.result.Result;
@@ -48,6 +49,9 @@ public interface MerchantAdminRemoteService {
             @RequestParam(value = "current", defaultValue = "1") Integer current,
             @RequestParam(value = "size", defaultValue = "100") Integer size
     );
+
+    @GetMapping("/ticket-sku/{id}")
+    Result<MerchantTicketSkuDetailRespDTO> getTicketSku(@PathVariable("id") Long id);
 
     /**
      * 查询场馆详情

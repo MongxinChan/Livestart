@@ -11,52 +11,59 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * 演出列表响应（面向 C 端用户展示，含票档信息）
+ * Event list response for the client application.
  */
 @Data
-@Schema(description = "演出列表项")
+@Schema(description = "Event list item")
 public class EventListRespDTO {
 
-    @Schema(description = "演出 ID")
+    @Schema(description = "Event id")
     @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
-    @Schema(description = "演出标题")
+    @Schema(description = "Event title")
     private String title;
 
-    @Schema(description = "演出类型：Livehouse / 演唱会")
+    @Schema(description = "Event type")
     private String type;
 
-    @Schema(description = "海报图片地址")
+    @Schema(description = "Poster url")
     private String cover;
 
-    @Schema(description = "演出时间")
+    @Schema(description = "Event start time")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm", timezone = "GMT+8")
     private Date date;
 
-    @Schema(description = "场馆名称")
+    @Schema(description = "Current sale-stage status text")
+    private String statusText;
+
+    @Schema(description = "Whether the event has already started")
+    private Boolean started;
+
+    @Schema(description = "Venue name")
     private String venue;
 
-    @Schema(description = "最低价")
+    @Schema(description = "Lowest price")
     private BigDecimal minPrice;
 
-    @Schema(description = "标签列表")
+    @Schema(description = "Tags")
     private List<String> tags;
 
-    @Schema(description = "票档规格列表")
+    @Schema(description = "Ticket sku list")
     private List<TicketSkuRespDTO> skus;
 
-    @Schema(description = "参演艺人名称")
+    @Schema(description = "Performer name")
     private String performerName;
 
-    @Schema(description = "参演艺人/歌手")
+    @Schema(description = "Artist name")
     private String artist;
 
-    @Schema(description = "演出售票阶段 1:一开 2:二开")
+    @Schema(description = "Ticket stage 1:first sale 2:second sale")
     private Integer ticketStage;
 
-    @Schema(description = "演出城市")
+    @Schema(description = "City")
     private String city;
+
+    @Schema(description = "Event status 0:off shelf 1:presale 2:on sale 3:sold out")
+    private Integer status;
 }
-
-
