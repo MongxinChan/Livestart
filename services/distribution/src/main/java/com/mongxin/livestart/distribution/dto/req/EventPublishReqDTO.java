@@ -1,5 +1,6 @@
 package com.mongxin.livestart.distribution.dto.req;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -32,13 +33,15 @@ public class EventPublishReqDTO {
 
     @Schema(description = "演出开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "演出开始时间不能为空")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date eventTime;
 
-    @Schema(description = "演出地点/场馆", requiredMode = Schema.RequiredMode.REQUIRED, example = "深圳大运中心体育场")
-    @NotBlank(message = "演出地点不能为空")
-    private String address;
+    @Schema(description = "关联场馆ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "101001")
+    @NotNull(message = "关联场馆ID不能为空")
+    private Long venueId;
 
     @Schema(description = "门票开售时间（不传则立即开售）", example = "2026-06-15 10:00:00")
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date saleStartTime;
 
     @Schema(description = "票档库存设置", requiredMode = Schema.RequiredMode.REQUIRED)

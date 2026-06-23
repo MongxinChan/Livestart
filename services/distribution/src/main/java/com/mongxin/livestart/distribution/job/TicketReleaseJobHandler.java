@@ -18,11 +18,7 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 
 /**
- * 演唱会门票定时开售 JobHandler
- * <p>
- * 由 XXL-JOB 调度中心在演出开售时间到达时精准触发（一次性任务），
- * 将对应演出下所有票档的库存从数据库预热至 Redis 缓存，
- * 并更新演出状态为"已开售"，使用户可以开始抢票。
+ * One-shot XXL-JOB handler that opens ticket sales at the configured time.
  */
 @Slf4j
 @Component
@@ -37,10 +33,12 @@ public class TicketReleaseJobHandler {
     @XxlJob("ticketReleaseJobHandler")
     public void execute() {
         String eventIdStr = XxlJobHelper.getJobParam();
-        XxlJobHelper.log(">>> 门票开售定时任务触发，eventId={}", eventIdStr);
+        long jobId = XxlJobHelper.getJobId();
+        XxlJobHelper.log("Scheduled ticket release triggered. eventId={0}", eventIdStr);
 
         if (eventIdStr == null || eventIdStr.isBlank()) {
-            XxlJobHelper.handleFail("任务参数为空，缺少 eventId");
+            cleanupCurrentJob(jobId, "missing eventId");
+            XxlJobHelper.handleFail("Missing job param: eventId");
             return;
         }
 
@@ -48,68 +46,71 @@ public class TicketReleaseJobHandler {
         try {
             eventId = Long.parseLong(eventIdStr.trim());
         } catch (NumberFormatException e) {
-            XxlJobHelper.handleFail("eventId 解析失败: " + eventIdStr);
+            cleanupCurrentJob(jobId, "invalid eventId format");
+            XxlJobHelper.handleFail("Invalid eventId: " + eventIdStr);
             return;
         }
 
-        // 1. 查询演出信息
         EventDO event = eventMapper.selectById(eventId);
         if (event == null) {
-            XxlJobHelper.handleFail("未找到演出记录，eventId=" + eventId);
+            cleanupCurrentJob(jobId, "event not found");
+            XxlJobHelper.handleFail("Event not found. eventId=" + eventId);
             return;
         }
 
         if (event.getStatus() != null && event.getStatus() != EventStatusEnum.PENDING_SALE.getCode()) {
-            XxlJobHelper.log("演出非待开售状态，跳过处理。当前状态={}", event.getStatus());
+            XxlJobHelper.log("Event is not in presale status, skip. currentStatus={0}", event.getStatus());
             XxlJobHelper.handleSuccess();
             return;
         }
 
-        // 2. 查询该演出下所有票档
         List<TicketSkuDO> skuList = ticketSkuMapper.selectList(
                 Wrappers.lambdaQuery(TicketSkuDO.class).eq(TicketSkuDO::getEventId, eventId));
 
         if (skuList == null || skuList.isEmpty()) {
-            XxlJobHelper.handleFail("演出无票档信息，eventId=" + eventId);
+            XxlJobHelper.handleFail("No ticket sku found for event. eventId=" + eventId);
             return;
         }
 
-        // 3. 预热 Redis 库存缓存
         int preheatedCount = 0;
         for (TicketSkuDO sku : skuList) {
             String redisKey = String.format(DistributionRedisConstant.TICKET_STOCK_KEY, sku.getId());
             try {
                 stringRedisTemplate.opsForValue().set(redisKey, String.valueOf(sku.getRemainingStock()));
                 preheatedCount++;
-                XxlJobHelper.log("票档库存预热成功，skuId={}，stock={}，redisKey={}",
+                XxlJobHelper.log("Preheated sku stock. skuId={0}, stock={1}, redisKey={2}",
                         sku.getId(), sku.getRemainingStock(), redisKey);
             } catch (Exception e) {
-                log.error("[门票开售] Redis 预热异常，skuId={}", sku.getId(), e);
-                XxlJobHelper.log("票档库存预热异常，skuId={}，error={}", sku.getId(), e.getMessage());
+                log.error("[Ticket Release] Failed to preheat Redis stock. skuId={}", sku.getId(), e);
+                XxlJobHelper.log("Failed to preheat sku stock. skuId={0}, error={1}",
+                        sku.getId(), e.getMessage());
             }
         }
 
-        // 4. 更新演出状态为已开售
         EventDO updateDO = new EventDO();
         updateDO.setId(eventId);
         updateDO.setStatus(EventStatusEnum.ON_SALE.getCode());
         eventMapper.updateById(updateDO);
 
-        String summary = String.format("门票开售任务完成！演出[%s]，预热票档 %d/%d 个",
+        String summary = String.format("Ticket release completed. event[%s], preheated sku count %d/%d.",
                 event.getTitle(), preheatedCount, skuList.size());
-        log.info("[门票开售] {}", summary);
+        log.info("[Ticket Release] {}", summary);
         XxlJobHelper.log(summary);
 
-        // 5. 任务完成后，异步清理该一次性定时任务
-        try {
-            long jobId = XxlJobHelper.getJobId();
-            if (jobId > 0) {
-                xxlJobApiService.removeJob((int) jobId);
-            }
-        } catch (Exception e) {
-            log.warn("[门票开售] 清理一次性任务异常（不影响业务）", e);
-        }
+        cleanupCurrentJob(jobId, "ticket release completed");
 
         XxlJobHelper.handleSuccess();
+    }
+
+    private void cleanupCurrentJob(long jobId, String reason) {
+        if (jobId <= 0) {
+            return;
+        }
+        try {
+            xxlJobApiService.removeJob((int) jobId);
+            log.info("[Ticket Release] Cleaned up one-shot xxl-job. jobId={}, reason={}", jobId, reason);
+        } catch (Exception e) {
+            log.warn("[Ticket Release] Failed to clean up one-shot xxl-job. jobId={}, reason={}", jobId, reason, e);
+        }
     }
 }

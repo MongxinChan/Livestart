@@ -4,26 +4,26 @@ import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
 /**
- * 演出状态枚举
+ * Event sale status used by the distribution service.
  */
 @Getter
 @RequiredArgsConstructor
 public enum EventStatusEnum {
 
     /**
-     * 待开售（已发布但尚未到开售时间）
+     * Published but not on sale yet.
      */
-    PENDING_SALE(0, "待开售"),
+    PENDING_SALE(1, "Presale"),
 
     /**
-     * 已开售（XXL-JOB 定时触发后，库存预热至 Redis，用户可抢票）
+     * Stock has been preheated to Redis and users can start grabbing tickets.
      */
-    ON_SALE(1, "已开售"),
+    ON_SALE(2, "On sale"),
 
     /**
-     * 已结束
+     * Event has finished or the ticketing lifecycle has ended.
      */
-    FINISHED(2, "已结束");
+    FINISHED(3, "Finished");
 
     private final int code;
     private final String desc;

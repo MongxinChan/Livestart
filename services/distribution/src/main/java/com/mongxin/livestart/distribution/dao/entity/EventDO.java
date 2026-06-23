@@ -14,7 +14,7 @@ import lombok.NoArgsConstructor;
 import java.util.Date;
 
 /**
- * 演唱会演出实体 (存储于 ds_common.t_event)
+ * Distribution-side event aggregate mapped to {@code t_event}.
  */
 @Data
 @Builder
@@ -26,61 +26,45 @@ public class EventDO {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
-    /**
-     * 演出标题
-     */
+    /** Event title. */
     private String title;
 
-    /**
-     * 主演艺人ID (分销主体)
-     */
+    /** Performer or artist id. */
     private Long artistId;
 
-    /**
-     * 艺人姓名
-     */
+    /** Performer or artist name. */
     private String artistName;
 
-    /**
-     * 演出时间
-     */
+    /** Related venue id. */
+    private Long venueId;
+
+    /** Event type: 0 livehouse, 1 concert. */
+    private Integer eventType;
+
+    /** Canonical event start time used by shared event schema. */
+    private Date startTime;
+
+    /** Event start time. */
     private Date eventTime;
 
-    /**
-     * 演出场馆地址
-     */
-    private String address;
-
-    /**
-     * 门票开售时间
-     */
+    /** Ticket sale start time. */
     private Date saleStartTime;
 
-    /**
-     * 演出状态 0:待开售 1:已开售 2:已结束
-     */
+    /** Event sale status. */
     private Integer status;
 
-    /**
-     * XXL-JOB 定时任务ID（用于任务管理）
-     */
+    /** Bound XXL-JOB id for scheduled sale release. */
     private Integer xxlJobId;
 
-    /**
-     * 创建时间
-     */
+    /** Create time. */
     @TableField(fill = FieldFill.INSERT)
     private Date createTime;
 
-    /**
-     * 修改时间
-     */
+    /** Update time. */
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;
 
-    /**
-     * 删除标记 0:未删除 1:已删除
-     */
+    /** Logical delete flag. */
     @TableLogic
     private Integer delFlag;
 }
