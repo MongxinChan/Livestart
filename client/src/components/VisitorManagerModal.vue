@@ -103,7 +103,7 @@
 
 <script setup lang="ts">
 import { TeamOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons-vue'
-import { useVisitorManager } from './useVisitorManager'
+import { useVisitorManager } from '@/composables/visitor/useVisitorManager'
 
 const props = defineProps<{
   open: boolean

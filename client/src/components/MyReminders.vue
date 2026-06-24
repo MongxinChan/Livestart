@@ -64,7 +64,7 @@
 <script setup lang="ts">
 import { message } from 'ant-design-vue'
 import { BellOutlined } from '@ant-design/icons-vue'
-import { useReminders } from './useReminders'
+import { useReminders } from '@/composables/reminder/useReminders'
 
 defineEmits<{
   backToSquare: []

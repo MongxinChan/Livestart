@@ -20,7 +20,7 @@ public class PerformerDO {
     /**
      * ID（AUTO_INCREMENT）
      */
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
@@ -29,7 +29,7 @@ public class PerformerDO {
     private String name;
 
     /**
-     * 关联风格ID
+     * 关联风格 ID
      */
     private Long styleId;
 
@@ -44,7 +44,7 @@ public class PerformerDO {
     private String bio;
 
     /**
-     * 状态 1:正常 0:停演
+     * 状态：1 正常，0 停演
      */
     private Integer status;
 

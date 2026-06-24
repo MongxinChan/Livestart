@@ -136,7 +136,7 @@ import {
   StopOutlined, WalletOutlined, CheckCircleOutlined,
   WechatOutlined, AlipayCircleOutlined, LoadingOutlined
 } from '@ant-design/icons-vue'
-import { useMyTickets } from './useMyTickets'
+import { useMyTickets } from '@/composables/order/useMyTickets'
 
 defineEmits<{
   backToSquare: []

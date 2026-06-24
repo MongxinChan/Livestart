@@ -18,13 +18,13 @@ import java.util.Date;
 public class StyleDO {
 
     /**
-     * ID（AUTO_INCREMENT）
+     * 分布式主键 ID
      */
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
-     * 风格名称 (如: 摇滚、民谣)
+     * 风格名称
      */
     private String name;
 

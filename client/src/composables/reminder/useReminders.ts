@@ -1,6 +1,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { request } from '@/composables/useRequest'
+import { request } from '@/composables/infra/useRequest'
 import type { TicketReminder } from '@/types'
 
 export function useReminders() {
@@ -27,10 +27,10 @@ export function useReminders() {
     return map[status] || 'default'
   }
 
-  const pendingCount = computed(() => reminders.value.filter(item => item.status === 0).length)
+  const pendingCount = computed(() => reminders.value.filter((item) => item.status === 0).length)
 
   onMounted(() => {
-    fetchReminders()
+    void fetchReminders()
   })
 
   return {

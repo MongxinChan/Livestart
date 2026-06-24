@@ -1,6 +1,6 @@
-import { ref, reactive, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { request } from '@/composables/useRequest'
+import { request } from '@/composables/infra/useRequest'
 
 export function useVisitorManager(props: { open: boolean }, emit: any) {
   const loading = ref(false)
@@ -14,7 +14,7 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
     realName: '',
     mobile: '',
     cardNo: '',
-    cardType: 1
+    cardType: 1,
   })
 
   async function fetchList() {
@@ -23,7 +23,7 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
       const list = await request<any[]>('/api/live-start/admin/v1/visitor/list')
       visitors.value = list || []
     } catch (err: any) {
-      message.error('加载观演人失败: ' + err.message)
+      message.error(`加载观演人失败: ${err.message}`)
     } finally {
       loading.value = false
     }
@@ -33,10 +33,10 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
     try {
       await request(`/api/live-start/admin/v1/visitor/${id}`, { method: 'DELETE' })
       message.success('已成功删除观演人')
-      fetchList()
+      void fetchList()
       emit('change')
     } catch (err: any) {
-      message.error('删除失败: ' + err.message)
+      message.error(`删除失败: ${err.message}`)
     }
   }
 
@@ -62,11 +62,9 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
       return
     }
 
-    if (!isEditMode.value) {
-      if (!form.cardNo.trim() || form.cardNo.length !== 18) {
-        message.warning('请输入18位二代身份证号码')
-        return
-      }
+    if (!isEditMode.value && (!form.cardNo.trim() || form.cardNo.length !== 18)) {
+      message.warning('请输入 18 位二代身份证号码')
+      return
     }
 
     submitting.value = true
@@ -78,7 +76,7 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
             id: editingId.value,
             realName: form.realName,
             mobile: form.mobile,
-          })
+          }),
         })
         message.success('观演人修改成功')
       } else {
@@ -88,16 +86,16 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
             realName: form.realName,
             cardNo: form.cardNo,
             mobile: form.mobile,
-            cardType: 1
-          })
+            cardType: 1,
+          }),
         })
         message.success('观演人添加成功')
       }
       cancelEdit()
-      fetchList()
+      void fetchList()
       emit('change')
     } catch (err: any) {
-      message.error('操作失败: ' + err.message)
+      message.error(`操作失败: ${err.message}`)
     } finally {
       submitting.value = false
     }
@@ -108,11 +106,14 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
     emit('update:open', false)
   }
 
-  watch(() => props.open, (newVal) => {
-    if (newVal) {
-      fetchList()
+  watch(
+    () => props.open,
+    (newVal) => {
+      if (newVal) {
+        void fetchList()
+      }
     }
-  })
+  )
 
   return {
     loading,
@@ -126,6 +127,6 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
     startEdit,
     cancelEdit,
     handleSubmit,
-    handleCancel
+    handleCancel,
   }
 }

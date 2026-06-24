@@ -1,19 +1,18 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { venueApi } from '@/api/venue'
-import { chinaCities } from '@/utils/chinaCities'
-import type { VenueItem } from '@/types'
-import { venueTableColumns } from './columns'
+import { styleApi } from '@/api/style'
+import type { StyleItem } from '@/types'
+import { styleTableColumns } from './columns'
 
-export function useVenueList() {
+export function useStyleList() {
   const loading = ref(false)
-  const list = ref<VenueItem[]>([])
+  const list = ref<StyleItem[]>([])
   const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
 
   async function fetchList() {
     loading.value = true
     try {
-      const res = await venueApi.page({ current: pagination.current, size: pagination.pageSize })
+      const res = await styleApi.page({ current: pagination.current, size: pagination.pageSize })
       list.value = res?.records || []
       pagination.total = res?.total || 0
     } finally {
@@ -29,23 +28,19 @@ export function useVenueList() {
   const formVisible = ref(false)
   const submitting = ref(false)
   const editingId = ref<number | null>(null)
-  const formData = reactive({ name: '', city: '', address: '', capacity: 0 })
-  const selectedCity = ref<string[]>([])
+  const formData = reactive({ name: '', code: '', description: '' })
 
   function resetForm() {
     editingId.value = null
     formData.name = ''
-    formData.city = ''
-    formData.address = ''
-    formData.capacity = 0
-    selectedCity.value = []
+    formData.code = ''
+    formData.description = ''
   }
 
-  function openForm(record?: VenueItem) {
+  function openForm(record?: StyleItem) {
     if (record) {
       editingId.value = record.id
       Object.assign(formData, record)
-      selectedCity.value = record.city ? record.city.split('/') : []
     } else {
       resetForm()
     }
@@ -53,23 +48,17 @@ export function useVenueList() {
   }
 
   async function onSubmit() {
-    if (!formData.name) {
-      message.warning('请填写场馆名称')
+    if (!formData.name || !formData.code) {
+      message.warning('请填写名称和代码')
       return
     }
-    if (selectedCity.value.length === 0) {
-      message.warning('请选择城市')
-      return
-    }
-
-    formData.city = selectedCity.value.join('/')
     submitting.value = true
     try {
       if (editingId.value) {
-        await venueApi.update({ id: editingId.value, ...formData })
+        await styleApi.update({ id: editingId.value, ...formData })
         message.success('更新成功')
       } else {
-        await venueApi.create(formData)
+        await styleApi.create(formData)
         message.success('创建成功')
       }
       formVisible.value = false
@@ -80,7 +69,7 @@ export function useVenueList() {
   }
 
   async function onDelete(id: number) {
-    await venueApi.delete(id)
+    await styleApi.delete(id)
     message.success('已删除')
     void fetchList()
   }
@@ -90,7 +79,7 @@ export function useVenueList() {
   })
 
   return {
-    columns: venueTableColumns,
+    columns: styleTableColumns,
     loading,
     list,
     pagination,
@@ -99,8 +88,6 @@ export function useVenueList() {
     submitting,
     editingId,
     formData,
-    selectedCity,
-    chinaCities,
     openForm,
     onSubmit,
     onDelete,

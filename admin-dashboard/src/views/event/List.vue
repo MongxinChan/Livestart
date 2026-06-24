@@ -11,7 +11,7 @@
 
     <a-card :bordered="false">
       <a-table
-        :columns="columns"
+        :columns="eventTableColumns"
         :data-source="list"
         :loading="loading"
         :pagination="pagination"
@@ -20,7 +20,13 @@
       >
         <template #bodyCell="{ column, record }">
           <template v-if="column.key === 'posterUrl'">
-            <a-image :src="record.posterUrl" :width="60" :height="40" style="object-fit: cover; border-radius: 4px" fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40'%3E%3Crect fill='%23f0f0f0' width='60' height='40'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='10'%3E无图%3C/text%3E%3C/svg%3E" />
+            <a-image
+              :src="record.posterUrl"
+              :width="60"
+              :height="40"
+              style="object-fit: cover; border-radius: 4px"
+              fallback="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='40'%3E%3Crect fill='%23f0f0f0' width='60' height='40'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' fill='%23999' font-size='10'%3E无图%3C/text%3E%3C/svg%3E"
+            />
           </template>
           <template v-if="column.key === 'eventType'">
             <a-tag :color="record.eventType === 0 ? 'blue' : 'purple'">
@@ -32,9 +38,9 @@
           </template>
           <template v-if="column.key === 'genre'">
             <template v-if="record.genre">
-              <a-tag v-for="g in record.genre.split(',')" :key="g" color="purple">{{ g }}</a-tag>
+              <a-tag v-for="genre in record.genre.split(',')" :key="genre" color="purple">{{ genre }}</a-tag>
             </template>
-            <a-tag v-else color="gray">未分类</a-tag>
+            <a-tag v-else color="default">未分类</a-tag>
           </template>
           <template v-if="column.key === 'ticketStage'">
             <a-tag :color="record.ticketStage === 2 ? 'orange' : 'blue'">
@@ -42,7 +48,7 @@
             </a-tag>
           </template>
           <template v-if="column.key === 'status'">
-            <a-tag :color="statusColors[record.status]">{{ statusLabels[record.status] }}</a-tag>
+            <a-tag :color="eventStatusColors[record.status]">{{ eventStatusLabels[record.status] }}</a-tag>
           </template>
           <template v-if="column.key === 'action'">
             <a-space>
@@ -72,7 +78,6 @@
       </a-table>
     </a-card>
 
-    <!-- 创建/编辑弹窗 -->
     <a-modal
       v-model:open="formVisible"
       :title="editingId ? '编辑演出' : '创建演出'"
@@ -96,8 +101,8 @@
         </a-form-item>
         <a-form-item label="出演艺人">
           <a-select v-model:value="formData.performerId" placeholder="选择参演歌手/乐队 (可选)" allow-clear>
-            <a-select-option v-for="p in performerOptions" :key="p.id" :value="p.id">
-              {{ p.name }}
+            <a-select-option v-for="performer in performerOptions" :key="performer.id" :value="performer.id">
+              {{ performer.name }}
             </a-select-option>
           </a-select>
         </a-form-item>
@@ -114,7 +119,13 @@
           />
         </a-form-item>
         <a-form-item label="演出时间" required>
-          <a-date-picker v-model:value="formData.startTime" show-time format="YYYY-MM-DD HH:mm:ss" style="width: 100%" value-format="YYYY-MM-DD HH:mm:ss" />
+          <a-date-picker
+            v-model:value="formData.startTime"
+            show-time
+            format="YYYY-MM-DD HH:mm:ss"
+            style="width: 100%"
+            value-format="YYYY-MM-DD HH:mm:ss"
+          />
         </a-form-item>
         <a-form-item label="海报图片">
           <a-input v-model:value="formData.posterUrl" placeholder="海报图片 URL 地址" />
@@ -128,7 +139,6 @@
       </a-form>
     </a-modal>
 
-    <!-- 演出配置弹窗 -->
     <a-modal
       v-model:open="configVisible"
       title="演出配置"
@@ -158,15 +168,35 @@
         </a-form-item>
         <template v-if="configData.refundPolicyType === 1 || configData.refundPolicyType === 2">
           <a-form-item label="全额退票截止">
-            <a-input-number v-model:value="configData.tier1FreeRefundHours" :min="1" addon-after="小时" placeholder="开演前X小时" style="width: 100%" />
+            <a-input-number
+              v-model:value="configData.tier1FreeRefundHours"
+              :min="1"
+              addon-after="小时"
+              placeholder="开演前 X 小时"
+              style="width: 100%"
+            />
           </a-form-item>
         </template>
         <template v-if="configData.refundPolicyType === 2">
           <a-form-item label="部分退票截止">
-            <a-input-number v-model:value="configData.tier2PartialRefundHours" :min="1" addon-after="小时" placeholder="开演前Y小时" style="width: 100%" />
+            <a-input-number
+              v-model:value="configData.tier2PartialRefundHours"
+              :min="1"
+              addon-after="小时"
+              placeholder="开演前 Y 小时"
+              style="width: 100%"
+            />
           </a-form-item>
           <a-form-item label="手续费比例">
-            <a-input-number v-model:value="configData.tier2RefundFeeRate" :min="0" :max="1" :step="0.05" :precision="2" placeholder="如 0.20 代表 20%" style="width: 100%" />
+            <a-input-number
+              v-model:value="configData.tier2RefundFeeRate"
+              :min="0"
+              :max="1"
+              :step="0.05"
+              :precision="2"
+              placeholder="如 0.20 代表 20%"
+              style="width: 100%"
+            />
           </a-form-item>
         </template>
         <a-form-item label="允许转赠门票">
@@ -181,226 +211,30 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
-import { message, Modal } from 'ant-design-vue'
-import { PlusOutlined, DownOutlined } from '@ant-design/icons-vue'
-import { eventApi } from '@/api/event'
-import { performerApi } from '@/api/performer'
-import { styleApi } from '@/api/style'
-import { eventConfigApi, type EventConfigItem } from '@/api/eventConfig'
-import type { EventItem } from '@/types'
+import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { eventTableColumns } from './columns'
+import { eventStatusColors, eventStatusLabels, useEventList } from './useEventList'
 
-const statusLabels: Record<number, string> = { 0: '已下架', 1: '预售', 2: '在售', 3: '售罄' }
-const statusColors: Record<number, string> = { 0: 'default', 1: 'orange', 2: 'green', 3: 'red' }
-
-const columns = [
-  { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '海报', key: 'posterUrl', width: 80 },
-  { title: '演出标题', dataIndex: 'title', key: 'title', ellipsis: true },
-  { title: '类型', key: 'eventType', width: 110 },
-  { title: '出演艺人', key: 'performerName', width: 120 },
-  { title: '风格', key: 'genre', width: 150 },
-  { title: '开始时间', dataIndex: 'startTime', key: 'startTime', width: 170 },
-  { title: '开票阶段', key: 'ticketStage', width: 90 },
-  { title: '状态', key: 'status', width: 80 },
-  { title: '操作', key: 'action', width: 160, fixed: 'right' as const },
-]
-
-const loading = ref(false)
-const list = ref<EventItem[]>([])
-const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
-const performerOptions = ref<any[]>([])
-const styleOptions = ref<any[]>([])
-
-async function fetchList() {
-  loading.value = true
-  try {
-    const res = await eventApi.page({ current: pagination.current, size: pagination.pageSize })
-    list.value = res?.records || []
-    pagination.total = res?.total || 0
-  } catch {
-    // axios 拦截器已处理错误
-  } finally {
-    loading.value = false
-  }
-}
-
-async function fetchPerformerOptions() {
-  try {
-    const res = await performerApi.page({ current: 1, size: 100 })
-    performerOptions.value = res?.records || []
-  } catch {
-    // 忽略错误
-  }
-}
-
-async function fetchStyleOptions() {
-  try {
-    const res = await styleApi.page({ current: 1, size: 100 })
-    styleOptions.value = res?.records || []
-  } catch {
-    // 忽略错误
-  }
-}
-
-function onTableChange(pag: any) {
-  pagination.current = pag.current
-  pagination.pageSize = pag.pageSize
-  fetchList()
-}
-
-// 表单
-const formVisible = ref(false)
-const submitting = ref(false)
-const editingId = ref<number | null>(null)
-const formData = reactive({
-  title: '',
-  eventType: 0,
-  venueId: null as number | null,
-  startTime: '',
-  posterUrl: '',
-  performerId: null as number | null,
-  ticketStage: 1,
-  styleIds: [] as number[],
-})
-
-function openForm(record?: EventItem) {
-  if (record) {
-    editingId.value = record.id
-    formData.title = record.title
-    formData.eventType = record.eventType
-    formData.venueId = record.venueId
-    formData.startTime = record.startTime
-    formData.posterUrl = record.posterUrl
-    formData.performerId = (record as any).performerId || null
-    formData.ticketStage = record.ticketStage || 1
-    formData.styleIds = (record as any).styleIds || []
-  } else {
-    editingId.value = null
-    formData.title = ''
-    formData.eventType = 0
-    formData.venueId = null
-    formData.startTime = ''
-    formData.posterUrl = ''
-    formData.performerId = null
-    formData.ticketStage = 1
-    formData.styleIds = []
-  }
-  formVisible.value = true
-}
-
-async function onSubmit() {
-  if (!formData.title || !formData.startTime) {
-    message.warning('请填写必填项')
-    return
-  }
-  submitting.value = true
-  try {
-    if (editingId.value) {
-      await eventApi.update({ id: editingId.value, ...formData })
-      message.success('更新成功')
-    } else {
-      await eventApi.create(formData)
-      message.success('创建成功')
-    }
-    formVisible.value = false
-    fetchList()
-  } finally {
-    submitting.value = false
-  }
-}
-
-// 演出配置
-const configVisible = ref(false)
-const configSubmitting = ref(false)
-const configEventId = ref<number>(0)
-const configData = reactive<EventConfigItem>({
-  eventId: 0,
-  selectionMode: 0,
-  isVerifyRequired: 0,
-  maxTicketsPerUser: 4,
-  refundPolicyType: 0,
-  tier1FreeRefundHours: 24,
-  tier2PartialRefundHours: 6,
-  tier2RefundFeeRate: 0.2,
-  isTransferable: 0,
-  isWaitingAllowed: 0,
-})
-
-const configVerifyRequired = computed({
-  get: () => configData.isVerifyRequired === 1,
-  set: (v: boolean) => { configData.isVerifyRequired = v ? 1 : 0 },
-})
-const configTransferable = computed({
-  get: () => configData.isTransferable === 1,
-  set: (v: boolean) => { configData.isTransferable = v ? 1 : 0 },
-})
-const configWaitingAllowed = computed({
-  get: () => configData.isWaitingAllowed === 1,
-  set: (v: boolean) => { configData.isWaitingAllowed = v ? 1 : 0 },
-})
-
-async function openConfig(record: EventItem) {
-  configEventId.value = record.id
-  configData.eventId = record.id
-  try {
-    const res = await eventConfigApi.getByEventId(record.id)
-    if (res) Object.assign(configData, res)
-  } catch {
-    // 如果没有配置记录，使用默认值
-  }
-  configVisible.value = true
-}
-
-async function onConfigSubmit() {
-  configSubmitting.value = true
-  try {
-    await eventConfigApi.update(configData)
-    message.success('配置已保存')
-    configVisible.value = false
-  } finally { configSubmitting.value = false }
-}
-
-// 操作
-async function onAction(key: string, record: EventItem) {
-  if (key === 'config') {
-    openConfig(record)
-  } else if (key === 'publish') {
-    await eventApi.publish(record.id)
-    message.success('已上架开售')
-    fetchList()
-  } else if (key === 'shelve') {
-    await eventApi.shelve(record.id)
-    message.success('已下架')
-    fetchList()
-  } else if (key === 'terminate') {
-    Modal.confirm({
-      title: '确认终止售票？',
-      content: '此操作不可逆，确认后该演出将永久停止售票。',
-      okType: 'danger',
-      onOk: async () => {
-        await eventApi.terminate(record.id)
-        message.success('已终止')
-        fetchList()
-      },
-    })
-  } else if (key === 'delete') {
-    Modal.confirm({
-      title: '确认删除？',
-      content: `将删除演出「${record.title}」，此操作不可恢复。`,
-      okType: 'danger',
-      onOk: async () => {
-        await eventApi.delete(record.id)
-        message.success('已删除')
-        fetchList()
-      },
-    })
-  }
-}
-
-onMounted(() => {
-  fetchList()
-  fetchPerformerOptions()
-  fetchStyleOptions()
-})
+const {
+  loading,
+  list,
+  pagination,
+  performerOptions,
+  styleOptions,
+  formVisible,
+  submitting,
+  editingId,
+  formData,
+  configVisible,
+  configSubmitting,
+  configData,
+  configVerifyRequired,
+  configTransferable,
+  configWaitingAllowed,
+  onTableChange,
+  openForm,
+  onSubmit,
+  onConfigSubmit,
+  onAction,
+} = useEventList()
 </script>

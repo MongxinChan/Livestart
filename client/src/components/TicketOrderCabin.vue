@@ -289,8 +289,8 @@ import {
 } from '@ant-design/icons-vue'
 import type { LiveEvent } from '@/types'
 import VisitorManagerModal from './VisitorManagerModal.vue'
-import { useTicketOrderCabin } from './useTicketOrderCabin'
-import { request } from '@/composables/useRequest'
+import { useTicketOrderCabin } from '@/composables/order/useTicketOrderCabin'
+import { request } from '@/composables/infra/useRequest'
 
 const props = defineProps<{
   selectedEvent: LiveEvent | null

@@ -28,8 +28,8 @@
               size="small"
               :pagination="false"
             >
-              <template #bodyCell="{ column: col, record: visitor }">
-                <template v-if="col.key === 'idCard'">{{ maskIdCard(visitor.idCard) }}</template>
+              <template #bodyCell="{ column: visitorColumn, record: visitor }">
+                <template v-if="visitorColumn.key === 'idCard'">{{ maskIdCard(visitor.idCard) }}</template>
               </template>
             </a-table>
           </div>
@@ -40,66 +40,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { userApi } from '@/api/user'
-import type { UserItem, VisitorItem } from '@/types'
+import { useUserList } from './useUserList'
 
-const columns = [
-  { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '用户名', dataIndex: 'username', key: 'username' },
-  { title: '真实姓名', dataIndex: 'realName', key: 'realName' },
-  { title: '手机号', key: 'phone', width: 140 },
-  { title: '注册时间', dataIndex: 'createTime', key: 'createTime', width: 170 },
-]
-
-const visitorColumns = [
-  { title: '姓名', dataIndex: 'realName', key: 'realName' },
-  { title: '证件号', key: 'idCard' },
-  { title: '手机号', dataIndex: 'phone', key: 'phone' },
-]
-
-const loading = ref(false)
-const list = ref<UserItem[]>([])
-const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
-const visitorMap = reactive<Record<number, VisitorItem[]>>({})
-const loadingVisitors = reactive<Record<number, boolean>>({})
-
-function maskPhone(phone: string) {
-  if (!phone || phone.length < 7) return phone
-  return phone.substring(0, 3) + '****' + phone.substring(7)
-}
-
-function maskIdCard(idCard: string) {
-  if (!idCard || idCard.length < 10) return idCard
-  return idCard.substring(0, 4) + '**********' + idCard.substring(idCard.length - 4)
-}
-
-async function fetchList() {
-  loading.value = true
-  try {
-    const res = await userApi.page({ current: pagination.current, size: pagination.pageSize })
-    list.value = res?.records || []
-    pagination.total = res?.total || 0
-  } finally { loading.value = false }
-}
-
-function onTableChange(pag: any) { pagination.current = pag.current; fetchList() }
-
-// 展开行时加载观演人
-async function onExpand(expanded: boolean, record: UserItem) {
-  if (!expanded) return
-  if (visitorMap[record.id]) return  // 已加载过则跳过
-  loadingVisitors[record.id] = true
-  try {
-    const res = await userApi.visitors(record.id)
-    visitorMap[record.id] = res || []
-  } catch {
-    visitorMap[record.id] = []
-  } finally {
-    loadingVisitors[record.id] = false
-  }
-}
-
-onMounted(fetchList)
+const {
+  columns,
+  visitorColumns,
+  loading,
+  list,
+  pagination,
+  visitorMap,
+  loadingVisitors,
+  maskPhone,
+  maskIdCard,
+  onTableChange,
+  onExpand,
+} = useUserList()
 </script>
-

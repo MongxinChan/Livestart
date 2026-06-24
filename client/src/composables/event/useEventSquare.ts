@@ -1,5 +1,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
-import { request } from '@/composables/useRequest'
+import { useRoute } from 'vue-router'
+import { request } from '@/composables/infra/useRequest'
 import type { CarouselSlide, HotSearch, LiveEvent } from '@/types'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 
@@ -18,6 +19,7 @@ export const PRICE_RANGES: PriceRangeOption[] = [
 ]
 
 export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): void }) {
+  const route = useRoute()
   const searchQuery = ref('')
   const activeCategory = ref('全部')
   const activeCity = ref('全国')
@@ -81,7 +83,7 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
 
   const filteredEvents = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase()
-    const priceRange = priceRanges.find(p => p.label === activePriceLabel.value)
+    const priceRange = priceRanges.find((item) => item.label === activePriceLabel.value)
 
     return events.value.filter((event) => {
       if (activeCategory.value !== '全部' && event.type !== activeCategory.value) {
@@ -146,8 +148,8 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   async function handleSearch() {
     if (searchQuery.value.trim()) {
       try {
-        await request('/api/search/click?keyword=' + encodeURIComponent(searchQuery.value), { method: 'POST' })
-        fetchHotSearches()
+        await request(`/api/search/click?keyword=${encodeURIComponent(searchQuery.value)}`, { method: 'POST' })
+        void fetchHotSearches()
       } catch (err) {
         console.error('记录热搜点击失败', err)
       }
@@ -158,13 +160,21 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     void fetchEvents()
   })
 
+  watch(
+    () => route.query.keyword,
+    (keyword) => {
+      searchQuery.value = typeof keyword === 'string' ? keyword : ''
+    },
+    { immediate: true }
+  )
+
   function clickHotWord(word: string) {
     searchQuery.value = word
     void handleSearch()
   }
 
   function clickBannerLink(eventId: number) {
-    const target = events.value.find(e => e.id === eventId)
+    const target = events.value.find((event) => event.id === eventId)
     if (target) {
       emit('selectEvent', target)
     }

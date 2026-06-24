@@ -1,19 +1,19 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { venueApi } from '@/api/venue'
-import { chinaCities } from '@/utils/chinaCities'
-import type { VenueItem } from '@/types'
-import { venueTableColumns } from './columns'
+import { performerApi } from '@/api/performer'
+import { styleApi } from '@/api/style'
+import type { PerformerItem } from '@/types'
+import { performerTableColumns } from './columns'
 
-export function useVenueList() {
+export function usePerformerList() {
   const loading = ref(false)
-  const list = ref<VenueItem[]>([])
+  const list = ref<PerformerItem[]>([])
   const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
 
   async function fetchList() {
     loading.value = true
     try {
-      const res = await venueApi.page({ current: pagination.current, size: pagination.pageSize })
+      const res = await performerApi.page({ current: pagination.current, size: pagination.pageSize })
       list.value = res?.records || []
       pagination.total = res?.total || 0
     } finally {
@@ -29,23 +29,33 @@ export function useVenueList() {
   const formVisible = ref(false)
   const submitting = ref(false)
   const editingId = ref<number | null>(null)
-  const formData = reactive({ name: '', city: '', address: '', capacity: 0 })
-  const selectedCity = ref<string[]>([])
+  const formData = reactive({ name: '', avatarUrl: '', styleIds: [] as number[], description: '' })
+  const styleOptions = ref<any[]>([])
+
+  async function fetchStyleOptions() {
+    try {
+      const res = await styleApi.page({ current: 1, size: 100 })
+      styleOptions.value = res?.records || []
+    } catch (err) {
+      console.error('加载风格选项失败', err)
+    }
+  }
 
   function resetForm() {
     editingId.value = null
     formData.name = ''
-    formData.city = ''
-    formData.address = ''
-    formData.capacity = 0
-    selectedCity.value = []
+    formData.avatarUrl = ''
+    formData.styleIds = []
+    formData.description = ''
   }
 
-  function openForm(record?: VenueItem) {
+  function openForm(record?: PerformerItem) {
     if (record) {
       editingId.value = record.id
-      Object.assign(formData, record)
-      selectedCity.value = record.city ? record.city.split('/') : []
+      formData.name = record.name || ''
+      formData.avatarUrl = record.avatarUrl || ''
+      formData.styleIds = (record as any).styleIds || []
+      formData.description = record.description || ''
     } else {
       resetForm()
     }
@@ -54,22 +64,16 @@ export function useVenueList() {
 
   async function onSubmit() {
     if (!formData.name) {
-      message.warning('请填写场馆名称')
+      message.warning('请填写艺名')
       return
     }
-    if (selectedCity.value.length === 0) {
-      message.warning('请选择城市')
-      return
-    }
-
-    formData.city = selectedCity.value.join('/')
     submitting.value = true
     try {
       if (editingId.value) {
-        await venueApi.update({ id: editingId.value, ...formData })
+        await performerApi.update({ id: editingId.value, ...formData } as any)
         message.success('更新成功')
       } else {
-        await venueApi.create(formData)
+        await performerApi.create(formData as any)
         message.success('创建成功')
       }
       formVisible.value = false
@@ -80,17 +84,18 @@ export function useVenueList() {
   }
 
   async function onDelete(id: number) {
-    await venueApi.delete(id)
+    await performerApi.delete(id)
     message.success('已删除')
     void fetchList()
   }
 
   onMounted(() => {
     void fetchList()
+    void fetchStyleOptions()
   })
 
   return {
-    columns: venueTableColumns,
+    columns: performerTableColumns,
     loading,
     list,
     pagination,
@@ -99,8 +104,7 @@ export function useVenueList() {
     submitting,
     editingId,
     formData,
-    selectedCity,
-    chinaCities,
+    styleOptions,
     openForm,
     onSubmit,
     onDelete,

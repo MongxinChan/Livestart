@@ -11,7 +11,7 @@
 
     <a-card :bordered="false">
       <div style="margin-bottom: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap">
-        <span style="white-space: nowrap">按演出筛选:</span>
+        <span style="white-space: nowrap">按演出筛选</span>
         <a-radio-group v-model:value="filterMode" button-style="solid">
           <a-radio-button value="id">按 ID</a-radio-button>
           <a-radio-button value="name">按名称</a-radio-button>
@@ -72,12 +72,12 @@
           </template>
 
           <template v-if="column.key === 'price'">
-            <span style="color: #ff4d4f; font-weight: 600">￥{{ record.sellingPrice }}</span>
+            <span style="color: #ff4d4f; font-weight: 600">¥{{ record.sellingPrice }}</span>
             <span
               v-if="record.originalPrice !== record.sellingPrice"
               style="text-decoration: line-through; color: #999; margin-left: 8px; font-size: 12px"
             >
-              ￥{{ record.originalPrice }}
+              ¥{{ record.originalPrice }}
             </span>
           </template>
 
@@ -115,10 +115,10 @@
           <a-input v-model:value="formData.title" placeholder="如：VIP票 / 学生票 / 预售票" />
         </a-form-item>
         <a-form-item label="原价">
-          <a-input-number v-model:value="formData.originalPrice" :min="0" :precision="2" prefix="￥" style="width: 100%" />
+          <a-input-number v-model:value="formData.originalPrice" :min="0" :precision="2" prefix="¥" style="width: 100%" />
         </a-form-item>
         <a-form-item label="售价" required>
-          <a-input-number v-model:value="formData.sellingPrice" :min="0" :precision="2" prefix="￥" style="width: 100%" />
+          <a-input-number v-model:value="formData.sellingPrice" :min="0" :precision="2" prefix="¥" style="width: 100%" />
         </a-form-item>
         <a-form-item v-if="!editingId" label="总库存" required>
           <a-input-number v-model:value="formData.totalStock" :min="1" style="width: 100%" />
@@ -161,226 +161,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, watch } from 'vue'
-import { message } from 'ant-design-vue'
 import { PlusOutlined } from '@ant-design/icons-vue'
-import { ticketSkuApi } from '@/api/ticketSku'
-import { eventApi } from '@/api/event'
-import type { TicketSkuItem, EventItem } from '@/types'
+import { useTicketSkuList } from './useTicketSkuList'
 
-const columns = [
-  { title: 'ID', dataIndex: 'id', key: 'id', width: 60 },
-  { title: '关联演出', key: 'event', width: 280 },
-  { title: '票种名称', dataIndex: 'title', key: 'title' },
-  { title: '价格', key: 'price', width: 170 },
-  { title: '库存', key: 'stock', width: 220 },
-  { title: '限购', dataIndex: 'limitNum', key: 'limitNum', width: 70 },
-  { title: '操作', key: 'action', width: 140 },
-]
-
-const loading = ref(false)
-const list = ref<TicketSkuItem[]>([])
-const pagination = reactive({
-  current: 1,
-  pageSize: 10,
-  total: 0,
-  showSizeChanger: true,
-  pageSizeOptions: ['10', '20', '50', '100'],
-  showTotal: (total: number) => `共 ${total} 条`,
-})
-
-const eventOptions = ref<{ label: string; value: number }[]>([])
-const eventTitleMap = reactive<Record<number, string>>({})
-
-function filterEventOption(input: string, option: { label: string; value: number }) {
-  return (option.label || '').toLowerCase().includes(input.toLowerCase())
-    || String(option.value).includes(input)
-}
-
-async function fetchEventOptions() {
-  try {
-    const res = await eventApi.page({ current: 1, size: 500 })
-    const records = res?.records || []
-    eventOptions.value = records.map((e: EventItem) => ({ label: `${e.title} (ID: ${e.id})`, value: e.id }))
-    records.forEach((e: EventItem) => { eventTitleMap[e.id] = e.title })
-    if (records.length === 0) {
-      message.warning('暂无演出数据')
-    }
-  } catch (err) {
-    console.error('fetch events failed', err)
-    message.error('演出列表加载失败')
-  }
-}
-
-async function fetchList() {
-  loading.value = true
-  try {
-    const res = await ticketSkuApi.page({
-      eventId: filterEventId.value || undefined,
-      current: pagination.current,
-      size: pagination.pageSize,
-    })
-    list.value = res?.records || []
-    pagination.total = res?.total || 0
-  } finally {
-    loading.value = false
-  }
-}
-
-function onTableChange(pag: any) {
-  pagination.current = pag.current
-  pagination.pageSize = pag.pageSize
-  fetchList()
-}
-
-const formVisible = ref(false)
-const submitting = ref(false)
-const editingId = ref<number | null>(null)
-const formData = reactive({
-  eventId: 0,
-  title: '',
-  originalPrice: 0,
-  sellingPrice: 0,
-  totalStock: 0,
-  stage1Stock: 0,
-  stage2Stock: 0,
-  limitNum: 4,
-})
-const increaseStockVisible = ref(false)
-const increaseStockSubmitting = ref(false)
-const increaseStockTarget = ref<TicketSkuItem | null>(null)
-const increaseStockCount = ref<number>(1)
-
-const filterMode = ref<'id' | 'name'>('id')
-const filterEventIdInput = ref<number | null>(null)
-const filterEventId = ref<number | null>(null)
-
-function onFilter() {
-  filterEventId.value = filterEventIdInput.value
-  pagination.current = 1
-  fetchList()
-}
-
-function onClearFilter() {
-  filterEventIdInput.value = null
-  filterEventId.value = null
-  pagination.current = 1
-  fetchList()
-}
-
-function openForm(record?: TicketSkuItem) {
-  if (record) {
-    editingId.value = record.id
-    Object.assign(formData, record)
-  } else {
-    editingId.value = null
-    formData.eventId = 0
-    formData.title = ''
-    formData.originalPrice = 0
-    formData.sellingPrice = 0
-    formData.totalStock = 0
-    formData.stage1Stock = 0
-    formData.stage2Stock = 0
-    formData.limitNum = 4
-  }
-  formVisible.value = true
-}
-
-watch(
-  () => formData.totalStock,
-  (newTotalStock, oldTotalStock) => {
-    if (editingId.value || newTotalStock == null || Number.isNaN(newTotalStock)) {
-      return
-    }
-    const previousTotalStock = oldTotalStock ?? 0
-    if (formData.stage1Stock === previousTotalStock && (formData.stage2Stock ?? 0) === 0) {
-      formData.stage1Stock = newTotalStock
-    }
-    if ((formData.stage1Stock ?? 0) + (formData.stage2Stock ?? 0) > newTotalStock) {
-      formData.stage2Stock = Math.max(newTotalStock - (formData.stage1Stock ?? 0), 0)
-    }
-  }
-)
-
-watch(
-  () => formData.stage1Stock,
-  (newStage1Stock) => {
-    if (editingId.value || newStage1Stock == null) {
-      return
-    }
-    if ((newStage1Stock ?? 0) + (formData.stage2Stock ?? 0) > (formData.totalStock ?? 0)) {
-      formData.stage2Stock = Math.max((formData.totalStock ?? 0) - (newStage1Stock ?? 0), 0)
-    }
-  }
-)
-
-function openIncreaseStock(record: TicketSkuItem) {
-  increaseStockTarget.value = record
-  increaseStockCount.value = 1
-  increaseStockVisible.value = true
-}
-
-async function onSubmit() {
-  if (!formData.title || !formData.sellingPrice) {
-    message.warning('请填写必填项')
-    return
-  }
-  if (!formData.eventId) {
-    message.warning('请选择演出')
-    return
-  }
-  if (!editingId.value && !formData.totalStock) {
-    message.warning('请填写总库存')
-    return
-  }
-  if (!editingId.value && formData.stage1Stock + formData.stage2Stock > formData.totalStock) {
-    message.warning('一开和二开数量之和不能超过总库存')
-    return
-  }
-  submitting.value = true
-  try {
-    if (editingId.value) {
-      await ticketSkuApi.update({ id: editingId.value, ...formData } as any)
-      message.success('更新成功')
-    } else {
-      await ticketSkuApi.create(formData)
-      message.success('创建成功')
-    }
-    formVisible.value = false
-    fetchList()
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function onSubmitIncreaseStock() {
-  if (!increaseStockTarget.value) return
-  if (!increaseStockCount.value || increaseStockCount.value <= 0) {
-    message.warning('请输入正确的增发数量')
-    return
-  }
-  increaseStockSubmitting.value = true
-  try {
-    await ticketSkuApi.increaseStock({
-      skuId: increaseStockTarget.value.id,
-      count: increaseStockCount.value,
-    })
-    message.success('库存增发成功')
-    increaseStockVisible.value = false
-    await fetchList()
-  } finally {
-    increaseStockSubmitting.value = false
-  }
-}
-
-async function onDelete(id: number) {
-  await ticketSkuApi.delete(id)
-  message.success('删除成功')
-  fetchList()
-}
-
-onMounted(() => {
-  fetchEventOptions()
-  fetchList()
-})
+const {
+  columns,
+  loading,
+  list,
+  pagination,
+  eventOptions,
+  eventTitleMap,
+  filterEventOption,
+  filterMode,
+  filterEventIdInput,
+  onFilter,
+  onClearFilter,
+  onTableChange,
+  formVisible,
+  submitting,
+  editingId,
+  formData,
+  increaseStockVisible,
+  increaseStockSubmitting,
+  increaseStockTarget,
+  increaseStockCount,
+  openForm,
+  openIncreaseStock,
+  onSubmit,
+  onSubmitIncreaseStock,
+  onDelete,
+} = useTicketSkuList()
 </script>

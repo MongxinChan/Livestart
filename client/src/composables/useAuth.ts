@@ -1,6 +1,6 @@
 import { reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
-import { apiState, request } from './useRequest'
+import { apiState, request } from '@/composables/infra/useRequest'
 import { clearSession, persistSession } from './sessionState'
 
 // ---- 模块级单例状态（所有调用方共享） ----

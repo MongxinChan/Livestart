@@ -127,7 +127,7 @@ import {
   SearchOutlined,
   CloseOutlined,
 } from '@ant-design/icons-vue'
-import { apiState } from '../composables/useRequest'
+import { apiState } from '@/composables/infra/useRequest'
 
 const isMockEnv = import.meta.env.VITE_USE_MOCK === 'true'
 

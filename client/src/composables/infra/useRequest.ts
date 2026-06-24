@@ -1,7 +1,7 @@
-import { handleMockRequest } from './mockHandlers'
-import { apiState } from './sessionState'
+import { handleMockRequest } from '@/composables/mockHandlers'
+import { apiState } from '@/composables/sessionState'
 
-export { apiState } from './sessionState'
+export { apiState } from '@/composables/sessionState'
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || ''
 
@@ -31,7 +31,7 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
   }
 
   const resJson = await response.json().catch(() => {
-    throw new Error('服务器响应格式异常，请稍后重试')
+    throw new Error('服务端响应格式异常，请稍后重试')
   })
   if (resJson.code !== '0' && resJson.code !== 0 && resJson.code !== '200') {
     throw new Error(resJson.message || '业务请求失败')

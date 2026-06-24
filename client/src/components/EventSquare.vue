@@ -206,9 +206,9 @@ import {
   ThunderboltOutlined,
   UserOutlined,
 } from '@ant-design/icons-vue'
-import { useEventSquare } from './useEventSquare'
+import { useEventSquare } from '@/composables/event/useEventSquare'
 import { resolveEventStageMeta } from '@/utils/eventStage'
-import { request } from '@/composables/useRequest'
+import { request } from '@/composables/infra/useRequest'
 import type { LiveEvent } from '@/types'
 
 const emit = defineEmits<{

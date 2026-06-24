@@ -1,6 +1,6 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
-import { apiState, request } from '@/composables/useRequest'
+import { apiState, request } from '@/composables/infra/useRequest'
 import type { EventSku, GrabStatus, LiveEvent, Visitor } from '@/types'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 
@@ -16,7 +16,7 @@ export function useTicketOrderCabin(
 
   const activeSku = computed<EventSku | null>(() => {
     if (!props.selectedEvent || !activeSkuId.value) return null
-    return props.selectedEvent.skus.find(s => s.id === activeSkuId.value) || null
+    return props.selectedEvent.skus.find((sku) => sku.id === activeSkuId.value) || null
   })
 
   const totalPrice = computed(() => (activeSku.value ? activeSku.value.price : 0) * ticketCount.value)
@@ -37,32 +37,32 @@ export function useTicketOrderCabin(
     }
     try {
       const list = await request<any[]>('/api/live-start/admin/v1/visitor/list')
-      visitorList.value = (list || []).map((v, i) => ({
-        id: v.id,
-        name: v.realName,
-        idCard: v.cardNo,
-        checked: i === 0,
+      visitorList.value = (list || []).map((visitor, index) => ({
+        id: visitor.id,
+        name: visitor.realName,
+        idCard: visitor.cardNo,
+        checked: index === 0,
       }))
-      ticketCount.value = visitorList.value.filter(v => v.checked).length || 1
+      ticketCount.value = visitorList.value.filter((visitor) => visitor.checked).length || 1
     } catch (err) {
       console.error('拉取观演人列表失败', err)
     }
   }
 
-  function toggleVisitor(v: Visitor) {
-    v.checked = !v.checked
-    const count = visitorList.value.filter(x => x.checked).length
+  function toggleVisitor(visitor: Visitor) {
+    visitor.checked = !visitor.checked
+    const count = visitorList.value.filter((item) => item.checked).length
     if (count > 0) {
       ticketCount.value = count
     } else {
-      v.checked = true
+      visitor.checked = true
     }
   }
 
   function onCountChange(val: number | null) {
-    const n = val || 1
-    visitorList.value.forEach((v, i) => {
-      v.checked = i < n
+    const nextCount = val || 1
+    visitorList.value.forEach((visitor, index) => {
+      visitor.checked = index < nextCount
     })
   }
 
@@ -78,7 +78,7 @@ export function useTicketOrderCabin(
       message.warning(`当前阶段为“${eventStageMeta.value.statusText}”，暂时不能抢票`)
       return
     }
-    const checkedVisitors = visitorList.value.filter(v => v.checked)
+    const checkedVisitors = visitorList.value.filter((visitor) => visitor.checked)
     if (checkedVisitors.length !== ticketCount.value) {
       message.warning('观演人数与购买数量不符，无法提交下单')
       return
@@ -104,7 +104,7 @@ export function useTicketOrderCabin(
             body: JSON.stringify({
               skuId: activeSku.value!.id,
               count: ticketCount.value,
-              visitorIds: checkedVisitors.map(v => v.id),
+              visitorIds: checkedVisitors.map((visitor) => visitor.id),
             }),
           })
 
@@ -171,7 +171,7 @@ export function useTicketOrderCabin(
 
   function stopStressTest() {
     stressRunning.value = false
-    activeStressTasks.value.forEach(task => clearTimeout(task))
+    activeStressTasks.value.forEach((task) => clearTimeout(task))
     activeStressTasks.value = []
     addLog('压测已手动停止')
   }
@@ -181,7 +181,7 @@ export function useTicketOrderCabin(
       message.warning('请先选择一个有效的票档规格')
       return
     }
-    const checkedVisitors = visitorList.value.filter(v => v.checked)
+    const checkedVisitors = visitorList.value.filter((visitor) => visitor.checked)
     if (checkedVisitors.length !== ticketCount.value) {
       message.warning('观演人数与购买数量不符，无法提交下单')
       return
@@ -233,7 +233,7 @@ export function useTicketOrderCabin(
           body: JSON.stringify({
             skuId: activeSku.value!.id,
             count: ticketCount.value,
-            visitorIds: checkedVisitors.map(v => v.id),
+            visitorIds: checkedVisitors.map((visitor) => visitor.id),
           }),
         })
 
@@ -283,15 +283,18 @@ export function useTicketOrderCabin(
     }
   }
 
-  watch(() => props.selectedEvent, (ev) => {
-    if (ev && ev.skus.length > 0) {
-      activeSkuId.value = ev.skus[0].id
+  watch(
+    () => props.selectedEvent,
+    (event) => {
+      if (event && event.skus.length > 0) {
+        activeSkuId.value = event.skus[0].id
+      }
+      void fetchVisitors()
     }
-    fetchVisitors()
-  })
+  )
 
   onMounted(() => {
-    fetchVisitors()
+    void fetchVisitors()
     if (props.selectedEvent && props.selectedEvent.skus.length > 0) {
       activeSkuId.value = props.selectedEvent.skus[0].id
     }

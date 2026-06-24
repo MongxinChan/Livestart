@@ -1,7 +1,7 @@
 import { onMounted } from 'vue'
-import { useTheme } from './useTheme'
-import { useNav } from './useNav'
-import { useAuth } from './useAuth'
+import { useTheme } from '@/composables/app/useTheme'
+import { useNav } from '@/composables/app/useNav'
+import { useAuth } from '@/composables/app/useAuth'
 
 export function useApp() {
   onMounted(() => {

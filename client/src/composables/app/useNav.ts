@@ -1,11 +1,11 @@
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { BellOutlined, SearchOutlined, ShoppingOutlined } from '@ant-design/icons-vue'
-import { request } from './useRequest'
-import type { LiveEvent, ViewId } from '../types'
+import { request } from '@/composables/infra/useRequest'
+import type { ViewId } from '@/types'
 
 export function useNav() {
-  const activeView = ref<ViewId>('square')
-  const selectedEvent = ref<LiveEvent | null>(null)
+  const router = useRouter()
 
   const navOptions = [
     { value: 'square', label: '演出广场', icon: SearchOutlined },
@@ -13,24 +13,23 @@ export function useNav() {
     { value: 'reminders', label: '我的提醒', icon: BellOutlined },
   ]
 
-  function setView(view: ViewId) {
-    activeView.value = view
+  function onNavChange(val: string | number) {
+    const view = val as ViewId
     if (view === 'square') {
-      selectedEvent.value = null
+      void router.push({ name: 'Square' })
+      return
+    }
+    if (view === 'orders') {
+      void router.push({ name: 'Orders' })
+      return
+    }
+    if (view === 'reminders') {
+      void router.push({ name: 'Reminders' })
     }
   }
 
-  function onNavChange(val: string | number) {
-    setView(val as ViewId)
-  }
-
   function navigateTo(view: ViewId) {
-    setView(view)
-  }
-
-  function selectEventForCabin(event: LiveEvent) {
-    selectedEvent.value = event
-    activeView.value = 'cabin'
+    onNavChange(view)
   }
 
   const isScrolled = ref(false)
@@ -81,12 +80,10 @@ export function useNav() {
   })
 
   return {
-    activeView,
-    selectedEvent,
+    activeView: computed<ViewId>(() => 'square'),
     navOptions,
     onNavChange,
     navigateTo,
-    selectEventForCabin,
     isScrolled,
     navSearchVisible,
     navSearchQuery,

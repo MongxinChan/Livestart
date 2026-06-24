@@ -10,15 +10,21 @@
     </a-page-header>
 
     <a-card :bordered="false">
-      <a-table :columns="columns" :data-source="list" :loading="loading" row-key="id" :pagination="pagination" @change="onTableChange">
+      <a-table
+        :columns="columns"
+        :data-source="list"
+        :loading="loading"
+        row-key="id"
+        :pagination="pagination"
+        @change="onTableChange"
+      >
         <template #bodyCell="{ column, record }">
-          <!-- 城市列精细化折行展示，显示xx市，在xx省下 -->
           <template v-if="column.key === 'city'">
             <div style="display: flex; flex-direction: column; line-height: 1.4">
               <span style="font-weight: 600; font-size: 14px; color: var(--ant-color-text)">
                 {{ record.city?.includes('/') ? record.city.split('/')[1] : record.city }}
               </span>
-              <span style="font-size: 11px; color: #8c8c8c" v-if="record.city?.includes('/')">
+              <span v-if="record.city?.includes('/')" style="font-size: 11px; color: #8c8c8c">
                 {{ record.city.split('/')[0] }}
               </span>
             </div>
@@ -34,7 +40,13 @@
       </a-table>
     </a-card>
 
-    <a-modal v-model:open="formVisible" :title="editingId ? '编辑场馆' : '新增场馆'" :confirm-loading="submitting" @ok="onSubmit" width="500px">
+    <a-modal
+      v-model:open="formVisible"
+      :title="editingId ? '编辑场馆' : '新增场馆'"
+      :confirm-loading="submitting"
+      @ok="onSubmit"
+      width="500px"
+    >
       <a-form :model="formData" :label-col="{ span: 5 }" :wrapper-col="{ span: 18 }">
         <a-form-item label="场馆名称" required>
           <a-input v-model:value="formData.name" placeholder="如：上海 Modern Sky LAB" />
@@ -76,6 +88,6 @@ const {
   chinaCities,
   openForm,
   onSubmit,
-  onDelete
+  onDelete,
 } = useVenueList()
 </script>

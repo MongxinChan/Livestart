@@ -46,7 +46,7 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
     );
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-    private static final List<String> TRUSTED_HEADERS = List.of("userId", "username", "realName");
+    private static final List<String> TRUSTED_HEADERS = List.of("userId", "username", "realName", "userType");
 
     private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
 
@@ -83,6 +83,7 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
                             .header("username", valueOrEmpty(userInfo.getString("username")))
                             .header("phone", valueOrEmpty(userInfo.getString("phone")))
                             .header("realName", valueOrEmpty(userInfo.getString("realName")))
+                            .header("userType", valueOrEmpty(userInfo.getString("userType")))
                             .build();
 
                     log.info("[Gateway-Auth] Auth success, userId={}, username={}", userInfo.getString("id"), userInfo.getString("username"));
