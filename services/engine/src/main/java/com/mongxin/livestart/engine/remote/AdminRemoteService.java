@@ -10,7 +10,7 @@ import java.util.List;
 
 @FeignClient(
         name = "livestart-admin",
-        url = "${feign.admin.url:http://localhost:8001}"
+        url = "${feign.admin.url:http://localhost:8002}"
 )
 public interface AdminRemoteService {
 

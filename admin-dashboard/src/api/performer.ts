@@ -3,14 +3,14 @@ import type { PerformerItem, PerformerSaveReq, PageResult } from '@/types'
 
 export const performerApi = {
   page: (params?: { current?: number; size?: number }) =>
-    http.get<any, PageResult<PerformerItem>>('/api/merchant-admin/performer/page', { params }),
+    http.get<any, PageResult<PerformerItem>>('/api/live-start/merchant-admin/performer/page', { params }),
 
   create: (data: PerformerSaveReq) =>
-    http.post<any, void>('/api/merchant-admin/performer/create', data),
+    http.post<any, void>('/api/live-start/merchant-admin/performer/create', data),
 
   update: (data: PerformerItem) =>
-    http.put<any, void>('/api/merchant-admin/performer/update', data),
+    http.put<any, void>('/api/live-start/merchant-admin/performer/update', data),
 
   delete: (id: number) =>
-    http.delete<any, void>(`/api/merchant-admin/performer/delete/${id}`),
+    http.delete<any, void>(`/api/live-start/merchant-admin/performer/delete/${id}`),
 }

@@ -11,10 +11,7 @@ export default defineConfig({
     port: 3001,
     open: true,
     proxy: {
-      '/api/live-start': { target: 'http://127.0.0.1:8002', changeOrigin: true },
-      '/api/merchant-admin': { target: 'http://127.0.0.1:8003', changeOrigin: true },
-      '/api/engine': { target: 'http://127.0.0.1:8004', changeOrigin: true },
-      '/api/settlement': { target: 'http://127.0.0.1:8007', changeOrigin: true },
+      '/api/live-start': { target: 'http://127.0.0.1:8888', changeOrigin: true },
     },
   },
 })

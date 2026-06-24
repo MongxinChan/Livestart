@@ -15,8 +15,8 @@ export interface EventConfigItem {
 
 export const eventConfigApi = {
   getByEventId: (eventId: number) =>
-    http.get<any, EventConfigItem>(`/api/merchant-admin/event-config/${eventId}`),
+    http.get<any, EventConfigItem>(`/api/live-start/merchant-admin/event-config/${eventId}`),
 
   update: (data: EventConfigItem) =>
-    http.put<any, void>('/api/merchant-admin/event-config/update', data),
+    http.put<any, void>('/api/live-start/merchant-admin/event-config/update', data),
 }

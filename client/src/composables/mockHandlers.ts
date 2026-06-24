@@ -15,8 +15,8 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/search/event') || url.includes('/api/engine/event/list')) {
-        if (url.includes('/api/search/event')) {
+      if (url.includes('/api/live-start/search/event') || url.includes('/api/live-start/engine/event/list')) {
+        if (url.includes('/api/live-start/search/event')) {
           const params = new URLSearchParams(url.split('?')[1] || '')
           const keyword = params.get('keyword')?.trim() || ''
           const eventType = params.get('eventType')
@@ -45,12 +45,12 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/search/hot')) {
+      if (url.includes('/api/live-start/search/hot')) {
         resolve([...mockHotSearches].sort((a, b) => b.score - a.score))
         return
       }
 
-      if (url.includes('/api/search/click')) {
+      if (url.includes('/api/live-start/search/click')) {
         const params = new URLSearchParams(url.split('?')[1])
         const keyword = params.get('keyword')
         if (keyword) {
@@ -65,7 +65,7 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/engine/order/token')) {
+      if (url.includes('/api/live-start/engine/order/token')) {
         const params = new URLSearchParams(url.split('?')[1])
         const skuId = params.get('skuId')
         const sku = mockEvents.flatMap((event) => event.skus).find((item) => Number(item.id) === Number(skuId))
@@ -79,7 +79,7 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/engine/order/create/')) {
+      if (url.includes('/api/live-start/engine/order/create/')) {
         const pathToken = url.substring(url.lastIndexOf('/') + 1)
         const reqData = JSON.parse((options.body as string) || '{}')
 
@@ -118,12 +118,12 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/engine/order/page')) {
+      if (url.includes('/api/live-start/engine/order/page')) {
         resolve({ records: mockOrders, total: mockOrders.length, size: 10, current: 1 })
         return
       }
 
-      if (url.includes('/api/engine/order/pay-callback')) {
+      if (url.includes('/api/live-start/engine/order/pay-callback')) {
         const reqData = JSON.parse((options.body as string) || '{}')
         const order = mockOrders.find((item) => item.orderNo === reqData.orderNo)
         if (!order) {
@@ -138,7 +138,7 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/engine/order/cancel')) {
+      if (url.includes('/api/live-start/engine/order/cancel')) {
         const reqData = JSON.parse((options.body as string) || '{}')
         const order = mockOrders.find((item) => item.orderNo === reqData.orderNo)
         if (!order) {
@@ -156,7 +156,7 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/engine/order/refund')) {
+      if (url.includes('/api/live-start/engine/order/refund')) {
         const reqData = JSON.parse((options.body as string) || '{}')
         const order = mockOrders.find((item) => item.orderNo === reqData.orderNo)
         if (!order) {
@@ -174,7 +174,7 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/settlement/trigger')) {
+      if (url.includes('/api/live-start/settlement/trigger')) {
         const params = new URLSearchParams(url.split('?')[1])
         resolve(createSettlementResult(params.get('eventId') || '101'))
         return

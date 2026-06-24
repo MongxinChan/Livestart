@@ -57,7 +57,7 @@ export function useNav() {
       return
     }
     try {
-      const res = await request<string[]>(`/api/search/suggest?keyword=${encodeURIComponent(keyword)}&limit=5`)
+      const res = await request<string[]>(`/api/live-start/search/suggest?keyword=${encodeURIComponent(keyword)}&limit=5`)
       navSuggest.value = Array.isArray(res) ? res : []
     } catch {
       navSuggest.value = []

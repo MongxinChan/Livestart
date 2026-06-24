@@ -43,7 +43,9 @@ spring:
         - id: livestart-merchant-admin
           uri: http://localhost:8003
           predicates:
-            - Path=/api/merchant-admin/**
+            - Path=/api/live-start/merchant-admin/**
+          filters:
+            - RewritePath=/api/live-start/merchant-admin/(?<segment>.*), /api/merchant-admin/${segment}
 
         # ----------------------------------------------------------------
         # 购票引擎服务 (engine)
