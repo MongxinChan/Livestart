@@ -4,6 +4,11 @@ import { apiState, request } from '@/composables/infra/useRequest'
 import type { EventSku, GrabStatus, LiveEvent, Visitor } from '@/types'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 
+function normalizeId(value: number | string | null | undefined) {
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : null
+}
+
 export function useTicketOrderCabin(
   props: { selectedEvent: LiveEvent | null },
   emit: {
@@ -287,7 +292,7 @@ export function useTicketOrderCabin(
     () => props.selectedEvent,
     (event) => {
       if (event && event.skus.length > 0) {
-        activeSkuId.value = event.skus[0].id
+        activeSkuId.value = normalizeId(event.skus[0].id)
       }
       void fetchVisitors()
     }
@@ -296,7 +301,7 @@ export function useTicketOrderCabin(
   onMounted(() => {
     void fetchVisitors()
     if (props.selectedEvent && props.selectedEvent.skus.length > 0) {
-      activeSkuId.value = props.selectedEvent.skus[0].id
+      activeSkuId.value = normalizeId(props.selectedEvent.skus[0].id)
     }
   })
 

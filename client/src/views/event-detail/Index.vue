@@ -38,7 +38,9 @@
               <a-card size="small" :bordered="false" style="background: rgba(255,255,255,0.03)">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
                   <span style="font-weight: 700">票档预览</span>
-                  <span style="font-size: 12px; color: var(--ls-text-secondary)">最低价 ¥{{ event.minPrice }}</span>
+                  <span style="font-size: 12px; color: var(--ls-text-secondary)">
+                    票价区间 {{ formatEventPriceRange(event) }}
+                  </span>
                 </div>
                 <a-space direction="vertical" style="width: 100%">
                   <div
@@ -86,6 +88,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { fetchEventById } from '@/composables/event/useEventCatalog'
 import { useEventAccess } from '@/composables/event/useEventAccess'
+import { formatEventPriceRange } from '@/composables/event/useEventSquare'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 import type { LiveEvent } from '@/types'
 
@@ -105,7 +108,7 @@ async function loadEvent() {
     return
   }
 
-  if (selectedEvent.value?.id === eventId) {
+  if (Number(selectedEvent.value?.id) === eventId) {
     event.value = selectedEvent.value
     return
   }

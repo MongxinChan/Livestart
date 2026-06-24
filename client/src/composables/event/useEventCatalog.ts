@@ -6,6 +6,5 @@ export async function fetchEventList() {
 }
 
 export async function fetchEventById(eventId: number) {
-  const events = await fetchEventList()
-  return events.find((event) => event.id === eventId) ?? null
+  return request<LiveEvent | null>(`/api/live-start/engine/event/${eventId}`)
 }

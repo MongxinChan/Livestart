@@ -4,8 +4,13 @@ import type { LiveEvent } from '@/types'
 const selectedEvent = ref<LiveEvent | null>(null)
 const cabinEntryEventId = ref<number | null>(null)
 
+function normalizeEventId(eventId: number | string | null | undefined) {
+  const value = Number(eventId)
+  return Number.isFinite(value) && value > 0 ? value : null
+}
+
 export function useEventAccess() {
-  const selectedEventId = computed(() => selectedEvent.value?.id ?? null)
+  const selectedEventId = computed(() => normalizeEventId(selectedEvent.value?.id) ?? null)
 
   function setSelectedEvent(event: LiveEvent | null) {
     selectedEvent.value = event
@@ -13,7 +18,7 @@ export function useEventAccess() {
 
   function allowCabinEntry(event: LiveEvent) {
     selectedEvent.value = event
-    cabinEntryEventId.value = event.id
+    cabinEntryEventId.value = normalizeEventId(event.id)
   }
 
   function clearCabinEntry() {
@@ -21,7 +26,8 @@ export function useEventAccess() {
   }
 
   function canAccessCabin(eventId: number) {
-    return cabinEntryEventId.value === eventId
+    const normalizedTargetId = normalizeEventId(eventId)
+    return cabinEntryEventId.value != null && normalizedTargetId != null && cabinEntryEventId.value === normalizedTargetId
   }
 
   return {
