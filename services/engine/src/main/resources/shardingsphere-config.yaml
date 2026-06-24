@@ -60,11 +60,6 @@ rules:
           keyGeneratorName: snowflake
     bindingTables:
       - t_order,t_order_item
-    broadcastTables:
-      - t_event
-      - t_event_config
-      - t_ticket_sku
-
     shardingAlgorithms:
       order_database_inline:
         type: INLINE

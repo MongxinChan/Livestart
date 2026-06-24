@@ -61,15 +61,65 @@ dataSources:
 rules:
   - !SHARDING
     tables:
-      t_placeholder:
-        actualDataNodes: ds_common.t_placeholder
-      
-    # 广播表声明
-    broadcastTables:
-      - t_event
-      - t_event_config
-      - t_ticket_sku
-      - t_refund_policy
+      t_event:
+        actualDataNodes: ds_common.t_event
+      t_event_config:
+        actualDataNodes: ds_common.t_event_config
+      t_ticket_sku:
+        actualDataNodes: ds_common.t_ticket_sku
+      t_refund_policy:
+        actualDataNodes: ds_common.t_refund_policy
+      t_event_performer:
+        actualDataNodes: ds_common.t_event_performer
+      t_event_ticket_stage:
+        actualDataNodes: ds_common.t_event_ticket_stage
+      t_event_style_relation:
+        actualDataNodes: ds_common.t_event_style_relation
+      t_style:
+        actualDataNodes: ds_common.t_style
+      t_performer:
+        actualDataNodes: ds_common.t_performer
+      t_order:
+        actualDataNodes: ds_order_${0..1}.t_order_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_database_inline
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_table_hash_mod
+      t_order_item:
+        actualDataNodes: ds_order_${0..1}.t_order_item_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_database_inline
+        tableStrategy:
+          standard:
+            shardingColumn: user_id
+            shardingAlgorithmName: order_item_table_hash_mod
+    bindingTables:
+      - t_order,t_order_item
+
+    shardingAlgorithms:
+      order_database_inline:
+        type: INLINE
+        props:
+          algorithm-expression: ds_order_${user_id % 2}
+      order_table_hash_mod:
+        type: CLASS_BASED
+        props:
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.merchant.admin.dao.sharding.OrderTableHashModShardingAlgorithm
+      order_item_table_hash_mod:
+        type: CLASS_BASED
+        props:
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.merchant.admin.dao.sharding.OrderTableHashModShardingAlgorithm
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
 
   - !SINGLE
     defaultDataSource: ds_common

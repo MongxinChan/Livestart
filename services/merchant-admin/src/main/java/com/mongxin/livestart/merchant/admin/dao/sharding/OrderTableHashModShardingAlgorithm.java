@@ -1,4 +1,4 @@
-package com.mongxin.livestart.distribution.dao.sharding;
+package com.mongxin.livestart.merchant.admin.dao.sharding;
 
 import org.apache.shardingsphere.sharding.api.sharding.standard.PreciseShardingValue;
 import org.apache.shardingsphere.sharding.api.sharding.standard.RangeShardingValue;
@@ -8,12 +8,12 @@ import java.util.Collection;
 import java.util.Properties;
 
 /**
- * 门票表与只读订单表 Hash 取模分片算法（16 分表）
+ * 订单表 Hash 取模分片算法（16 分表）
  * <p>
  * 分片列：user_id
- * 算法：user_id % 16 → t_user_ticket_{0..15} / t_order_{0..15}
+ * 算法：user_id % 16 → t_order_{0..15}
  */
-public class UserTicketTableHashModShardingAlgorithm implements StandardShardingAlgorithm<Long> {
+public class OrderTableHashModShardingAlgorithm implements StandardShardingAlgorithm<Long> {
 
     private static final int SHARDING_COUNT = 16;
 
