@@ -16,9 +16,9 @@ import java.util.Date;
 public class EventDO {
 
     /**
-     * ID（AUTO_INCREMENT）
+     * 分布式主键 ID
      */
-    @TableId(type = IdType.AUTO)
+    @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
     /**
@@ -32,7 +32,7 @@ public class EventDO {
     private Integer eventType;
 
     /**
-     * 关联场馆ID
+     * 关联场馆 ID
      */
     private Long venueId;
 
@@ -47,7 +47,7 @@ public class EventDO {
     private String posterUrl;
 
     /**
-     * 状态 0:下架 1:预售 2:在售 3:售罄
+     * 状态 0: 下架 1: 预售 2: 在售 3: 售罄
      */
     private Integer status;
 }
