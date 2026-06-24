@@ -14,7 +14,7 @@ export const mockEvents: LiveEvent[] = [
     cover: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=600',
     date: '2026-06-25 19:30',
     venue: '上海 Modern Sky LAB',
-    city: '上海市 上海市',
+    city: '上海市',
     artist: '万能青年旅店',
     minPrice: 280,
     tags: ['独立摇滚', 'Livehouse', '热卖中'],
@@ -30,8 +30,8 @@ export const mockEvents: LiveEvent[] = [
     type: '演唱会',
     cover: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=600',
     date: '2026-07-12 19:00',
-    venue: '杭州奥体中心体育场(大莲花)',
-    city: '浙江省 杭州市',
+    venue: '杭州奥体中心体育场',
+    city: '杭州市',
     artist: '周杰伦',
     minPrice: 580,
     tags: ['流行巨星', '体育场', '准点抢票'],
@@ -44,15 +44,15 @@ export const mockEvents: LiveEvent[] = [
   },
   {
     id: 103,
-    title: '「重塑雕像的权利」A RE-TREAD OVERTURE 特别专场',
+    title: '「重塑雕像的权利」RE-TREAD OVERTURE 特别专场',
     type: 'Livehouse',
     cover: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=600',
     date: '2026-08-08 20:00',
     venue: '深圳 HOU Live',
-    city: '广东省 深圳市',
+    city: '深圳市',
     artist: '重塑雕像的权利',
     minPrice: 320,
-    tags: ['后朋克', '极致美学', '特惠中'],
+    tags: ['后朋现场', '极致美学', '特惠中'],
     skus: [
       { id: 1031, name: '全价票', price: 320, stock: 28, total: 500 },
       { id: 1032, name: '现场票', price: 380, stock: 50, total: 100 },
@@ -65,7 +65,7 @@ export const mockEvents: LiveEvent[] = [
     cover: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?auto=format&fit=crop&q=80&w=600',
     date: '2026-08-20 19:30',
     venue: '广州大学城体育中心体育场',
-    city: '广东省 广州市',
+    city: '广州市',
     artist: '陈奕迅',
     minPrice: 680,
     tags: ['华语金曲', '万人现场', '即将开售'],
@@ -96,14 +96,14 @@ export const mockOrders: Order[] = [
     count: 2,
     totalAmount: 760,
     status: 0,
-    statusDesc: '待支付(剩余14分32秒)',
+    statusDesc: '待支付(剩余14分12秒)',
     createTime: '2026-06-02 10:15:00',
     checkCode: '',
     isChecked: 0,
   },
   {
     orderNo: '171725800088888888',
-    title: '「重塑雕像的权利」A RE-TREAD OVERTURE 特别专场',
+    title: '「重塑雕像的权利」RE-TREAD OVERTURE 特别专场',
     skuId: 1031,
     skuName: '全价票',
     price: 320,
@@ -118,7 +118,7 @@ export const mockOrders: Order[] = [
 ]
 
 export function createSettlementResult(eventId: string): SettlementResult {
-  const targetEvent = mockEvents.find((event) => event.id === Number(eventId)) || mockEvents[0]
+  const targetEvent = mockEvents.find((event) => Number(event.id) === Number(eventId)) || mockEvents[0]
   const shards = []
   let totalSold = 0
   let totalRevenue = 0

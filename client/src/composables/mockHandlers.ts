@@ -1,9 +1,20 @@
 import { apiState } from './sessionState'
 import { createSettlementResult, mockEvents, mockHotSearches, mockOrders, mockVisitors } from './mockData'
 
+function getMockEventPrices(event: (typeof mockEvents)[number]) {
+  return event.skus.map((sku) => sku.price)
+}
+
 export async function handleMockRequest(url: string, options: RequestInit = {}) {
   return new Promise((resolve, reject) => {
     window.setTimeout(() => {
+      if (url.includes('/api/live-start/engine/event/') && !url.endsWith('/list')) {
+        const eventId = Number(url.substring(url.lastIndexOf('/') + 1))
+        const event = mockEvents.find((item) => Number(item.id) === eventId) ?? null
+        resolve(event)
+        return
+      }
+
       if (url.includes('/api/search/event') || url.includes('/api/engine/event/list')) {
         if (url.includes('/api/search/event')) {
           const params = new URLSearchParams(url.split('?')[1] || '')
@@ -13,20 +24,23 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
           const minPrice = params.get('minPrice')
           const maxPrice = params.get('maxPrice')
 
-          const TYPE_TO_TEXT: Record<string, string> = { '0': 'Livehouse', '1': '演唱会', '2': '音乐节' }
+          const typeToText: Record<string, string> = { '0': 'Livehouse', '1': '演唱会', '2': '音乐节' }
 
           const filtered = mockEvents.filter((event) => {
             if (keyword && !event.title.includes(keyword)) return false
-            if (eventType !== null && eventType !== '' && TYPE_TO_TEXT[eventType] !== event.type) return false
+            if (eventType !== null && eventType !== '' && typeToText[eventType] !== event.type) return false
             if (city && !(event.city || '').includes(city)) return false
-            if (minPrice !== null && event.minPrice < Number(minPrice)) return false
-            if (maxPrice !== null && event.minPrice > Number(maxPrice)) return false
+
+            const prices = getMockEventPrices(event)
+            if (minPrice !== null && minPrice !== '' && !prices.some((price) => price >= Number(minPrice))) return false
+            if (maxPrice !== null && maxPrice !== '' && !prices.some((price) => price <= Number(maxPrice))) return false
             return true
           })
 
           resolve({ records: filtered, total: filtered.length, size: filtered.length, current: 1, pages: 1 })
           return
         }
+
         resolve(mockEvents)
         return
       }
@@ -54,10 +68,10 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
       if (url.includes('/api/engine/order/token')) {
         const params = new URLSearchParams(url.split('?')[1])
         const skuId = params.get('skuId')
-        const sku = mockEvents.flatMap((event) => event.skus).find((item) => item.id === Number(skuId))
+        const sku = mockEvents.flatMap((event) => event.skus).find((item) => Number(item.id) === Number(skuId))
 
         if (sku && sku.stock <= 0) {
-          reject(new Error('该票种已售罄，拦截后续请求'))
+          reject(new Error('该票种已售罄，请更换其他票档'))
           return
         }
 
@@ -74,16 +88,16 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
           return
         }
 
-        const sku = mockEvents.flatMap((event) => event.skus).find((item) => item.id === Number(reqData.skuId))
+        const sku = mockEvents.flatMap((event) => event.skus).find((item) => Number(item.id) === Number(reqData.skuId))
         if (sku && sku.stock <= 0) {
-          reject(new Error('库存不足，已被本地拦截'))
+          reject(new Error('库存不足，已被其他用户抢完'))
           return
         }
         if (sku) {
           sku.stock = Math.max(0, sku.stock - reqData.count)
         }
 
-        const targetEvent = mockEvents.find((event) => event.skus.some((item) => item.id === Number(reqData.skuId)))
+        const targetEvent = mockEvents.find((event) => event.skus.some((item) => Number(item.id) === Number(reqData.skuId)))
         const orderNo = `17172${Date.now()}${Math.floor(Math.random() * 1000)}`
 
         mockOrders.unshift({
@@ -95,7 +109,7 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
           count: reqData.count,
           totalAmount: (sku ? sku.price : 100) * reqData.count,
           status: 0,
-          statusDesc: '待支付(剩余15分00秒)',
+          statusDesc: '待支付(剩余15分10秒)',
           createTime: new Date().toLocaleString(),
           checkCode: '',
           isChecked: 0,
@@ -133,8 +147,8 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         }
 
         order.status = 2
-        order.statusDesc = '已取消(库存已安全归还)'
-        const sku = mockEvents.flatMap((event) => event.skus).find((item) => item.id === order.skuId)
+        order.statusDesc = '已取消，库存已安全回流'
+        const sku = mockEvents.flatMap((event) => event.skus).find((item) => Number(item.id) === Number(order.skuId))
         if (sku) {
           sku.stock += order.count
         }
@@ -151,8 +165,8 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         }
 
         order.status = 3
-        order.statusDesc = '已退票(资金与库存已回流)'
-        const sku = mockEvents.flatMap((event) => event.skus).find((item) => item.id === order.skuId)
+        order.statusDesc = '已退票，资金与库存已回流'
+        const sku = mockEvents.flatMap((event) => event.skus).find((item) => Number(item.id) === Number(order.skuId))
         if (sku) {
           sku.stock += order.count
         }

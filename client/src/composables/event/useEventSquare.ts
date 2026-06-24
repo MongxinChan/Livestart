@@ -10,6 +10,18 @@ export interface PriceRangeOption {
   maxPrice: number | null
 }
 
+interface RecommendCard {
+  eventId: number
+  title: string
+  venue: string
+  cover: string
+  priceRange: string
+  tag: string
+  tagColor: string
+  status: string
+  statusColor: string
+}
+
 export const PRICE_RANGES: PriceRangeOption[] = [
   { label: '不限', minPrice: null, maxPrice: null },
   { label: '100 以下', minPrice: null, maxPrice: 100 },
@@ -17,6 +29,55 @@ export const PRICE_RANGES: PriceRangeOption[] = [
   { label: '300-800', minPrice: 300, maxPrice: 800 },
   { label: '800 以上', minPrice: 800, maxPrice: null },
 ]
+
+function getEventPrices(event: LiveEvent) {
+  const skuPrices = (event.skus || [])
+    .map((sku) => Number(sku.price))
+    .filter((price) => Number.isFinite(price) && price >= 0)
+
+  if (skuPrices.length > 0) {
+    return skuPrices
+  }
+
+  const fallbackPrice = Number(event.minPrice)
+  return Number.isFinite(fallbackPrice) && fallbackPrice >= 0 ? [fallbackPrice] : []
+}
+
+export function formatEventPriceRange(event: LiveEvent) {
+  const prices = getEventPrices(event).sort((a, b) => a - b)
+  if (prices.length === 0) {
+    return '价格待定'
+  }
+
+  const minPrice = prices[0]
+  const maxPrice = prices[prices.length - 1]
+  if (minPrice === maxPrice) {
+    return `¥ ${minPrice}`
+  }
+
+  return `¥ ${minPrice} - ¥ ${maxPrice}`
+}
+
+function matchesPriceRange(event: LiveEvent, priceRange?: PriceRangeOption) {
+  if (!priceRange || (priceRange.minPrice == null && priceRange.maxPrice == null)) {
+    return true
+  }
+
+  const prices = getEventPrices(event)
+  if (prices.length === 0) {
+    return false
+  }
+
+  return prices.some((price) => {
+    if (priceRange.minPrice != null && price < priceRange.minPrice) {
+      return false
+    }
+    if (priceRange.maxPrice != null && price > priceRange.maxPrice) {
+      return false
+    }
+    return true
+  })
+}
 
 export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): void }) {
   const route = useRoute()
@@ -56,30 +117,30 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     },
   ]
 
-  const recommendCards = [
-    {
-      eventId: 102,
-      title: '周杰伦 2026「嘉年华」巡演',
-      venue: '杭州奥体中心体育场',
-      cover: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=200',
-      priceRange: '580 - 2000',
-      tag: '超热万人抢票',
-      tagColor: 'volcano',
-      status: '正在热卖',
-      statusColor: 'success',
-    },
-    {
-      eventId: 101,
-      title: '万能青年旅店 上海站演出',
-      venue: '上海 Modern Sky LAB',
-      cover: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=200',
-      priceRange: '280 - 580',
-      tag: '独立摇滚精选',
-      tagColor: 'cyan',
-      status: '口碑推荐',
-      statusColor: 'processing',
-    },
-  ]
+  const recommendCards = computed<RecommendCard[]>(() => {
+    const hotEventIds = [102, 101]
+    return hotEventIds
+      .map((eventId, index) => {
+        const event = events.value.find((item) => Number(item.id) === eventId)
+        if (!event) {
+          return null
+        }
+
+        const stageMeta = resolveEventStageMeta(event)
+        return {
+          eventId: Number(event.id),
+          title: event.title,
+          venue: event.venue,
+          cover: event.cover,
+          priceRange: formatEventPriceRange(event).replace(/^¥\s*/, ''),
+          tag: index === 0 ? '超热万人抢票' : '独立摇滚精选',
+          tagColor: index === 0 ? 'volcano' : 'cyan',
+          status: stageMeta.statusText,
+          statusColor: stageMeta.canGrab ? 'success' : 'processing',
+        }
+      })
+      .filter((card): card is RecommendCard => card !== null)
+  })
 
   const filteredEvents = computed(() => {
     const keyword = searchQuery.value.trim().toLowerCase()
@@ -94,13 +155,8 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
         return false
       }
 
-      if (priceRange) {
-        if (priceRange.minPrice != null && event.minPrice < priceRange.minPrice) {
-          return false
-        }
-        if (priceRange.maxPrice != null && event.minPrice > priceRange.maxPrice) {
-          return false
-        }
+      if (!matchesPriceRange(event, priceRange)) {
+        return false
       }
 
       if (!keyword) {
@@ -174,7 +230,7 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   }
 
   function clickBannerLink(eventId: number) {
-    const target = events.value.find((event) => event.id === eventId)
+    const target = events.value.find((event) => Number(event.id) === eventId)
     if (target) {
       emit('selectEvent', target)
     }
