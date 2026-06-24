@@ -8,7 +8,7 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
   const visitors = ref<any[]>([])
 
   const isEditMode = ref(false)
-  const editingId = ref<number | null>(null)
+  const editingId = ref<number | string | null>(null)
 
   const form = reactive({
     realName: '',
@@ -29,7 +29,7 @@ export function useVisitorManager(props: { open: boolean }, emit: any) {
     }
   }
 
-  async function deleteVisitor(id: number) {
+  async function deleteVisitor(id: number | string) {
     try {
       await request(`/api/live-start/admin/v1/visitor/${id}`, { method: 'DELETE' })
       message.success('已成功删除观演人')

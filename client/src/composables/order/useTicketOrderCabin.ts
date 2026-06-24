@@ -17,12 +17,12 @@ export function useTicketOrderCabin(
     (e: 'goToOrders'): void
   }
 ) {
-  const activeSkuId = ref<number | null>(null)
+  const activeSkuId = ref<string | null>(null)
   const ticketCount = ref(1)
 
   const activeSku = computed<EventSku | null>(() => {
     if (!props.selectedEvent || !activeSkuId.value) return null
-    return props.selectedEvent.skus.find((sku) => sku.id === activeSkuId.value) || null
+    return props.selectedEvent.skus.find((sku) => String(sku.id) === activeSkuId.value) || null
   })
 
   const totalPrice = computed(() => (activeSku.value ? activeSku.value.price : 0) * ticketCount.value)

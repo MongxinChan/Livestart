@@ -2,11 +2,12 @@ import { computed, ref } from 'vue'
 import type { LiveEvent } from '@/types'
 
 const selectedEvent = ref<LiveEvent | null>(null)
-const cabinEntryEventId = ref<number | null>(null)
+const cabinEntryEventId = ref<string | null>(null)
 
 function normalizeEventId(eventId: number | string | null | undefined) {
-  const value = Number(eventId)
-  return Number.isFinite(value) && value > 0 ? value : null
+  if (eventId == null) return null
+  const value = String(eventId).trim()
+  return /^\d+$/.test(value) ? value : null
 }
 
 export function useEventAccess() {
@@ -25,7 +26,7 @@ export function useEventAccess() {
     cabinEntryEventId.value = null
   }
 
-  function canAccessCabin(eventId: number) {
+  function canAccessCabin(eventId: number | string) {
     const normalizedTargetId = normalizeEventId(eventId)
     return cabinEntryEventId.value != null && normalizedTargetId != null && cabinEntryEventId.value === normalizedTargetId
   }

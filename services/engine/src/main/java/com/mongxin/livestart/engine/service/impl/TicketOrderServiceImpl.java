@@ -41,6 +41,7 @@ import com.mongxin.livestart.engine.mq.producer.TicketOrderCreateProducer;
 import com.mongxin.livestart.engine.remote.AdminRemoteService;
 import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
 import com.mongxin.livestart.engine.remote.dto.AdminUserSimpleRespDTO;
+import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
@@ -54,13 +55,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scripting.support.ResourceScriptSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
-import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -93,7 +93,6 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private final OrderPaySuccessProducer orderPaySuccessProducer;
     private final TicketOrderCreateProducer ticketOrderCreateProducer;
     private final AlipayConfig alipayConfig;
-    private final JdbcTemplate jdbcTemplate;
 
     @Value("${livestart.engine.local-order-mode:true}")
     private boolean localOrderMode;
@@ -410,75 +409,24 @@ public class TicketOrderServiceImpl implements TicketOrderService {
 
     @Override
     public IPage<AdminOrderPageQueryRespDTO> pageQueryAdminOrders(AdminOrderPageQueryReqDTO requestParam) {
-        Long currentUserId = Long.parseLong(requireUserId());
         Integer userType = UserContext.getUserType();
         if (userType == null || (userType != USER_TYPE_SUPER_ADMIN && userType != USER_TYPE_VENUE_ADMIN)) {
             throw new ClientException("当前用户无后台订单查看权限");
         }
-
-        StringBuilder fromSql = new StringBuilder("""
-                FROM t_order o
-                INNER JOIN (
-                    SELECT order_no,
-                           user_id,
-                           MIN(event_id) AS event_id,
-                           MIN(sku_id) AS sku_id,
-                           COUNT(*) AS ticket_count
-                    FROM t_order_item
-                    GROUP BY order_no, user_id
-                ) oi ON oi.order_no = o.order_no AND oi.user_id = o.user_id
-                INNER JOIN t_event e ON e.id = oi.event_id
-                INNER JOIN t_ticket_sku sku ON sku.id = oi.sku_id
-                INNER JOIN t_venue v ON v.id = e.venue_id
-                WHERE 1 = 1
-                """);
-        List<Object> params = new java.util.ArrayList<>();
-        if (requestParam.getStatus() != null) {
-            fromSql.append(" AND o.status = ?");
-            params.add(toOrderStatusCode(requestParam.getStatus()));
-        }
         if (userType == USER_TYPE_VENUE_ADMIN) {
-            fromSql.append(" AND v.owner_user_id = ?");
-            params.add(currentUserId);
+            throw new ClientException("当前版本暂不支持场馆管理员查看订单，请使用超级管理员账号查看");
         }
 
-        Long total = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM (SELECT o.order_no " + fromSql + " GROUP BY o.order_no, o.user_id) t",
-                Long.class,
-                params.toArray()
-        );
-
-        long current = requestParam.getCurrent() <= 0 ? 1 : requestParam.getCurrent();
-        long size = requestParam.getSize() <= 0 ? 10 : requestParam.getSize();
-        long offset = (current - 1) * size;
-
-        String querySql = """
-                SELECT o.order_no,
-                       o.user_id,
-                       oi.event_id,
-                       e.title AS event_title,
-                       oi.sku_id,
-                       sku.title AS sku_name,
-                       oi.ticket_count,
-                       o.total_amount,
-                       o.status,
-                       o.create_time
-                """ + fromSql + """
-                GROUP BY o.order_no, o.user_id, oi.event_id, e.title, oi.sku_id, sku.title, oi.ticket_count, o.total_amount, o.status, o.create_time
-                ORDER BY o.create_time DESC
-                LIMIT ? OFFSET ?
-                """;
-        params.add(size);
-        params.add(offset);
-
-        List<AdminOrderPageQueryRespDTO> records = jdbcTemplate.query(
-                querySql,
-                (rs, rowNum) -> mapAdminOrderRow(rs),
-                params.toArray()
-        );
+        long current = normalizeCurrent(requestParam.getCurrent());
+        long size = normalizeSize(requestParam.getSize());
+        Integer statusCode = requestParam.getStatus() == null ? null : toOrderStatusCode(requestParam.getStatus());
+        LambdaQueryWrapper<OrderDO> queryWrapper = Wrappers.lambdaQuery(OrderDO.class)
+                .eq(statusCode != null, OrderDO::getStatus, statusCode)
+                .orderByDesc(OrderDO::getCreateTime);
+        IPage<OrderDO> orderPage = orderMapper.selectPage(new Page<>(current, size), queryWrapper);
+        List<AdminOrderPageQueryRespDTO> records = buildAdminOrderRecords(orderPage.getRecords());
         fillUsernames(records);
-
-        Page<AdminOrderPageQueryRespDTO> page = new Page<>(current, size, total == null ? 0 : total);
+        Page<AdminOrderPageQueryRespDTO> page = new Page<>(current, size, orderPage.getTotal());
         page.setRecords(records);
         return page;
     }
@@ -562,10 +510,9 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 log.error("[库存回补] Redis 库存回补失败，skuId={}", skuId, e);
             }
         }
-        if (!localOrderMode) {
-            ticketSkuMapper.returnStock(skuId, count);
-        } else {
-            log.warn("[库存回补] local-order-mode 已启用，跳过数据库库存回补，skuId={}, count={}", skuId, count);
+        int affected = ticketSkuMapper.returnStock(skuId, count);
+        if (!SqlHelper.retBool(affected)) {
+            log.warn("[库存回补] 数据库库存回补未命中记录，skuId={}, count={}", skuId, count);
         }
         SOLD_OUT_MAP.remove(skuId);
     }
@@ -589,14 +536,9 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         transactionTemplate.executeWithoutResult(status -> {
             try {
                 TicketSkuDO latestSku = loadTicketSku(event.getSkuId());
-                if (!localOrderMode) {
-                    int decremented = ticketSkuMapper.decrementStock(latestSku.getId(), event.getCount(), latestSku.getVersion());
-                    if (!SqlHelper.retBool(decremented)) {
-                        throw new ServiceException("库存扣减失败");
-                    }
-                } else {
-                    log.warn("[下单] local-order-mode 已启用，跳过数据库库存扣减，依赖 Redis 预扣库存，skuId={}, count={}",
-                            latestSku.getId(), event.getCount());
+                int decremented = ticketSkuMapper.decrementStock(latestSku.getId(), event.getCount(), latestSku.getVersion());
+                if (!SqlHelper.retBool(decremented)) {
+                    throw new ServiceException("库存扣减失败");
                 }
 
                 BigDecimal totalAmount = latestSku.getSellingPrice().multiply(BigDecimal.valueOf(event.getCount()));
@@ -690,20 +632,103 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         }
     }
 
-    private AdminOrderPageQueryRespDTO mapAdminOrderRow(ResultSet rs) throws java.sql.SQLException {
+    private List<AdminOrderPageQueryRespDTO> buildAdminOrderRecords(List<OrderDO> orders) {
+        if (CollUtil.isEmpty(orders)) {
+            return List.of();
+        }
+
+        Map<Long, MerchantTicketSkuDetailRespDTO> skuCache = new HashMap<>();
+        Map<Long, MerchantEventRespDTO> eventCache = new HashMap<>();
+        List<AdminOrderPageQueryRespDTO> records = new ArrayList<>(orders.size());
+        for (OrderDO order : orders) {
+            records.add(buildAdminOrderRecord(order, skuCache, eventCache));
+        }
+        return records;
+    }
+
+    private AdminOrderPageQueryRespDTO buildAdminOrderRecord(OrderDO order,
+                                                             Map<Long, MerchantTicketSkuDetailRespDTO> skuCache,
+                                                             Map<Long, MerchantEventRespDTO> eventCache) {
+        List<OrderItemDO> items = orderItemMapper.selectList(Wrappers.lambdaQuery(OrderItemDO.class)
+                .eq(OrderItemDO::getOrderNo, order.getOrderNo())
+                .eq(OrderItemDO::getUserId, order.getUserId()));
+        if (CollUtil.isEmpty(items)) {
+            log.warn("[后台订单分页] 订单明细缺失，orderNo={}, userId={}", order.getOrderNo(), order.getUserId());
+        }
+
+        OrderItemDO firstItem = CollUtil.getFirst(items);
+        Long skuId = firstItem != null ? firstItem.getSkuId() : null;
+        Long eventId = firstItem != null ? firstItem.getEventId() : null;
+        MerchantTicketSkuDetailRespDTO skuDetail = loadTicketSkuDetail(skuId, skuCache);
+        MerchantEventRespDTO eventDetail = loadEventDetail(eventId, eventCache);
+
         AdminOrderPageQueryRespDTO dto = new AdminOrderPageQueryRespDTO();
-        dto.setOrderNo(rs.getString("order_no"));
-        dto.setUserId(rs.getLong("user_id"));
-        dto.setEventId(rs.getLong("event_id"));
-        dto.setEventTitle(rs.getString("event_title"));
-        dto.setSkuId(rs.getLong("sku_id"));
-        dto.setSkuName(rs.getString("sku_name"));
-        dto.setTicketCount(rs.getInt("ticket_count"));
-        dto.setTotalAmount(rs.getBigDecimal("total_amount"));
-        dto.setStatus(rs.getInt("status"));
-        dto.setStatusDesc(resolveStatusDesc(rs.getInt("status")));
-        dto.setCreateTime(rs.getTimestamp("create_time"));
+        dto.setOrderNo(order.getOrderNo());
+        dto.setUserId(order.getUserId());
+        dto.setEventId(eventId);
+        dto.setEventTitle(eventDetail != null ? eventDetail.getTitle() : "");
+        dto.setSkuId(skuId);
+        dto.setSkuName(skuDetail != null ? skuDetail.getTitle() : "");
+        dto.setTicketCount(items.size());
+        dto.setTotalAmount(order.getTotalAmount());
+        dto.setStatus(order.getStatus());
+        dto.setStatusDesc(resolveStatusDesc(order.getStatus()));
+        dto.setCreateTime(order.getCreateTime());
         return dto;
+    }
+
+    private MerchantTicketSkuDetailRespDTO loadTicketSkuDetail(Long skuId,
+                                                               Map<Long, MerchantTicketSkuDetailRespDTO> skuCache) {
+        if (skuId == null) {
+            return null;
+        }
+        if (skuCache.containsKey(skuId)) {
+            return skuCache.get(skuId);
+        }
+
+        Result<MerchantTicketSkuDetailRespDTO> result = merchantAdminRemoteService.getTicketSku(skuId);
+        MerchantTicketSkuDetailRespDTO detail = null;
+        if (result != null && result.isSuccess()) {
+            detail = result.getData();
+        } else {
+            log.warn("[后台订单分页] 查询票档信息失败，skuId={}, code={}, message={}",
+                    skuId,
+                    result != null ? result.getCode() : "null",
+                    result != null ? result.getMessage() : "remote result is null");
+        }
+        skuCache.put(skuId, detail);
+        return detail;
+    }
+
+    private MerchantEventRespDTO loadEventDetail(Long eventId,
+                                                 Map<Long, MerchantEventRespDTO> eventCache) {
+        if (eventId == null) {
+            return null;
+        }
+        if (eventCache.containsKey(eventId)) {
+            return eventCache.get(eventId);
+        }
+
+        Result<MerchantEventRespDTO> result = merchantAdminRemoteService.getEvent(eventId);
+        MerchantEventRespDTO detail = null;
+        if (result != null && result.isSuccess()) {
+            detail = result.getData();
+        } else {
+            log.warn("[后台订单分页] 查询演出信息失败，eventId={}, code={}, message={}",
+                    eventId,
+                    result != null ? result.getCode() : "null",
+                    result != null ? result.getMessage() : "remote result is null");
+        }
+        eventCache.put(eventId, detail);
+        return detail;
+    }
+
+    private long normalizeCurrent(long current) {
+        return current <= 0 ? 1 : current;
+    }
+
+    private long normalizeSize(long size) {
+        return size <= 0 ? 10 : size;
     }
 
     private void fillUsernames(List<AdminOrderPageQueryRespDTO> records) {

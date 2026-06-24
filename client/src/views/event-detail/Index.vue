@@ -116,7 +116,6 @@ async function loadEvent() {
 
   if (String(selectedEvent.value?.id) === eventId) {
     event.value = selectedEvent.value
-    return
   }
 
   loading.value = true

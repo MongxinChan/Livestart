@@ -1,9 +1,14 @@
 <template>
   <div>
-    <a-page-header title="订单管理" sub-title="查看全平台订单数据（只读）" :ghost="false" style="margin-bottom: 24px">
+    <a-page-header
+      title="订单管理"
+      sub-title="查看全平台订单数据（只读）"
+      :ghost="false"
+      style="margin-bottom: 24px"
+    >
       <template #extra>
-        <a-radio-group v-model:value="statusFilter" button-style="solid" @change="fetchList">
-          <a-radio-button :value="undefined">全部</a-radio-button>
+        <a-radio-group v-model:value="statusFilter" button-style="solid" @change="handleStatusChange">
+          <a-radio-button :value="-1">全部</a-radio-button>
           <a-radio-button :value="1">待支付</a-radio-button>
           <a-radio-button :value="2">已出票</a-radio-button>
           <a-radio-button :value="3">已取消</a-radio-button>
@@ -17,7 +22,7 @@
         :columns="columns"
         :data-source="list"
         :loading="loading"
-        row-key="id"
+        row-key="orderNo"
         :pagination="pagination"
         @change="onTableChange"
       >
@@ -25,7 +30,7 @@
           <template v-if="column.key === 'status'">
             <a-tag :color="statusColors[record.status]">{{ statusLabels[record.status] }}</a-tag>
           </template>
-          <template v-if="column.key === 'totalAmount'">
+          <template v-else-if="column.key === 'totalAmount'">
             <span style="color: #ff4d4f; font-weight: 600">¥{{ record.totalAmount }}</span>
           </template>
         </template>

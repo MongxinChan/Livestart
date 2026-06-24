@@ -252,6 +252,6 @@ async function subscribeReminder(event: LiveEvent) {
 }
 
 function normalizeEventId(eventId: number | string) {
-  return Number(eventId)
+  return String(eventId)
 }
 </script>

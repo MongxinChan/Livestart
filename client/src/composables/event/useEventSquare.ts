@@ -11,7 +11,7 @@ export interface PriceRangeOption {
 }
 
 interface RecommendCard {
-  eventId: number
+  eventId: string
   title: string
   venue: string
   cover: string
@@ -118,17 +118,17 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   ]
 
   const recommendCards = computed<RecommendCard[]>(() => {
-    const hotEventIds = [102, 101]
+    const hotEventIds = ['102', '101']
     return hotEventIds
       .map((eventId, index) => {
-        const event = events.value.find((item) => Number(item.id) === eventId)
+        const event = events.value.find((item) => String(item.id) === eventId)
         if (!event) {
           return null
         }
 
         const stageMeta = resolveEventStageMeta(event)
         return {
-          eventId: Number(event.id),
+          eventId: String(event.id),
           title: event.title,
           venue: event.venue,
           cover: event.cover,
@@ -194,7 +194,7 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
 
   async function fetchHotSearches() {
     try {
-      hotSearches.value = await request<HotSearch[]>('/api/search/hot')
+      hotSearches.value = await request<HotSearch[]>('/api/live-start/search/hot')
     } catch (err) {
       console.error('拉取热搜失败', err)
       hotSearches.value = []
@@ -204,7 +204,7 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   async function handleSearch() {
     if (searchQuery.value.trim()) {
       try {
-        await request(`/api/search/click?keyword=${encodeURIComponent(searchQuery.value)}`, { method: 'POST' })
+        await request(`/api/live-start/search/click?keyword=${encodeURIComponent(searchQuery.value)}`, { method: 'POST' })
         void fetchHotSearches()
       } catch (err) {
         console.error('记录热搜点击失败', err)
@@ -229,8 +229,8 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     void handleSearch()
   }
 
-  function clickBannerLink(eventId: number) {
-    const target = events.value.find((event) => Number(event.id) === eventId)
+  function clickBannerLink(eventId: number | string) {
+    const target = events.value.find((event) => String(event.id) === String(eventId))
     if (target) {
       emit('selectEvent', target)
     }

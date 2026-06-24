@@ -106,7 +106,7 @@ export function useEventList() {
   }
 
   async function onSubmit() {
-    if (!formData.title || !formData.startTime) {
+    if (!formData.title || !formData.startTime || !formData.venueId) {
       message.warning('请填写必填项')
       return
     }

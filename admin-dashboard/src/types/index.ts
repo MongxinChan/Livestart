@@ -105,14 +105,17 @@ export interface VisitorItem {
 
 export interface OrderItem {
   id: number
-  orderSn: string
+  orderNo: string
   userId: number
   username: string
+  eventId: number
   eventTitle: string
+  skuId: number
   skuName: string
   ticketCount: number
   totalAmount: number
   status: number
+  statusDesc?: string
   createTime: string
 }
 

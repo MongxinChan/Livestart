@@ -34,7 +34,7 @@ export type OrderStatus = 0 | 1 | 2 | 3
 export interface Order {
   orderNo: string
   title: string
-  skuId: number
+  skuId: number | string
   skuName: string
   price: number
   count: number
@@ -75,7 +75,7 @@ export interface CarouselSlide {
 }
 
 export interface Visitor {
-  id: number
+  id: number | string
   name: string
   idCard: string
   checked: boolean
@@ -99,8 +99,8 @@ export interface ThemeOption {
 }
 
 export interface TicketReminder {
-  id: number
-  eventId: number
+  id: number | string
+  eventId: number | string
   eventTitle: string
   ticketStage: number
   status: number
