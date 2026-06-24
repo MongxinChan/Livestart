@@ -1,6 +1,6 @@
 <template>
   <div>
-    <a-page-header title="艺人管理" sub-title="管理演出艺人/歌手信息" :ghost="false" style="margin-bottom: 24px">
+    <a-page-header title="艺人管理" sub-title="管理演出艺人和乐队信息" :ghost="false" style="margin-bottom: 24px">
       <template #extra>
         <a-button type="primary" @click="openForm()">
           <template #icon><PlusOutlined /></template>
@@ -59,11 +59,14 @@
             mode="multiple"
             show-search
             option-filter-prop="name"
-            placeholder="请选择风格流派（支持搜索）"
+            placeholder="请选择风格流派"
             :options="styleOptions"
             :field-names="{ label: 'name', value: 'id' }"
             allow-clear
           />
+        </a-form-item>
+        <a-form-item label="状态">
+          <a-select v-model:value="formData.status" :options="statusOptions" />
         </a-form-item>
         <a-form-item label="简介">
           <a-textarea v-model:value="formData.description" :rows="3" />
@@ -76,6 +79,11 @@
 <script setup lang="ts">
 import { PlusOutlined } from '@ant-design/icons-vue'
 import { usePerformerList } from './usePerformerList'
+
+const statusOptions = [
+  { label: '正常', value: 1 },
+  { label: '停演', value: 0 },
+]
 
 const {
   columns,

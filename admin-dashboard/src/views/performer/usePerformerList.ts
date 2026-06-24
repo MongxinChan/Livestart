@@ -2,8 +2,20 @@ import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { performerApi } from '@/api/performer'
 import { styleApi } from '@/api/style'
-import type { PerformerItem } from '@/types'
+import type { PerformerItem, PerformerSaveReq } from '@/types'
 import { performerTableColumns } from './columns'
+
+const DEFAULT_PERFORMER_STATUS = 1
+
+function createDefaultFormData(): PerformerSaveReq {
+  return {
+    name: '',
+    avatarUrl: '',
+    styleIds: [],
+    description: '',
+    status: DEFAULT_PERFORMER_STATUS,
+  }
+}
 
 export function usePerformerList() {
   const loading = ref(false)
@@ -29,7 +41,7 @@ export function usePerformerList() {
   const formVisible = ref(false)
   const submitting = ref(false)
   const editingId = ref<number | null>(null)
-  const formData = reactive({ name: '', avatarUrl: '', styleIds: [] as number[], description: '' })
+  const formData = reactive<PerformerSaveReq>(createDefaultFormData())
   const styleOptions = ref<any[]>([])
 
   async function fetchStyleOptions() {
@@ -43,10 +55,7 @@ export function usePerformerList() {
 
   function resetForm() {
     editingId.value = null
-    formData.name = ''
-    formData.avatarUrl = ''
-    formData.styleIds = []
-    formData.description = ''
+    Object.assign(formData, createDefaultFormData())
   }
 
   function openForm(record?: PerformerItem) {
@@ -54,8 +63,10 @@ export function usePerformerList() {
       editingId.value = record.id
       formData.name = record.name || ''
       formData.avatarUrl = record.avatarUrl || ''
-      formData.styleIds = (record as any).styleIds || []
+      formData.styleIds = record.styleIds || []
       formData.description = record.description || ''
+      formData.genre = record.genre || ''
+      formData.status = record.status ?? DEFAULT_PERFORMER_STATUS
     } else {
       resetForm()
     }
@@ -63,20 +74,31 @@ export function usePerformerList() {
   }
 
   async function onSubmit() {
-    if (!formData.name) {
-      message.warning('请填写艺名')
+    if (!formData.name.trim()) {
+      message.warning('请填写艺人名称')
       return
     }
+
     submitting.value = true
     try {
+      const payload: PerformerSaveReq = {
+        name: formData.name.trim(),
+        avatarUrl: formData.avatarUrl?.trim() || '',
+        description: formData.description?.trim() || '',
+        genre: formData.genre?.trim() || undefined,
+        styleIds: formData.styleIds || [],
+        status: formData.status ?? DEFAULT_PERFORMER_STATUS,
+      }
+
       if (editingId.value) {
-        await performerApi.update({ id: editingId.value, ...formData } as any)
+        await performerApi.update({ id: editingId.value, ...payload } as PerformerItem)
         message.success('更新成功')
       } else {
-        await performerApi.create(formData as any)
+        await performerApi.create(payload)
         message.success('创建成功')
       }
       formVisible.value = false
+      resetForm()
       void fetchList()
     } finally {
       submitting.value = false
