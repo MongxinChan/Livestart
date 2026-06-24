@@ -10,7 +10,7 @@ import lombok.Data;
 import java.util.Date;
 
 /**
- * 艺人/表演者持久层实体
+ * 艺人持久层实体
  * 对应表：t_performer
  */
 @Data
@@ -18,7 +18,7 @@ import java.util.Date;
 public class PerformerDO {
 
     /**
-     * ID（AUTO_INCREMENT）
+     * 分布式主键 ID
      */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
@@ -39,7 +39,7 @@ public class PerformerDO {
     private String avatar;
 
     /**
-     * 介绍
+     * 简介
      */
     private String bio;
 

@@ -1,5 +1,5 @@
 export interface EventSku {
-  id: number
+  id: number | string
   name: string
   price: number
   stock: number
@@ -7,7 +7,7 @@ export interface EventSku {
 }
 
 export interface LiveEvent {
-  id: number
+  id: number | string
   title: string
   type: string
   cover: string
@@ -71,7 +71,7 @@ export interface CarouselSlide {
   desc: string
   tag: string
   image: string
-  eventId: number
+  eventId: number | string
 }
 
 export interface Visitor {

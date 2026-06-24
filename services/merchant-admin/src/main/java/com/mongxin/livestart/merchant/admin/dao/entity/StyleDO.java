@@ -29,7 +29,7 @@ public class StyleDO {
     private String name;
 
     /**
-     * 风格代码 (如: ROCK)
+     * 风格编码
      */
     private String code;
 

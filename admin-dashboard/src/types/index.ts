@@ -70,15 +70,19 @@ export interface PerformerItem {
   id: number
   name: string
   avatarUrl: string
-  genre: string
+  genre?: string
   description: string
+  styleIds?: number[]
+  status?: number
 }
 
 export interface PerformerSaveReq {
   name: string
   avatarUrl: string
-  genre: string
   description: string
+  genre?: string
+  styleIds?: number[]
+  status?: number
 }
 
 export interface UserItem {
