@@ -166,7 +166,7 @@ async function persistSession(token: string, phone: string, payload: LoginRespon
   const userId = String(payload.userId || '1')
   const realName = payload.realName || username || '管理员'
 
-  console.log('[Login] 保存基础 session', { token: token.substring(0, 20), phone, userId })
+  // console.log('[Login] 保存基础 session', { token: token.substring(0, 20), phone, userId })
   saveAdminSession(token, {
     username,
     userId,
@@ -176,14 +176,14 @@ async function persistSession(token: string, phone: string, payload: LoginRespon
 
   // 调 /me 校验角色：场地管理员(3) 或 超管(4) 才能登录后台
   try {
-    console.log('[Login] 调用 /me 接口获取 userType')
+    // console.log('[Login] 调用 /me 接口获取 userType')
     const me = await userApi.me()
-    console.log('[Login] /me 接口返回', me)
+    // console.log('[Login] /me 接口返回', me)
 
     const userType = me?.userType as UserRoleValue | undefined
     if (!userType || !ADMIN_DASHBOARD_ALLOWED_ROLES.includes(userType)) {
-      console.error('[Login] 角色验证失败', { userType, allowedRoles: ADMIN_DASHBOARD_ALLOWED_ROLES })
-      clearAdminSession()
+      // console.error('[Login] 角色验证失败', { userType, allowedRoles: ADMIN_DASHBOARD_ALLOWED_ROLES })
+      clearAdminSession('login-role-reject')
       message.error(buildRoleRejectMessage(userType))
       return
     }
@@ -194,8 +194,8 @@ async function persistSession(token: string, phone: string, payload: LoginRespon
     router.push('/dashboard')
   } catch (err) {
     // /me 调用失败时保守处理：清掉 session，避免半登录态
-    console.error('[Login] /me 接口调用失败', err)
-    clearAdminSession()
+    // console.error('[Login] /me 接口调用失败', err)
+    // clearAdminSession('login-me-failed')
     message.error('登录校验失败，请稍后重试')
   }
 }
@@ -218,6 +218,10 @@ async function handleMockLogin() {
       phone: '13800000000',
       userType: UserRole.SuperAdmin,
     })
+    // console.log('[Mock Login] localStorage after save', {
+    //   token: localStorage.getItem('admin_token'),
+    //   user: localStorage.getItem('admin_user'),
+    // })
     message.success('Mock 超级管理员登录成功')
     router.push('/dashboard')
   }, 400)

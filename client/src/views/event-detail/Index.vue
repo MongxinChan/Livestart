@@ -101,14 +101,20 @@ const event = ref<LiveEvent | null>(null)
 
 const eventStageMeta = computed(() => resolveEventStageMeta(event.value))
 
+function normalizeRouteEventId(id: unknown) {
+  if (id == null) return null
+  const value = String(id).trim()
+  return /^\d+$/.test(value) ? value : null
+}
+
 async function loadEvent() {
-  const eventId = Number(route.params.id)
-  if (!Number.isFinite(eventId) || eventId <= 0) {
+  const eventId = normalizeRouteEventId(route.params.id)
+  if (!eventId) {
     event.value = null
     return
   }
 
-  if (Number(selectedEvent.value?.id) === eventId) {
+  if (String(selectedEvent.value?.id) === eventId) {
     event.value = selectedEvent.value
     return
   }

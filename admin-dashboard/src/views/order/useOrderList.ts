@@ -24,6 +24,11 @@ export function useOrderList() {
     void fetchList()
   }
 
+  function handleStatusChange() {
+    pagination.current = 1
+    void fetchList()
+  }
+
   onMounted(() => {
     void fetchList()
   })
@@ -37,6 +42,7 @@ export function useOrderList() {
     pagination,
     statusFilter,
     fetchList,
+    handleStatusChange,
     onTableChange,
   }
 }

@@ -5,8 +5,9 @@ import type { EventSku, GrabStatus, LiveEvent, Visitor } from '@/types'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 
 function normalizeId(value: number | string | null | undefined) {
-  const numericValue = Number(value)
-  return Number.isFinite(numericValue) && numericValue > 0 ? numericValue : null
+  if (value == null) return null
+  const normalizedValue = String(value).trim()
+  return /^\d+$/.test(normalizedValue) ? normalizedValue : null
 }
 
 export function useTicketOrderCabin(

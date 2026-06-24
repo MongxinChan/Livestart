@@ -46,6 +46,7 @@ const {
   pagination,
   statusFilter,
   fetchList,
+  handleStatusChange,
   onTableChange,
 } = useOrderList()
 </script>

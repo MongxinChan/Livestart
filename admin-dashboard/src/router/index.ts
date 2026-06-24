@@ -139,7 +139,6 @@ router.beforeEach((to, from) => {
     }
   }
 
-  console.log('[Router Guard] 通过守卫检查')
   return true
 })
 

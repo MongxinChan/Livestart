@@ -17,10 +17,15 @@ const route = useRoute()
 const router = useRouter()
 const { selectedEvent, setSelectedEvent, clearCabinEntry } = useEventAccess()
 
+function normalizeRouteEventId(id: unknown) {
+  if (id == null) return null
+  const value = String(id).trim()
+  return /^\d+$/.test(value) ? value : null
+}
+
 async function ensureSelectedEvent() {
-  const eventId = Number(route.params.id)
-  if (!Number.isFinite(eventId) || eventId <= 0) return
-  if (selectedEvent.value?.id === eventId) return
+  const eventId = normalizeRouteEventId(route.params.id)
+  if (!eventId) return
 
   const event = await fetchEventById(eventId)
   setSelectedEvent(event)

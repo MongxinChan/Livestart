@@ -3,6 +3,12 @@ import { apiState } from '@/composables/infra/useRequest'
 import { fetchEventById } from '@/composables/event/useEventCatalog'
 import { useEventAccess } from '@/composables/event/useEventAccess'
 
+function normalizeRouteEventId(id: unknown) {
+  if (id == null) return null
+  const value = String(id).trim()
+  return /^\d+$/.test(value) ? value : null
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
@@ -56,9 +62,9 @@ router.beforeEach(async (to) => {
   }
 
   if (to.name === 'OrderCabin') {
-    const eventId = Number(to.params.id)
+    const eventId = normalizeRouteEventId(to.params.id)
     const { canAccessCabin, setSelectedEvent } = useEventAccess()
-    if (!Number.isFinite(eventId) || eventId <= 0) {
+    if (!eventId) {
       return { name: 'Square' }
     }
 

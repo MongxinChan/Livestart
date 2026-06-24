@@ -44,6 +44,19 @@ export function getAdminSession(): AdminSession | null {
 
   try {
     return JSON.parse(raw) as AdminSession
+    // const session = JSON.parse(raw) as AdminSession & { userType?: UserRoleValue | string | number }
+    // const normalizedUserType =
+    //   session.userType === undefined || session.userType === null
+    //     ? undefined
+    //     : Number(session.userType)
+    //
+    // return {
+    //   ...session,
+    //   userType:
+    //     normalizedUserType && [UserRole.Fan, UserRole.Artist, UserRole.VenueAdmin, UserRole.SuperAdmin].includes(normalizedUserType)
+    //       ? (normalizedUserType as UserRoleValue)
+    //       : undefined,
+    // }
   } catch {
     localStorage.removeItem(USER_KEY)
     return null
@@ -53,15 +66,31 @@ export function getAdminSession(): AdminSession | null {
 export function saveAdminSession(token: string, session: AdminSession) {
   localStorage.setItem(TOKEN_KEY, token)
   localStorage.setItem(USER_KEY, JSON.stringify(session))
+  // console.log('[AdminSession] saveAdminSession', {
+  //   hasToken: !!token,
+  //   tokenPreview: token ? token.slice(0, 20) : '',
+  //   session,
+  // })
 }
 
 export function updateAdminSession(patch: Partial<AdminSession>) {
   const current = getAdminSession()
   if (!current) return
-  localStorage.setItem(USER_KEY, JSON.stringify({ ...current, ...patch }))
+  const next = { ...current, ...patch }
+  localStorage.setItem(USER_KEY, JSON.stringify(next))
+  // console.log('[AdminSession] updateAdminSession', {
+  //   patch,
+  //   next,
+  // })
 }
 
-export function clearAdminSession() {
+export function clearAdminSession(reason = 'unknown') {
+  // console.warn('[AdminSession] clearAdminSession', {
+  //   reason,
+  //   token: localStorage.getItem(TOKEN_KEY),
+  //   user: localStorage.getItem(USER_KEY),
+  //   stack: new Error().stack,
+  // })
   localStorage.removeItem(TOKEN_KEY)
   localStorage.removeItem(USER_KEY)
 }
@@ -118,7 +147,7 @@ http.interceptors.response.use(
     const status = error.response?.status
 
     if (status === 401) {
-      clearAdminSession()
+      clearAdminSession('http-401')
       window.location.href = '/login'
     }
 

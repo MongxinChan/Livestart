@@ -154,7 +154,7 @@ function handleMenuClick({ key }: { key: string }) {
       okText: '确定',
       cancelText: '取消',
       onOk() {
-        clearAdminSession()
+        clearAdminSession('manual-logout')
         message.success('已安全退出登录')
         router.push('/login')
       },
