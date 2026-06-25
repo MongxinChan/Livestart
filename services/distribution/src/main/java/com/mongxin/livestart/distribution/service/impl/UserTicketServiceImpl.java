@@ -99,10 +99,8 @@ public class UserTicketServiceImpl extends ServiceImpl<UserTicketMapper, UserTic
         }
 
         try {
-            int decremented = ticketSkuMapper.update(null, Wrappers.lambdaUpdate(TicketSkuDO.class)
-                    .eq(TicketSkuDO::getId, ticketSkuId)
-                    .gt(TicketSkuDO::getRemainingStock, 0)
-                    .setSql("remaining_stock = remaining_stock - 1"));
+            Integer version = sku.getVersion() != null ? sku.getVersion() : 0;
+            int decremented = ticketSkuMapper.decrementStock(ticketSkuId, 1, version);
             if (!SqlHelper.retBool(decremented)) {
                 throw new ServiceException("秒杀库存不足，冲突退回，请重试");
             }

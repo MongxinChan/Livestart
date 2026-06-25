@@ -25,7 +25,9 @@ public class TicketOrderCreateEvent {
     /** 票档SKU ID */
     private Long skuId;
 
-    /** 购票张数 */
+    /** 演出 ID */
+    private Long eventId;
+
     private Integer count;
 
     /** 观演人ID列表 */

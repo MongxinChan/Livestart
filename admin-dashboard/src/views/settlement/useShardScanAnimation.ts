@@ -1,27 +1,84 @@
 import { ref, onScopeDispose, type Ref } from 'vue'
+import type { SettlementShardItem } from '@/types'
 import type { ShardCell, ShardScanState } from './settlement.types'
 
 export interface StartOptions {
-  eventId: number
+  shards: SettlementShardItem[]
   onComplete?: () => void
+}
+
+const SHARD_COUNT = 16
+const DEFAULT_HEIGHT = 10
+
+function createEmptyShards(): ShardCell[] {
+  return Array.from({ length: SHARD_COUNT }, (_, i) => ({
+    index: i,
+    tableName: `t_order_item_${i}` as const,
+    visible: true,
+    height: DEFAULT_HEIGHT,
+    revenue: 0,
+    tickets: 0,
+    commissionAmount: 0,
+    settlementAmount: 0,
+  }))
+}
+
+function normalizeShardHeights(shards: SettlementShardItem[]) {
+  const maxRevenue = Math.max(...shards.map((item) => Number(item.totalSalesAmount ?? 0)), 0)
+  if (maxRevenue <= 0) {
+    return shards.map(() => DEFAULT_HEIGHT)
+  }
+  return shards.map((item) => Math.max((Number(item.totalSalesAmount ?? 0) / maxRevenue) * 90 + 10, DEFAULT_HEIGHT))
+}
+
+function toShardCells(shards: SettlementShardItem[]): ShardCell[] {
+  const sorted = [...shards].sort((left, right) => left.shardIndex - right.shardIndex)
+  const heights = normalizeShardHeights(sorted)
+
+  return Array.from({ length: SHARD_COUNT }, (_, index) => {
+    const shard = sorted[index]
+    if (!shard) {
+      return {
+        index,
+        tableName: `t_order_item_${index}` as const,
+        visible: true,
+        height: DEFAULT_HEIGHT,
+        revenue: 0,
+        tickets: 0,
+        commissionAmount: 0,
+        settlementAmount: 0,
+      }
+    }
+
+    return {
+      index,
+      tableName: `t_order_item_${index}` as const,
+      visible: true,
+      height: heights[index],
+      revenue: Number(shard.totalSalesAmount ?? 0),
+      tickets: Number(shard.totalTickets ?? 0),
+      commissionAmount: Number(shard.commissionAmount ?? 0),
+      settlementAmount: Number(shard.settlementAmount ?? 0),
+    }
+  })
 }
 
 export function useShardScanAnimation() {
   const state = ref<ShardScanState>({
     scanning: false,
-    scanIndex: -1,
-    shards: Array.from({ length: 16 }, (_, i) => ({
-      index: i,
-      tableName: `t_order_item_${i}` as const,
-      visible: false,
-      height: 0,
-      revenue: 0,
-    })),
+    scanIndex: SHARD_COUNT - 1,
+    shards: createEmptyShards(),
   })
 
-  const showVisualization = ref(false)
-
+  const showVisualization = ref(true)
   let timer: ReturnType<typeof setInterval> | null = null
+
+  function syncFromShards(shards: SettlementShardItem[]) {
+    state.value.scanning = false
+    state.value.scanIndex = SHARD_COUNT - 1
+    state.value.shards = toShardCells(shards)
+    showVisualization.value = true
+  }
 
   function reset() {
     if (timer) {
@@ -29,49 +86,43 @@ export function useShardScanAnimation() {
       timer = null
     }
     state.value.scanning = false
-    state.value.scanIndex = -1
-    state.value.shards = Array.from({ length: 16 }, (_, i) => ({
-      index: i,
-      tableName: `t_order_item_${i}` as const,
-      visible: false,
-      height: 0,
-      revenue: 0,
-    }))
-    showVisualization.value = false
+    state.value.scanIndex = SHARD_COUNT - 1
+    state.value.shards = createEmptyShards()
+    showVisualization.value = true
   }
 
   function start(opts: StartOptions) {
-    reset()
+    if (timer) {
+      clearInterval(timer)
+      timer = null
+    }
+
+    const shardCells = toShardCells(opts.shards)
     showVisualization.value = true
     state.value.scanning = true
-
-    /* DEMO ONLY: 模拟 16 个分片扫描，生产环境应替换为真实后端 SSE/轮询进度 */
-    const priceBase = opts.eventId === 102 ? 980 : 380
-    const totalTicketsEstimated = Math.floor(180 + Math.random() * 220)
-    const maxRev = (totalTicketsEstimated * priceBase) / 10
+    state.value.scanIndex = -1
+    state.value.shards = createEmptyShards()
 
     let i = 0
     timer = setInterval(() => {
-      if (i < 16) {
+      if (i < SHARD_COUNT) {
         state.value.scanIndex = i
-        const shardTickets = Math.floor(8 + Math.random() * 32)
-        const shardRevenue = shardTickets * priceBase
-
-        state.value.shards[i].visible = true
-        state.value.shards[i].revenue = shardRevenue
-        state.value.shards[i].height = (shardRevenue / maxRev) * 90 + 10
+        state.value.shards[i] = { ...shardCells[i], visible: true }
         i++
       } else {
         clearInterval(timer!)
         timer = null
         state.value.scanning = false
+        state.value.scanIndex = SHARD_COUNT - 1
         opts.onComplete?.()
       }
     }, 120)
   }
 
   onScopeDispose(() => {
-    if (timer) clearInterval(timer)
+    if (timer) {
+      clearInterval(timer)
+    }
   })
 
   return {
@@ -79,5 +130,6 @@ export function useShardScanAnimation() {
     showVisualization,
     start,
     reset,
+    syncFromShards,
   }
 }

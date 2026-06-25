@@ -37,6 +37,9 @@ export interface ShardCell {
   visible: boolean
   height: number
   revenue: number
+  tickets: number
+  commissionAmount: number
+  settlementAmount: number
 }
 
 export interface ShardScanState {
@@ -47,9 +50,9 @@ export interface ShardScanState {
 
 export function buildStatsCards(stats: SettlementStats): StatCardConfig[] {
   return [
-    { title: '总票房收入', value: stats.totalRevenue, prefix: '¥', color: '#52c41a' },
+    { title: '总票房收入', value: stats.grossRevenue, prefix: '¥', color: '#52c41a' },
     { title: '平台佣金', value: stats.totalCommission, prefix: '¥', color: '#fa8c16' },
-    { title: '净结算额', value: stats.totalNetAmount, prefix: '¥', color: '#1677ff' },
-    { title: '结算单数', value: stats.totalOrders, color: '#262626' },
+    { title: '净结算额', value: stats.netSettlement, prefix: '¥', color: '#1677ff' },
+    { title: '结算单数', value: stats.totalEvents, color: '#262626' },
   ]
 }

@@ -57,10 +57,10 @@ rocketmq:
 livestart:
   engine:
     order-close-delay-minutes: 15
-    local-order-mode: true
+    local-order-mode: ${LIVESTART_ENGINE_LOCAL_ORDER_MODE:false}
     auto-warm-stock-on-miss: true
     mq:
-      enabled: false
+      enabled: ${LIVESTART_ENGINE_MQ_ENABLED:true}
 
 alipay:
   app-id: ${ALIPAY_APP_ID:9021000164662769}

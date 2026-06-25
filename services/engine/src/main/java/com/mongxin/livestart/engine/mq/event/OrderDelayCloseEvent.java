@@ -30,6 +30,11 @@ public class OrderDelayCloseEvent {
     private Long skuId;
 
     /**
+     * 演出ID（回滚单人单场限购计数使用）
+     */
+    private Long eventId;
+
+    /**
      * 购买数量（归还库存使用）
      */
     private Integer count;

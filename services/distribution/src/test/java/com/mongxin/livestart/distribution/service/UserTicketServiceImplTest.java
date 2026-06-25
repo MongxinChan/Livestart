@@ -62,6 +62,7 @@ class UserTicketServiceImplTest {
                 .eventId(22L)
                 .remainingStock(10)
                 .limitNum(2)
+                .version(0)
                 .build();
 
         TicketGrabReqDTO request = new TicketGrabReqDTO();
@@ -77,7 +78,7 @@ class UserTicketServiceImplTest {
         when(stringRedisTemplate.execute(any(RedisScript.class), eq(redisKeys),
                 eq("1"), eq("2"), eq(String.valueOf(7 * 24 * 3600L))))
                 .thenReturn(1L);
-        when(ticketSkuMapper.update(eq(null), any())).thenReturn(0);
+        when(ticketSkuMapper.decrementStock(11L, 1, 0)).thenReturn(0);
         when(stringRedisTemplate.execute(any(RedisScript.class), eq(redisKeys), eq("1"), eq("1")))
                 .thenReturn(0L);
 
@@ -88,14 +89,39 @@ class UserTicketServiceImplTest {
     }
 
     @Test
-    void shouldResolveTicketStatusDescCorrectly() throws Exception {
-        java.lang.reflect.Method method = UserTicketServiceImpl.class.getDeclaredMethod("resolveTicketStatusDesc", Integer.class);
-        method.setAccessible(true);
+    void shouldUseOptimisticLockVersionWhenDecrementingStock() {
+        UserContext.setUser(UserInfoDTO.builder()
+                .userId("1001")
+                .username("tester")
+                .phone("13800000000")
+                .build());
 
-        assertEquals("未使用", method.invoke(userTicketService, 0));
-        assertEquals("已使用", method.invoke(userTicketService, 1));
-        assertEquals("已退票", method.invoke(userTicketService, 2));
-        assertEquals("未知状态", method.invoke(userTicketService, (Integer) null));
-        assertEquals("未知状态", method.invoke(userTicketService, 99));
+        TicketSkuDO sku = TicketSkuDO.builder()
+                .id(11L)
+                .eventId(22L)
+                .remainingStock(10)
+                .limitNum(2)
+                .version(7)
+                .build();
+
+        TicketGrabReqDTO request = new TicketGrabReqDTO();
+        request.setTicketSkuId(11L);
+        request.setArtistPromoCode("ART-001");
+
+        List<String> redisKeys = List.of(
+                "livestart:distribution:ticket:stock:11",
+                "livestart:distribution:ticket:limit:11:user:1001"
+        );
+
+        when(ticketSkuMapper.selectById(11L)).thenReturn(sku);
+        when(stringRedisTemplate.execute(any(RedisScript.class), eq(redisKeys),
+                eq("1"), eq("2"), eq(String.valueOf(7 * 24 * 3600L))))
+                .thenReturn(1L);
+        when(ticketSkuMapper.decrementStock(11L, 1, 7)).thenThrow(new ServiceException("mock stop"));
+        when(stringRedisTemplate.execute(any(RedisScript.class), eq(redisKeys), eq("1"), eq("1")))
+                .thenReturn(0L);
+
+        assertThrows(ServiceException.class, () -> userTicketService.grabTicket(request));
+        verify(ticketSkuMapper).decrementStock(11L, 1, 7);
     }
 }

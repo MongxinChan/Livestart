@@ -14,11 +14,14 @@
             {{ statusMeta[record.status as SettlementStatusValue].label }}
           </a-tag>
         </template>
-        <template v-if="column.key === 'revenue'">
-          <span class="amount-revenue">¥{{ record.totalRevenue?.toLocaleString() }}</span>
+        <template v-else-if="column.key === 'revenue'">
+          <span class="amount-revenue">¥{{ formatAmount(record.totalSalesAmount) }}</span>
         </template>
-        <template v-if="column.key === 'net'">
-          <span class="amount-net">¥{{ record.netAmount?.toLocaleString() }}</span>
+        <template v-else-if="column.key === 'commission'">
+          <span class="amount-commission">¥{{ formatAmount(record.commissionAmount) }}</span>
+        </template>
+        <template v-else-if="column.key === 'net'">
+          <span class="amount-net">¥{{ formatAmount(record.settlementAmount) }}</span>
         </template>
       </template>
     </a-table>
@@ -48,11 +51,26 @@ const statusMeta = SETTLEMENT_STATUS_META
 function onChange(pag: AntTablePaginationChange) {
   emit('change', pag)
 }
+
+function formatAmount(value?: number) {
+  if (value == null) {
+    return '0.00'
+  }
+  return Number(value).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
 </script>
 
 <style scoped>
 .amount-revenue {
   color: #52c41a;
+  font-weight: 600;
+}
+
+.amount-commission {
+  color: #fa8c16;
   font-weight: 600;
 }
 

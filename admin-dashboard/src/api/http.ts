@@ -103,6 +103,56 @@ export function getCurrentUserType(): UserRoleValue | undefined {
   return getAdminSession()?.userType
 }
 
+function toSafeNumber(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+
+  if (typeof value === 'string' && value.trim() !== '') {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) {
+      return parsed
+    }
+  }
+
+  return undefined
+}
+
+function normalizePageResult<T>(data: T): T {
+  if (!data || typeof data !== 'object' || !Array.isArray((data as { records?: unknown }).records)) {
+    return data
+  }
+
+  const pageData = data as T & {
+    total?: unknown
+    size?: unknown
+    current?: unknown
+    pages?: unknown
+  }
+
+  const normalizedTotal = toSafeNumber(pageData.total)
+  const normalizedSize = toSafeNumber(pageData.size)
+  const normalizedCurrent = toSafeNumber(pageData.current)
+  const normalizedPages = toSafeNumber(pageData.pages)
+
+  if (
+    normalizedTotal === undefined &&
+    normalizedSize === undefined &&
+    normalizedCurrent === undefined &&
+    normalizedPages === undefined
+  ) {
+    return data
+  }
+
+  return {
+    ...pageData,
+    ...(normalizedTotal !== undefined ? { total: normalizedTotal } : {}),
+    ...(normalizedSize !== undefined ? { size: normalizedSize } : {}),
+    ...(normalizedCurrent !== undefined ? { current: normalizedCurrent } : {}),
+    ...(normalizedPages !== undefined ? { pages: normalizedPages } : {}),
+  }
+}
+
 const http = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '',
   timeout: 15000,
@@ -137,7 +187,7 @@ http.interceptors.response.use(
   (response) => {
     const res = response.data as ApiResult
     if (res.code === '0' || res.code === '200') {
-      return res.data
+      return normalizePageResult(res.data)
     }
 
     message.error(res.message || '请求失败')

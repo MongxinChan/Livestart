@@ -3,14 +3,13 @@
     <template #title>
       <span class="card-title">
         <ThunderboltOutlined class="title-icon" />
-        ShardingSphere 16 个订单分片表 (ds_order_0 / ds_order_1) 数据热力扫描
+        默认展示 16 张物理订单分表的真实结算明细
       </span>
     </template>
     <template #extra>
-      <a-badge :status="state.scanning ? 'processing' : 'success'" :text="state.scanning ? '多线程扫描中...' : '对账完成'" />
+      <a-badge :status="state.scanning ? 'processing' : 'success'" :text="state.scanning ? '分表扫描中...' : '真实金额已同步'" />
     </template>
 
-    <!-- SVG 柱状图 -->
     <div class="chart-container">
       <svg viewBox="0 0 800 160" class="bar-chart">
         <defs>
@@ -54,27 +53,31 @@
             text-anchor="middle"
             font-family="monospace"
           >
-            ¥{{ Math.round(shard.revenue / 1000) }}k
+            ¥{{ formatCompactAmount(shard.revenue) }}
           </text>
         </g>
       </svg>
     </div>
 
-    <!-- 16 表扫描网格 -->
     <a-row :gutter="[10, 10]">
-      <a-col :xs="12" :sm="8" :md="6" :lg="4" :xl="3" v-for="(_, i) in 16" :key="i">
+      <a-col :xs="12" :sm="8" :md="6" :lg="4" :xl="3" v-for="shard in state.shards" :key="shard.index">
         <div
           class="shard-grid-item"
           :class="{
-            'item-scanning': state.scanIndex === i,
-            'item-scanned': state.scanIndex > i,
-            'item-pending': state.scanIndex < i,
+            'item-scanning': state.scanIndex === shard.index && state.scanning,
+            'item-scanned': !state.scanning || state.scanIndex >= shard.index,
+            'item-pending': state.scanning && state.scanIndex < shard.index,
           }"
         >
-          <span>t_order_{{ i }}</span>
-          <LoadingOutlined v-if="state.scanIndex === i" spin class="icon-scanning" />
-          <CheckCircleOutlined v-else-if="state.scanIndex > i" class="icon-scanned" />
-          <MinusCircleOutlined v-else class="icon-pending" />
+          <div class="grid-text">
+            <span class="grid-name">{{ shard.tableName }}</span>
+            <span class="grid-line">出票 {{ shard.tickets }}</span>
+            <span class="grid-line">票房 ¥{{ formatAmount(shard.revenue) }}</span>
+            <span class="grid-line">佣金 ¥{{ formatAmount(shard.commissionAmount) }}</span>
+            <span class="grid-line">实结 ¥{{ formatAmount(shard.settlementAmount) }}</span>
+          </div>
+          <LoadingOutlined v-if="state.scanIndex === shard.index && state.scanning" spin class="icon-scanning" />
+          <CheckCircleOutlined v-else class="icon-scanned" />
         </div>
       </a-col>
     </a-row>
@@ -82,7 +85,7 @@
 </template>
 
 <script setup lang="ts">
-import { ThunderboltOutlined, LoadingOutlined, CheckCircleOutlined, MinusCircleOutlined } from '@ant-design/icons-vue'
+import { ThunderboltOutlined, LoadingOutlined, CheckCircleOutlined } from '@ant-design/icons-vue'
 import type { ShardScanState } from './settlement.types'
 
 interface Props {
@@ -91,6 +94,20 @@ interface Props {
 }
 
 defineProps<Props>()
+
+function formatAmount(value: number) {
+  return Number(value ?? 0).toLocaleString('zh-CN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })
+}
+
+function formatCompactAmount(value: number) {
+  if (value >= 10000) {
+    return `${(value / 10000).toFixed(1)}w`
+  }
+  return Number(value ?? 0).toFixed(0)
+}
 </script>
 
 <style scoped>
@@ -127,19 +144,36 @@ defineProps<Props>()
 
 .shard-grid-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  padding: 6px 10px;
+  padding: 8px 10px;
   border-radius: 6px;
   font-size: 11px;
   font-family: monospace;
   border-width: 1px;
   border-style: solid;
   transition: all 0.2s;
+  min-height: 110px;
+}
+
+.grid-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.grid-name {
+  color: #262626;
+  font-weight: 700;
+  margin-bottom: 2px;
+}
+
+.grid-line {
+  color: #595959;
 }
 
 .item-pending {
-  opacity: 0.35;
+  opacity: 0.5;
   background: rgba(0, 0, 0, 0.01);
   border-color: rgba(0, 0, 0, 0.05);
 }
@@ -158,13 +192,11 @@ defineProps<Props>()
 
 .icon-scanning {
   color: #1677ff;
+  margin-top: 2px;
 }
 
 .icon-scanned {
   color: #52c41a;
-}
-
-.icon-pending {
-  opacity: 0.3;
+  margin-top: 2px;
 }
 </style>

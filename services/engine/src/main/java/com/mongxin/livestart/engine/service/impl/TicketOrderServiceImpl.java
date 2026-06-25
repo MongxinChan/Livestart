@@ -94,7 +94,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private final TicketOrderCreateProducer ticketOrderCreateProducer;
     private final AlipayConfig alipayConfig;
 
-    @Value("${livestart.engine.local-order-mode:true}")
+    @Value("${livestart.engine.local-order-mode:false}")
     private boolean localOrderMode;
 
     @Value("${livestart.engine.auto-warm-stock-on-miss:true}")
@@ -187,6 +187,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 .orderNo(orderNo)
                 .userId(userId)
                 .skuId(sku.getId())
+                .eventId(sku.getEventId())
                 .count(requestParam.getCount())
                 .visitorIds(requestParam.getVisitorIds())
                 .build();
@@ -533,14 +534,39 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     }
 
     private void persistOrderDirectly(TicketOrderCreateEvent event) {
+        TicketSkuDO latestSku = loadTicketSku(event.getSkuId());
+        if (latestSku == null) {
+            throw new ServiceException("票档不存在");
+        }
+
+        boolean stockDecremented = decrementStockInSingleTx(latestSku, event.getCount());
+        if (!stockDecremented) {
+            throw new ServiceException("库存扣减失败");
+        }
+
+        try {
+            persistOrderAndItemsInSingleTx(event, latestSku);
+        } catch (Exception ex) {
+            restoreStockAfterOrderFailure(latestSku.getId(), event.getCount());
+            throw ex;
+        }
+    }
+
+    private boolean decrementStockInSingleTx(TicketSkuDO latestSku, int count) {
+        return Boolean.TRUE.equals(transactionTemplate.execute(status -> {
+            try {
+                int decremented = ticketSkuMapper.decrementStock(latestSku.getId(), count, latestSku.getVersion());
+                return SqlHelper.retBool(decremented);
+            } catch (Exception ex) {
+                status.setRollbackOnly();
+                throw ex;
+            }
+        }));
+    }
+
+    private void persistOrderAndItemsInSingleTx(TicketOrderCreateEvent event, TicketSkuDO latestSku) {
         transactionTemplate.executeWithoutResult(status -> {
             try {
-                TicketSkuDO latestSku = loadTicketSku(event.getSkuId());
-                int decremented = ticketSkuMapper.decrementStock(latestSku.getId(), event.getCount(), latestSku.getVersion());
-                if (!SqlHelper.retBool(decremented)) {
-                    throw new ServiceException("库存扣减失败");
-                }
-
                 BigDecimal totalAmount = latestSku.getSellingPrice().multiply(BigDecimal.valueOf(event.getCount()));
                 Date now = new Date();
                 OrderDO order = OrderDO.builder()
@@ -563,6 +589,20 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                             .isChecked(0)
                             .build();
                     orderItemMapper.insert(item);
+                }
+            } catch (Exception ex) {
+                status.setRollbackOnly();
+                throw ex;
+            }
+        });
+    }
+
+    private void restoreStockAfterOrderFailure(Long skuId, int count) {
+        transactionTemplate.executeWithoutResult(status -> {
+            try {
+                int affected = ticketSkuMapper.returnStock(skuId, count);
+                if (!SqlHelper.retBool(affected)) {
+                    throw new ServiceException("订单失败后的库存回补失败");
                 }
             } catch (Exception ex) {
                 status.setRollbackOnly();

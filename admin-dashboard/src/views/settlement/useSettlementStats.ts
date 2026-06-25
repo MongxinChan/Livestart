@@ -4,18 +4,21 @@ import type { SettlementStats } from '@/types'
 
 export function useSettlementStats() {
   const statsData = reactive<SettlementStats>({
-    totalRevenue: 0,
+    totalEvents: 0,
+    totalTickets: 0,
+    grossRevenue: 0,
     totalCommission: 0,
-    totalNetAmount: 0,
-    totalOrders: 0,
+    netSettlement: 0,
   })
 
   async function fetchStats(eventId?: number) {
     try {
       const res = await settlementApi.stats(eventId)
-      if (res) Object.assign(statsData, res)
+      if (res) {
+        Object.assign(statsData, res)
+      }
     } catch {
-      // 统计数据非关键路径，静默失败
+      // 统计信息不是关键链路，失败时静默处理
     }
   }
 

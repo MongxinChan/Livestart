@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
 import com.mongxin.livestart.settlement.dto.resp.SettlementRespDTO;
+import com.mongxin.livestart.settlement.dto.resp.SettlementShardRespDTO;
 import com.mongxin.livestart.settlement.dto.resp.SettlementStatsRespDTO;
 import com.mongxin.livestart.settlement.service.SettlementService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 结算中心 Controller
@@ -58,6 +61,13 @@ public class SettlementController {
         return Results.success();
     }
 
+    @Operation(summary = "触发当前可见范围结算", description = "超管结算当前全部演出，场馆管理员只结算自己场馆下的演出")
+    @PostMapping("/trigger-visible")
+    public Result<Void> triggerVisibleSettlements() {
+        settlementService.triggerVisibleSettlements();
+        return Results.success();
+    }
+
     /**
      * 收入统计概览
      */
@@ -66,5 +76,11 @@ public class SettlementController {
     public Result<SettlementStatsRespDTO> incomeStats(
             @RequestParam(required = false) Long eventId) {
         return Results.success(settlementService.getIncomeStats(eventId));
+    }
+
+    @Operation(summary = "分表结算明细", description = "查询指定演出的 16 张物理订单分表结算明细")
+    @GetMapping("/shards")
+    public Result<List<SettlementShardRespDTO>> settlementShards(@RequestParam(required = false) Long eventId) {
+        return Results.success(settlementService.listSettlementShards(eventId));
     }
 }

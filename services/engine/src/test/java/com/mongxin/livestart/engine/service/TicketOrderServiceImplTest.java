@@ -20,15 +20,17 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.transaction.support.SimpleTransactionStatus;
-import org.springframework.transaction.support.TransactionCallbackWithoutResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
@@ -93,7 +95,7 @@ class TicketOrderServiceImplTest {
         when(orderMapper.selectOne(any())).thenReturn(order);
 
         assertDoesNotThrow(() -> ticketOrderService.paySuccess("O202406100002", "TRADE-2", new BigDecimal("88.00")));
-        verify(orderMapper, never()).updateOrderStatus(any(), any(), any(), any());
+        verify(orderMapper, never()).updateOrderStatus(anyLong(), anyLong(), anyInt(), anyInt());
         verify(orderPaySuccessProducer, never()).sendMessage(any());
     }
 
@@ -110,18 +112,19 @@ class TicketOrderServiceImplTest {
 
         when(orderMapper.selectOne(any())).thenReturn(order);
         when(orderMapper.updateOrderStatus(3L, 3003L, 1, 0)).thenReturn(1);
+        when(orderMapper.updatePayTime(eq(3L), eq(3003L), any())).thenReturn(1);
         when(orderPaySuccessProducer.sendMessage(any())).thenReturn(sendResult);
         when(sendResult.getSendStatus()).thenReturn(org.apache.rocketmq.client.producer.SendStatus.SEND_OK);
         doAnswer(invocation -> {
-            TransactionCallbackWithoutResult callback = invocation.getArgument(0);
-            callback.doInTransaction(new SimpleTransactionStatus());
+            Consumer<SimpleTransactionStatus> callback = invocation.getArgument(0);
+            callback.accept(new SimpleTransactionStatus());
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
 
         ticketOrderService.paySuccess("O202406100003", "TRADE-3", new BigDecimal("66.00"));
 
         verify(orderMapper).updateOrderStatus(3L, 3003L, 1, 0);
-        verify(orderMapper).updateById(any(OrderDO.class));
+        verify(orderMapper).updatePayTime(eq(3L), eq(3003L), any());
         ArgumentCaptor<com.mongxin.livestart.engine.mq.event.OrderPaySuccessEvent> captor =
                 ArgumentCaptor.forClass(com.mongxin.livestart.engine.mq.event.OrderPaySuccessEvent.class);
         verify(orderPaySuccessProducer).sendMessage(captor.capture());

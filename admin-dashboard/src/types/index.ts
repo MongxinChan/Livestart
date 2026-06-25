@@ -122,20 +122,32 @@ export interface OrderItem {
 export interface SettlementItem {
   id: number
   eventId: number
-  eventName: string
-  totalSold: number
-  totalRevenue: number
-  commission: number
-  netAmount: number
+  eventTitle: string
+  totalTickets: number
+  totalSalesAmount: number
+  commissionRate: number
+  commissionAmount: number
+  settlementAmount: number
   status: number
-  settleTime: string
+  createTime: string
+  updateTime: string
 }
 
 export interface SettlementStats {
-  totalRevenue: number
+  totalEvents: number
+  totalTickets: number
+  grossRevenue: number
   totalCommission: number
-  totalNetAmount: number
-  totalOrders: number
+  netSettlement: number
+}
+
+export interface SettlementShardItem {
+  shardIndex: number
+  tableName: string
+  totalTickets: number
+  totalSalesAmount: number
+  commissionAmount: number
+  settlementAmount: number
 }
 
 export interface StyleItem {

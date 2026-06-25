@@ -49,6 +49,14 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
     @Value("${livestart.visitor.aes-key:LiveStart2025Key!}")
     private String aesKey;
 
+    /**
+     * 本地开发测试开关：
+     * 开启后，允许使用 TEST-* 前缀的测试证件号，便于联调“注册用户 -> 新增观演人 -> 购票”链路。
+     * 生产环境必须保持关闭。
+     */
+    @Value("${livestart.visitor.allow-test-card-no:false}")
+    private boolean allowTestCardNo;
+
     // ========================= 证件类型常量 =========================
 
     private static final int CARD_TYPE_ID_CARD = 1;
@@ -228,6 +236,9 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
         if (cardType == null || StrUtil.isBlank(cardNo)) {
             throw new ClientException(VisitorErrorCodeEnum.VISITOR_CARD_FORMAT_ERROR);
         }
+        if (allowTestCardNo && isTestCardNo(cardNo)) {
+            return;
+        }
         boolean valid = switch (cardType) {
             case CARD_TYPE_ID_CARD -> validateIdCard(cardNo);
             case CARD_TYPE_PASSPORT -> validatePassport(cardNo);
@@ -297,6 +308,16 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
      */
     private boolean validateTaiwan(String cardNo) {
         return cardNo.matches("^\\d{8}$");
+    }
+
+    /**
+     * 测试证件号规则：
+     * - 仅用于本地开发联调
+     * - 统一使用 TEST- 前缀，避免与真实证件格式混淆
+     * - 允许 TEST-ID / TEST-PP / TEST-HM / TEST-TW 等自定义段
+     */
+    private boolean isTestCardNo(String cardNo) {
+        return cardNo != null && cardNo.trim().toUpperCase().matches("^TEST-[A-Z]{2,8}-[A-Z0-9_-]{3,32}$");
     }
 
     // ========================= 加密工具 =========================
