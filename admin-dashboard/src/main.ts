@@ -9,10 +9,15 @@ import './styles/global.css'
 const app = createApp(App)
 
 app.config.errorHandler = (error, instance, info) => {
+  const componentType =
+    instance && '$' in instance
+      ? (instance.$ as { type?: unknown }).type
+      : undefined
+
   console.error('[App ErrorHandler]', {
     error,
     info,
-    component: instance?.type,
+    component: componentType,
   })
   message.error('后台页面运行时报错，请打开控制台查看 [App ErrorHandler] 日志')
 }

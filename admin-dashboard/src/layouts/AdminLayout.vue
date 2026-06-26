@@ -60,9 +60,58 @@
         </div>
 
         <div class="admin-header-right">
-          <a-badge :count="3" :offset="[-4, 4]">
-            <BellOutlined style="font-size: 18px; cursor: pointer" />
-          </a-badge>
+          <a-popover
+            v-model:open="notificationOpen"
+            placement="bottomRight"
+            trigger="click"
+            overlay-class-name="settlement-notification-popover"
+            @openChange="handleNotificationOpenChange"
+          >
+            <template #content>
+              <div class="notification-panel">
+                <div class="notification-panel__header">
+                  <div>
+                    <div class="notification-panel__title">结算通知</div>
+                    <div class="notification-panel__subtitle">基于当前账号可见结算单实时生成</div>
+                  </div>
+                  <a-button size="small" @click="refreshNotifications">刷新</a-button>
+                </div>
+
+                <a-spin :spinning="notificationLoading">
+                  <a-empty
+                    v-if="notifications.length === 0"
+                    description="当前没有需要处理的结算通知"
+                  />
+
+                  <div v-else class="notification-list">
+                    <button
+                      v-for="item in notifications"
+                      :key="item.id"
+                      type="button"
+                      class="notification-item"
+                      @click="openSettlementNotification(item.eventId)"
+                    >
+                      <div class="notification-item__meta">
+                        <a-tag :color="item.type === 'pending' ? 'orange' : 'blue'">
+                          {{ item.typeLabel }}
+                        </a-tag>
+                        <span class="notification-item__time">{{ formatNotificationTime(item.updateTime) }}</span>
+                      </div>
+                      <div class="notification-item__title">{{ item.eventTitle }}</div>
+                      <div class="notification-item__subtitle">
+                        艺人：{{ item.performerName || '未绑定' }} · 演出序号：{{ item.eventId }}
+                      </div>
+                      <div class="notification-item__desc">{{ item.description }}</div>
+                    </button>
+                  </div>
+                </a-spin>
+              </div>
+            </template>
+
+            <a-badge :count="actionableCount" :offset="[-4, 4]">
+              <BellOutlined style="font-size: 18px; cursor: pointer" />
+            </a-badge>
+          </a-popover>
 
           <a-dropdown>
             <a-space style="cursor: pointer">
@@ -101,6 +150,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import dayjs from 'dayjs'
 import { useRoute, useRouter } from 'vue-router'
 import { message, Modal } from 'ant-design-vue'
 import {
@@ -115,6 +165,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons-vue'
 import { clearAdminSession, getAdminSession, UserRole } from '@/api/http'
+import { useSettlementNotifications } from '@/composables/useSettlementNotifications'
 
 const router = useRouter()
 const route = useRoute()
@@ -122,15 +173,20 @@ const route = useRoute()
 const collapsed = ref(false)
 const selectedKeys = ref<string[]>([route.path])
 const adminRealName = ref('系统管理员')
+const notificationOpen = ref(false)
 
 const currentTitle = computed(() => route.meta.title || '')
-
 const currentUserType = computed(() => getAdminSession()?.userType)
 const isSuper = computed(() => currentUserType.value === UserRole.SuperAdmin)
-/** 内容子菜单：超管完整可见；场地管理员只看演出，仍展示分组 */
 const canSeeContentSubmenu = computed(() => isSuper.value || currentUserType.value === UserRole.VenueAdmin)
-/** 运营子菜单：场地管理员只能看到订单，超管完整 */
 const canSeeOperationSubmenu = computed(() => isSuper.value || currentUserType.value === UserRole.VenueAdmin)
+
+const {
+  loading: notificationLoading,
+  notifications,
+  actionableCount,
+  fetchNotifications,
+} = useSettlementNotifications()
 
 watch(
   () => route.path,
@@ -144,6 +200,10 @@ onMounted(() => {
   if (adminUser?.realName) {
     adminRealName.value = adminUser.realName
   }
+
+  fetchNotifications().catch(() => {
+    // 由 http 拦截器统一提示错误
+  })
 })
 
 function handleMenuClick({ key }: { key: string }) {
@@ -170,4 +230,170 @@ function handleMenuClick({ key }: { key: string }) {
 function onMenuClick({ key }: { key: string }) {
   router.push(key)
 }
+
+function handleNotificationOpenChange(open: boolean) {
+  notificationOpen.value = open
+  if (open) {
+    refreshNotifications()
+  }
+}
+
+function refreshNotifications() {
+  fetchNotifications(true).catch(() => {
+    // 由 http 拦截器统一提示错误
+  })
+}
+
+function openSettlementNotification(eventId: number) {
+  notificationOpen.value = false
+  router.push({ path: '/settlement', query: { eventId: String(eventId) } })
+}
+
+function formatNotificationTime(value?: string) {
+  if (!value) return '未知时间'
+  const time = dayjs(value)
+  if (!time.isValid()) return value
+  return time.format('MM-DD HH:mm')
+}
 </script>
+
+<style scoped>
+.notification-panel {
+  width: 360px;
+}
+
+.notification-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.notification-panel__title {
+  color: #1f1f1f;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.notification-panel__subtitle {
+  margin-top: 4px;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.notification-list {
+  display: flex;
+  max-height: 420px;
+  flex-direction: column;
+  gap: 10px;
+  overflow: auto;
+}
+
+.notification-item {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.notification-item:hover {
+  border-color: #91caff;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(22, 119, 255, 0.10);
+}
+
+.notification-item__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notification-item__time {
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
+.notification-item__title {
+  margin-top: 8px;
+  color: #1f1f1f;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.notification-item__subtitle,
+.notification-item__desc {
+  margin-top: 6px;
+  color: #595959;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.admin-logo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 20px;
+  color: #fff;
+  cursor: pointer;
+}
+
+.admin-logo-icon {
+  font-size: 24px;
+  color: #ffd666;
+}
+
+.admin-logo-text {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.admin-logo-text.collapsed {
+  opacity: 0;
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.admin-header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.admin-header-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.page-container {
+  min-height: calc(100vh - 64px - 53px);
+  padding: 24px;
+  background: #f5f7fa;
+}
+
+.admin-footer {
+  padding: 16px 24px;
+  color: #8c8c8c;
+  font-size: 13px;
+  text-align: center;
+  background: #fff;
+  border-top: 1px solid #f0f0f0;
+}
+</style>
