@@ -46,10 +46,10 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
 
     @LogRecord(
             success = """
-                    创建票种：{{#requestParam.title}}，\
-                    关联演出ID：{{#requestParam.eventId}}，\
-                    售价：{{#requestParam.sellingPrice}}，\
-                    总库存：{{#requestParam.totalStock}}，\
+                    创建票种：{{#requestParam.title}}；
+                    关联演出ID：{{#requestParam.eventId}}；
+                    售价：{{#requestParam.sellingPrice}}；
+                    总库存：{{#requestParam.totalStock}}；
                     单人限购：{{#requestParam.limitNum}};
                     """,
             type = "TicketSku",
@@ -140,13 +140,12 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
             throw new ServiceException("票种库存增发失败");
         }
 
-        // Redis 缓存原子递增
         try {
             incrementStockCache(requestParam.getSkuId(), requestParam.getCount());
-            log.info("票种库存增发成功 | skuId={} | +{} | DB总库存={}",
+            log.info("票种库存增发成功 | skuId={} | +{} | DB总库存{}",
                     requestParam.getSkuId(), requestParam.getCount(), sku.getTotalStock() + requestParam.getCount());
         } catch (Exception e) {
-            log.error("票种库存缓存增发同步失败（非阻塞） | skuId={}", requestParam.getSkuId(), e);
+            log.error("票种库存缓存增发同步失败（非阻塞）| skuId={}", requestParam.getSkuId(), e);
         }
     }
 
@@ -169,7 +168,7 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
             deleteStockCache(id);
             log.info("票种删除完成 & 库存缓存已清除 | skuId={}", id);
         } catch (Exception e) {
-            log.error("票种库存缓存清除失败（非阻塞） | skuId={}", id, e);
+            log.error("票种库存缓存清除失败（非阻塞）| skuId={}", id, e);
         }
     }
 
@@ -184,11 +183,42 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         if (oldSku == null) {
             throw new ClientException("票种不存在");
         }
+
+        Integer nextStage1Stock = requestParam.getStage1Stock() == null ? oldSku.getStage1Stock() : requestParam.getStage1Stock();
+        Integer nextStage2Stock = requestParam.getStage2Stock() == null ? oldSku.getStage2Stock() : requestParam.getStage2Stock();
+        int normalizedStage1Stock = nextStage1Stock == null ? 0 : nextStage1Stock;
+        int normalizedStage2Stock = nextStage2Stock == null ? 0 : nextStage2Stock;
+
+        if (normalizedStage1Stock < 0 || normalizedStage2Stock < 0) {
+            throw new ClientException("一开和二开放票数量不能为负数");
+        }
+        if (normalizedStage1Stock + normalizedStage2Stock > oldSku.getTotalStock()) {
+            throw new ClientException("一开和二开放票数量之和不能超过总库存");
+        }
+
+        if ((oldSku.getStage2Released() == null ? 0 : oldSku.getStage2Released()) == 0) {
+            int currentStage1Stock = oldSku.getStage1Stock() == null ? 0 : oldSku.getStage1Stock();
+            int currentRemainingStock = oldSku.getRemainingStock() == null ? 0 : oldSku.getRemainingStock();
+            int soldDuringStage1 = Math.max(currentStage1Stock - currentRemainingStock, 0);
+            if (normalizedStage1Stock < soldDuringStage1) {
+                throw new ClientException("一开数量不能小于已售出的一开票数");
+            }
+            oldSku.setRemainingStock(normalizedStage1Stock - soldDuringStage1);
+        }
+
         oldSku.setTitle(requestParam.getTitle());
         oldSku.setOriginalPrice(requestParam.getOriginalPrice());
         oldSku.setSellingPrice(requestParam.getSellingPrice());
+        oldSku.setStage1Stock(normalizedStage1Stock);
+        oldSku.setStage2Stock(normalizedStage2Stock);
         oldSku.setLimitNum(requestParam.getLimitNum());
         updateById(oldSku);
+
+        try {
+            syncStockCache(oldSku.getId(), oldSku.getRemainingStock());
+        } catch (Exception e) {
+            log.error("票种库存缓存同步失败（非阻塞）| skuId={}", oldSku.getId(), e);
+        }
     }
 
     private void syncStockCache(Long skuId, Integer stock) {
