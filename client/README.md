@@ -26,6 +26,8 @@
    npm install
    npm run dev
    ```
+   说明：`npm run dev` 与 `npm run dev:local` 等价，都会使用 Vite 本地代理转发 `/api/live-start/**`，适合本地联调。
+   若需要验证发布配置，再使用 `npm run dev:publish`，该模式会直接请求 `http://localhost:8888`，浏览器可能遇到跨域限制。
 3. Vite 开发服务器启动后，会自动打开浏览器（默认端口 `3000`）。
 4. 在页面顶部导航栏右侧，**勾选关闭“离线 Mock 模式”**（使滑块流转为**“网关联调模式”**，状态指示灯将变绿）。
 5. 此时，所有前端操作（搜索、下单 Token、购票下单、订单管理、票房结算）都将经由 Vite 服务器代理并直通后端的 `http://localhost:8888` 网关，完成 100% 前后端物理闭环！
@@ -49,3 +51,46 @@
    - 点击“抢票” ➔ 动态展示防刷网关加载动画（`/api/engine/order/token`） ➔ 高亮获取到的单次有效 pathToken ➔ 携带 Token 访问异步下单 ➔ 动态展示 RocketMQ 排队削峰百分比进度条 ➔ 成功返回订单号 ➔ 流转超时未支付自愈。
 3. **分库分表票房穿透看板**
    - 一键触发结算（`/api/settlement/trigger`） ➔ 炫酷逐一扫描物理表 `t_order_item_0` 到 `t_order_item_15` 的动画 ➔ 展示数字翻滚的销售总额、出票量、5%平台佣金与实结净额 ➔ 穿透渲染这 16 张物理订单分表的散列柱状卡片，将分库分表技术直观且具象地秀给评委！
+---
+
+## Docker 说明
+
+当前仓库没有提供“整套 Livestart 微服务一键 Docker Compose 启动方案”。`docker/` 目录目前只包含 XXL-JOB Admin 的容器编排：
+
+```text
+docker/xxl-job/docker-compose.yml
+```
+
+这个 Compose 主要用于给 `services/distribution` 提供调度后台，适合联调以下能力：
+
+- 开售放票任务
+- 开售提醒任务
+- 依赖 XXL-JOB 的一次性定时任务
+
+启动方式：
+
+```bash
+cd docker/xxl-job
+docker compose up -d
+```
+
+启动后访问：
+
+```text
+http://127.0.0.1:8080/xxl-job-admin
+```
+
+注意事项：
+
+- Compose 默认连接宿主机 MySQL：`host.docker.internal:3306/xxl_job`
+- 当前示例账号密码写在 `docker/xxl-job/docker-compose.yml` 中，默认是 `root / 123456`
+- 如果你的本地 MySQL 配置不同，需要先修改 `PARAMS` 里的数据源配置
+- 如果你只需要看前端页面、演出列表、下单流程，通常不必启动 XXL-JOB
+- 如果你要联调定时放票、提醒任务，请同时启动 `services/distribution`
+
+推荐顺序：
+
+1. 先启动 MySQL、Redis、RocketMQ 等基础依赖
+2. 需要定时任务能力时，再启动 `docker/xxl-job`
+3. 启动网关和后端微服务
+4. 最后在 `client` 目录执行 `npm run dev`
