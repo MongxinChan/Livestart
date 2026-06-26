@@ -33,7 +33,7 @@
         搜索你关注的 <span class="text-gradient">明星 / 演出</span>
       </h2>
       <p style="color: var(--ls-text-secondary); margin-bottom: 18px; font-size: 0.86rem">
-        当前会直接展示一开、二开、待开售、抢票中还是已开演，不用再自己猜测。
+        首页会直接展示演出当前是待开售、可抢票还是已经开演，减少无效点击。
       </p>
       <a-input-search
         v-model:value="searchQuery"
@@ -129,9 +129,12 @@
       </div>
     </div>
 
-    <div style="display: flex; justify-content: flex-end; align-items: center; margin-bottom: 16px">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px; flex-wrap: wrap">
       <span style="font-size: 13px; color: var(--ls-text-secondary)">
-        已为你找到 <span style="font-weight: 700; color: var(--ant-color-primary)">{{ filteredEvents.length }}</span> 场演出
+        已为你找到 <span style="font-weight: 700; color: var(--ls-color-primary)">{{ filteredEvents.length }}</span> 场演出
+      </span>
+      <span style="font-size: 12px; color: var(--ls-text-secondary)">
+        第 {{ page }} 页 / 每页 {{ pageSize }} 条
       </span>
     </div>
 
@@ -144,7 +147,7 @@
     </a-row>
 
     <a-row v-else :gutter="[24, 24]">
-      <a-col :xs="24" :sm="12" :lg="8" :xl="6" v-for="event in filteredEvents" :key="event.id">
+      <a-col :xs="24" :sm="12" :lg="8" :xl="6" v-for="event in pagedEvents" :key="event.id">
         <a-card hoverable class="glow-card" :bordered="false" :body-style="{ padding: '14px' }">
           <div class="event-cover-wrap" style="height: 180px; margin-bottom: 12px; position: relative">
             <img :src="event.cover" :alt="event.title" style="width: 100%; height: 100%; object-fit: cover; border-radius: 10px" />
@@ -191,15 +194,25 @@
               block
               size="small"
               ghost
-              :disabled="resolveEventStageMeta(event).canGrab || resolveEventStageMeta(event).hasStarted"
-              @click.stop="subscribeReminder(event)"
+              :disabled="isReminderButtonDisabled(event)"
+              @click.stop="handleReminderClick(event)"
             >
-              预约开售提醒
+              {{ getReminderButtonText(event) }}
             </a-button>
           </div>
         </a-card>
       </a-col>
     </a-row>
+
+    <div v-if="!loading && filteredEvents.length > 0" style="display: flex; justify-content: center; margin-top: 28px">
+      <a-pagination
+        :current="page"
+        :page-size="pageSize"
+        :total="filteredEvents.length"
+        :show-size-changer="false"
+        @change="changePage"
+      />
+    </div>
   </div>
 </template>
 
@@ -213,8 +226,8 @@ import {
   UserOutlined,
 } from '@ant-design/icons-vue'
 import { formatEventPriceRange, useEventSquare } from '@/composables/event/useEventSquare'
+import { useReminderRegistry } from '@/composables/reminder/useReminderRegistry'
 import { resolveEventStageMeta } from '@/utils/eventStage'
-import { request } from '@/composables/infra/useRequest'
 import type { LiveEvent } from '@/types'
 
 const emit = defineEmits<{
@@ -226,6 +239,8 @@ const {
   activeCategory,
   activeCity,
   activePriceLabel,
+  page,
+  pageSize,
   loading,
   hotSearches,
   citiesList,
@@ -234,21 +249,55 @@ const {
   carouselSlides,
   recommendCards,
   filteredEvents,
+  pagedEvents,
   handleSearch,
+  changePage,
+  ensureAuthenticatedAction,
   clickHotWord,
   clickBannerLink,
 } = useEventSquare(emit)
 
-async function subscribeReminder(event: LiveEvent) {
+const { fetchReminders, subscribeReminder, getReminderByEventId } = useReminderRegistry()
+void fetchReminders().catch((err) => {
+  console.warn('拉取提醒列表失败', err)
+})
+
+function getReminderButtonText(event: LiveEvent) {
+  const stageMeta = resolveEventStageMeta(event)
+  const reminder = getReminderByEventId(event.id)
+  if (reminder?.status === 0) return '已预约提醒'
+  if (reminder?.status === 1) return '已完成提醒'
+  if (stageMeta.hasStarted) return '演出已开演'
+  if (stageMeta.canGrab) return '正在开售'
+  return '预约开售提醒'
+}
+
+function isReminderButtonDisabled(event: LiveEvent) {
+  const stageMeta = resolveEventStageMeta(event)
+  const reminder = getReminderByEventId(event.id)
+  return stageMeta.canGrab || stageMeta.hasStarted || reminder?.status === 0 || reminder?.status === 1
+}
+
+async function handleReminderClick(event: LiveEvent) {
+  if (isReminderButtonDisabled(event)) {
+    return
+  }
+  if (!ensureAuthenticatedAction()) {
+    return
+  }
   try {
-    await request('/api/live-start/distribution/v1/reminder/subscribe', {
-      method: 'POST',
-      body: JSON.stringify({ eventId: event.id }),
-    })
+    await subscribeReminder(event.id)
     message.success(`已为《${event.title}》预约开售提醒`)
   } catch (err: any) {
     message.error(err.message || '预约提醒失败')
   }
+}
+
+function handleSelectEvent(event: LiveEvent) {
+  if (!ensureAuthenticatedAction()) {
+    return
+  }
+  emit('selectEvent', event)
 }
 
 function normalizeEventId(eventId: number | string) {

@@ -2,6 +2,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { BellOutlined, SearchOutlined, ShoppingOutlined } from '@ant-design/icons-vue'
 import { request } from '@/composables/infra/useRequest'
+import { requireAuth } from '@/composables/useAuth'
 import type { ViewId } from '@/types'
 
 export function useNav() {
@@ -20,10 +21,16 @@ export function useNav() {
       return
     }
     if (view === 'orders') {
+      if (!requireAuth()) {
+        return
+      }
       void router.push({ name: 'Orders' })
       return
     }
     if (view === 'reminders') {
+      if (!requireAuth()) {
+        return
+      }
       void router.push({ name: 'Reminders' })
     }
   }

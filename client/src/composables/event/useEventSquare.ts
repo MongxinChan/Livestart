@@ -1,6 +1,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { request } from '@/composables/infra/useRequest'
+import { requireAuth } from '@/composables/useAuth'
 import type { CarouselSlide, HotSearch, LiveEvent } from '@/types'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 
@@ -52,10 +53,10 @@ export function formatEventPriceRange(event: LiveEvent) {
   const minPrice = prices[0]
   const maxPrice = prices[prices.length - 1]
   if (minPrice === maxPrice) {
-    return `¥ ${minPrice}`
+    return `¥${minPrice}`
   }
 
-  return `¥ ${minPrice} - ¥ ${maxPrice}`
+  return `¥${minPrice} - ¥${maxPrice}`
 }
 
 function matchesPriceRange(event: LiveEvent, priceRange?: PriceRangeOption) {
@@ -85,6 +86,8 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   const activeCategory = ref('全部')
   const activeCity = ref('全国')
   const activePriceLabel = ref<string>('不限')
+  const page = ref(1)
+  const pageSize = ref(12)
   const loading = ref(false)
   const events = ref<LiveEvent[]>([])
   const hotSearches = ref<HotSearch[]>([])
@@ -95,22 +98,22 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
 
   const carouselSlides: CarouselSlide[] = [
     {
-      title: '「周杰伦」嘉年华巡回演唱会',
-      desc: '面向高并发抢票场景，活动状态会实时展示是否待开售、是否已开抢。',
+      title: '周杰伦嘉年华世界巡回演唱会',
+      desc: '首页会实时展示当前演出是一开、二开、待开售还是已经开演。',
       tag: '超热演出',
       image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=1200',
       eventId: 102,
     },
     {
-      title: '万能青年旅店巡回音乐会 - 上海站',
-      desc: 'Livehouse 场景同样支持阶段判断和开售提醒预约。',
+      title: '万能青年旅店巡回 Livehouse 上海站',
+      desc: 'Livehouse 场景同样支持阶段展示和开售提醒预约。',
       tag: 'Livehouse 推荐',
       image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
       eventId: 101,
     },
     {
-      title: '「重塑雕像的权利」特别专场',
-      desc: '在演出广场就能看清当前是一开、二开还是已开演。',
+      title: '重塑雕像的权利特别专场',
+      desc: '在演出广场就能直接看清当前售票阶段和可抢状态。',
       tag: '先锋现场',
       image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=1200',
       eventId: 103,
@@ -132,8 +135,8 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
           title: event.title,
           venue: event.venue,
           cover: event.cover,
-          priceRange: formatEventPriceRange(event).replace(/^¥\s*/, ''),
-          tag: index === 0 ? '超热万人抢票' : '独立摇滚精选',
+          priceRange: formatEventPriceRange(event).replace(/^¥/, ''),
+          tag: index === 0 ? '热门抢票' : '独立现场',
           tagColor: index === 0 ? 'volcano' : 'cyan',
           status: stageMeta.statusText,
           statusColor: stageMeta.canGrab ? 'success' : 'processing',
@@ -180,6 +183,11 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     })
   })
 
+  const pagedEvents = computed(() => {
+    const start = (page.value - 1) * pageSize.value
+    return filteredEvents.value.slice(start, start + pageSize.value)
+  })
+
   async function fetchEvents() {
     loading.value = true
     try {
@@ -213,7 +221,12 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   }
 
   watch([activeCategory, activeCity, activePriceLabel], () => {
+    page.value = 1
     void fetchEvents()
+  })
+
+  watch(searchQuery, () => {
+    page.value = 1
   })
 
   watch(
@@ -227,6 +240,17 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   function clickHotWord(word: string) {
     searchQuery.value = word
     void handleSearch()
+  }
+
+  function changePage(nextPage: number, nextPageSize?: number) {
+    page.value = nextPage
+    if (nextPageSize != null) {
+      pageSize.value = nextPageSize
+    }
+  }
+
+  function ensureAuthenticatedAction() {
+    return requireAuth()
   }
 
   function clickBannerLink(eventId: number | string) {
@@ -246,6 +270,8 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     activeCategory,
     activeCity,
     activePriceLabel,
+    page,
+    pageSize,
     loading,
     events,
     hotSearches,
@@ -255,9 +281,12 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     carouselSlides,
     recommendCards,
     filteredEvents,
+    pagedEvents,
     fetchEvents,
     fetchHotSearches,
     handleSearch,
+    changePage,
+    ensureAuthenticatedAction,
     clickHotWord,
     clickBannerLink,
   }

@@ -1,20 +1,15 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { message } from 'ant-design-vue'
-import { request } from '@/composables/infra/useRequest'
-import type { TicketReminder } from '@/types'
+import { useReminderRegistry } from './useReminderRegistry'
 
 export function useReminders() {
-  const reminders = ref<TicketReminder[]>([])
-  const loading = ref(false)
+  const { reminders, loading, fetchReminders } = useReminderRegistry()
 
-  async function fetchReminders() {
-    loading.value = true
+  async function safeFetchReminders(force = false) {
     try {
-      reminders.value = await request<TicketReminder[]>('/api/live-start/distribution/v1/reminder/list')
+      await fetchReminders(force)
     } catch (err: any) {
       message.error(err.message || '获取提醒列表失败')
-    } finally {
-      loading.value = false
     }
   }
 
@@ -30,14 +25,14 @@ export function useReminders() {
   const pendingCount = computed(() => reminders.value.filter((item) => item.status === 0).length)
 
   onMounted(() => {
-    void fetchReminders()
+    void safeFetchReminders()
   })
 
   return {
     reminders,
     loading,
     pendingCount,
-    fetchReminders,
+    fetchReminders: safeFetchReminders,
     statusColor,
   }
 }

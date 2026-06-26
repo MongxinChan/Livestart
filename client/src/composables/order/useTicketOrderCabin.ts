@@ -1,6 +1,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { apiState, request } from '@/composables/infra/useRequest'
+import { requireAuth } from '@/composables/useAuth'
 import type { EventSku, GrabStatus, LiveEvent, Visitor } from '@/types'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 
@@ -32,6 +33,10 @@ export function useTicketOrderCabin(
   const showVisitorManager = ref(false)
 
   async function fetchVisitors() {
+    if (!apiState.isMock && !requireAuth()) {
+      visitorList.value = []
+      return
+    }
     if (apiState.isMock) {
       visitorList.value = [
         { id: 201, name: '陈孟欣(开发者)', idCard: '3301**********1234', checked: true },
@@ -80,6 +85,9 @@ export function useTicketOrderCabin(
 
   async function triggerGrab() {
     if (!activeSku.value) return
+    if (!apiState.isMock && !requireAuth()) {
+      return
+    }
     if (!eventStageMeta.value.canGrab) {
       message.warning(`当前阶段为“${eventStageMeta.value.statusText}”，暂时不能抢票`)
       return

@@ -31,9 +31,10 @@
               size="small"
               ghost
               style="width: fit-content; margin-top: 4px"
-              @click="subscribeReminder"
+              :disabled="isReminderDisabled"
+              @click="handleReminderClick"
             >
-              预约开售提醒
+              {{ reminderButtonText }}
             </a-button>
           </div>
         </a-col>
@@ -56,7 +57,7 @@
                   <a-space>
                     <a-tag v-if="sku.stock <= 0" color="error">该规格已售罄</a-tag>
                     <a-tag v-else color="success">余 {{ sku.stock }} 张</a-tag>
-                    <span style="font-weight: 800; font-size: 1.05rem">¥ {{ sku.price }}</span>
+                    <span style="font-weight: 800; font-size: 1.05rem">¥{{ sku.price }}</span>
                   </a-space>
                 </div>
               </a-radio-button>
@@ -79,7 +80,7 @@
                 size="small"
                 hoverable
                 :class="{ 'glow-card': true }"
-                :style="{ borderColor: v.checked ? 'var(--ant-color-primary)' : undefined }"
+                :style="{ borderColor: v.checked ? 'var(--ls-color-primary)' : undefined }"
                 @click="toggleVisitor(v)"
               >
                 <div style="display: flex; justify-content: space-between; align-items: center">
@@ -104,7 +105,7 @@
           <a-card :bordered="false" style="background: rgba(0,0,0,0.08); border: 1px dashed rgba(var(--ls-accent-rgb), 0.2); border-radius: 14px">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed rgba(var(--ls-accent-rgb), 0.15)">
               <span style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px">
-                <ThunderboltOutlined style="color: var(--ant-color-primary)" />
+                <ThunderboltOutlined style="color: var(--ls-color-primary)" />
                 开启高并发压测演示模式
               </span>
               <a-switch v-model:checked="showStressPanel" :disabled="grabStatus !== 'idle' || stressRunning" />
@@ -114,10 +115,10 @@
               <div v-if="grabStatus === 'idle'">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px">
                   <span style="font-size: 13px; color: var(--ls-text-secondary)">合计：</span>
-                  <span style="font-size: 1.5rem; font-weight: 800">¥ {{ totalPrice }}</span>
+                  <span style="font-size: 1.5rem; font-weight: 800">¥{{ totalPrice }}</span>
                 </div>
                 <div style="margin-bottom: 12px; font-size: 12px; color: var(--ls-text-secondary)">
-                  当前阶段：<span style="font-weight: 700; color: var(--ant-color-primary)">{{ eventStageMeta.statusText }}</span>
+                  当前阶段：<span style="font-weight: 700; color: var(--ls-color-primary)">{{ eventStageMeta.statusText }}</span>
                 </div>
                 <a-button type="primary" block size="large" :disabled="!activeSku || activeSku.stock <= 0 || !eventStageMeta.canGrab" @click="triggerGrab">
                   <template #icon><ThunderboltOutlined /></template>
@@ -132,7 +133,7 @@
               </div>
 
               <div v-else-if="grabStatus === 'fetching_token'" style="display: flex; gap: 20px; align-items: center; padding: 8px 0">
-                <div class="fingerprint-scanner" style="color: var(--ant-color-primary)">
+                <div class="fingerprint-scanner" style="color: var(--ls-color-primary)">
                   <ScanOutlined style="font-size: 28px" />
                 </div>
                 <div>
@@ -142,7 +143,7 @@
               </div>
 
               <div v-else-if="grabStatus === 'grabbing'" style="text-align: center; padding: 8px 0">
-                <a-progress :percent="grabProgress" :stroke-color="{ from: 'var(--ant-color-primary)', to: 'var(--ant-color-success)' }" :show-info="false" style="margin-bottom: 12px" />
+                <a-progress :percent="grabProgress" :stroke-color="{ from: 'var(--ls-color-primary)', to: 'var(--ls-color-success)' }" :show-info="false" style="margin-bottom: 12px" />
                 <div style="display: flex; justify-content: space-between; margin-bottom: 6px">
                   <a-tag color="success"><SafetyCertificateOutlined /> Token 校验通过</a-tag>
                   <span style="font-size: 11px; color: var(--ls-text-secondary); font-family: monospace">{{ pathToken.substring(0, 18) }}...</span>
@@ -174,13 +175,13 @@
                 <a-row :gutter="16" align="middle">
                   <a-col :span="12">
                     <div style="font-size: 12px; margin-bottom: 4px; color: var(--ls-text-secondary)">
-                      并发用户数：<b style="color: var(--ant-color-primary)">{{ stressConcurrency }}</b>
+                      并发用户数：<b style="color: var(--ls-color-primary)">{{ stressConcurrency }}</b>
                     </div>
                     <a-slider v-model:value="stressConcurrency" :min="10" :max="500" :step="10" :disabled="stressRunning" />
                   </a-col>
                   <a-col :span="12">
                     <div style="font-size: 12px; margin-bottom: 4px; color: var(--ls-text-secondary)">
-                      请求间隔：<b style="color: var(--ant-color-primary)">{{ stressInterval }} ms</b>
+                      请求间隔：<b style="color: var(--ls-color-primary)">{{ stressInterval }} ms</b>
                     </div>
                     <a-slider v-model:value="stressInterval" :min="0" :max="500" :step="5" :disabled="stressRunning" />
                   </a-col>
@@ -204,7 +205,7 @@
                           cx="50"
                           cy="50"
                           r="40"
-                          stroke="var(--ant-color-success)"
+                          stroke="var(--ls-color-success)"
                           stroke-width="8"
                           fill="none"
                           :stroke-dasharray="2 * Math.PI * 40"
@@ -215,27 +216,27 @@
                       </svg>
                       <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center">
                         <span style="font-size: 10px; color: var(--ls-text-secondary)">抢票成功率</span>
-                        <span style="font-size: 1.25rem; font-weight: 800; font-family: 'Outfit'; color: var(--ant-color-success)">{{ successRate }}%</span>
+                        <span style="font-size: 1.25rem; font-weight: 800; font-family: 'Outfit'; color: var(--ls-color-success)">{{ successRate }}%</span>
                       </div>
                     </div>
                     <div style="font-size: 11px; color: var(--ls-text-secondary); margin-top: 8px; text-align: center">
-                      已发请求: <b style="color: var(--ant-color-primary)">{{ stressResults.total }}</b> / {{ stressConcurrency }}
+                      已发请求: <b style="color: var(--ls-color-primary)">{{ stressResults.total }}</b> / {{ stressConcurrency }}
                     </div>
                   </a-col>
 
                   <a-col :xs="24" :md="14" style="display: flex; flex-direction: column; justify-content: center">
                     <div style="display: flex; flex-direction: column; gap: 6px">
-                      <div class="stress-metric-card" style="border-left-color: var(--ant-color-success)">
+                      <div class="stress-metric-card" style="border-left-color: var(--ls-color-success)">
                         <span style="font-size: 11px; color: var(--ls-text-secondary)">成功请求：</span>
-                        <span style="font-weight: 700; color: var(--ant-color-success); font-family: monospace">{{ stressResults.success }}</span>
+                        <span style="font-weight: 700; color: var(--ls-color-success); font-family: monospace">{{ stressResults.success }}</span>
                       </div>
-                      <div class="stress-metric-card" style="border-left-color: var(--ant-color-warning)">
+                      <div class="stress-metric-card" style="border-left-color: var(--ls-color-warning)">
                         <span style="font-size: 11px; color: var(--ls-text-secondary)">限流拦截：</span>
-                        <span style="font-weight: 700; color: var(--ant-color-warning); font-family: monospace">{{ stressResults.rateLimit }}</span>
+                        <span style="font-weight: 700; color: var(--ls-color-warning); font-family: monospace">{{ stressResults.rateLimit }}</span>
                       </div>
-                      <div class="stress-metric-card" style="border-left-color: var(--ant-color-error)">
+                      <div class="stress-metric-card" style="border-left-color: var(--ls-color-error)">
                         <span style="font-size: 11px; color: var(--ls-text-secondary)">WAF 拦截：</span>
-                        <span style="font-weight: 700; color: var(--ant-color-error); font-family: monospace">{{ stressResults.wafBlock }}</span>
+                        <span style="font-weight: 700; color: var(--ls-color-error); font-family: monospace">{{ stressResults.wafBlock }}</span>
                       </div>
                       <div class="stress-metric-card" style="border-left-color: rgba(255,255,255,0.3)">
                         <span style="font-size: 11px; color: var(--ls-text-secondary)">售罄拦截：</span>
@@ -274,6 +275,7 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { message } from 'ant-design-vue'
 import {
   ArrowLeftOutlined,
@@ -290,7 +292,7 @@ import {
 import type { LiveEvent } from '@/types'
 import VisitorManagerModal from './VisitorManagerModal.vue'
 import { useTicketOrderCabin } from '@/composables/order/useTicketOrderCabin'
-import { request } from '@/composables/infra/useRequest'
+import { useReminderRegistry } from '@/composables/reminder/useReminderRegistry'
 
 const props = defineProps<{
   selectedEvent: LiveEvent | null
@@ -332,13 +334,26 @@ const {
   runStressTest,
 } = useTicketOrderCabin(props, emit)
 
-async function subscribeReminder() {
-  if (!props.selectedEvent) return
+const { fetchReminders, subscribeReminder, getReminderByEventId } = useReminderRegistry()
+void fetchReminders()
+
+const currentReminder = computed(() => {
+  if (!props.selectedEvent) return undefined
+  return getReminderByEventId(props.selectedEvent.id)
+})
+
+const reminderButtonText = computed(() => {
+  if (currentReminder.value?.status === 0) return '已预约提醒'
+  if (currentReminder.value?.status === 1) return '已完成提醒'
+  return '预约开售提醒'
+})
+
+const isReminderDisabled = computed(() => currentReminder.value?.status === 0 || currentReminder.value?.status === 1)
+
+async function handleReminderClick() {
+  if (!props.selectedEvent || isReminderDisabled.value) return
   try {
-    await request('/api/live-start/distribution/v1/reminder/subscribe', {
-      method: 'POST',
-      body: JSON.stringify({ eventId: props.selectedEvent.id }),
-    })
+    await subscribeReminder(props.selectedEvent.id)
     message.success(`已为《${props.selectedEvent.title}》预约开售提醒`)
   } catch (err: any) {
     message.error(err.message || '预约提醒失败')

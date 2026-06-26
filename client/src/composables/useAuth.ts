@@ -3,7 +3,6 @@ import { message } from 'ant-design-vue'
 import { apiState, request } from '@/composables/infra/useRequest'
 import { clearSession, persistSession } from './sessionState'
 
-// ---- 模块级单例状态（所有调用方共享） ----
 const showAuthModal = ref(false)
 const showVisitorModal = ref(false)
 const authLoading = ref(false)
@@ -69,7 +68,7 @@ async function handleAuthSubmit() {
       apiState.phone = authForm.phone
       apiState.currentUser = {
         username: `Live_${authForm.phone.substring(7)}`,
-        realName: `新用户(${authForm.phone.substring(7)})`,
+        realName: `新用户${authForm.phone.substring(7)}`,
         phone: authForm.phone,
       }
       persistSession()
@@ -80,26 +79,20 @@ async function handleAuthSubmit() {
       return
     }
 
-    // 先判断手机号是否已注册
-    const isAvailable = await request<boolean>(`/api/live-start/admin/v1/has-phone/${authForm.phone}`)
+    const hasPhone = await request<boolean>(`/api/live-start/admin/v1/has-phone/${authForm.phone}`)
 
     let data: { token: string }
 
-    if (isAvailable) {
-      // 未注册 → 调用 register（传验证码 + 占位密码）
-      data = await request<{ token: string }>(
-        `/api/live-start/admin/v1/user`,
-        {
-          method: 'POST',
-          body: JSON.stringify({
-            phone: authForm.phone,
-            password: 'LiveStart123',
-            code: authForm.code,
-          }),
-        }
-      )
+    if (hasPhone) {
+      data = await request<{ token: string }>(`/api/live-start/admin/v1/user`, {
+        method: 'POST',
+        body: JSON.stringify({
+          phone: authForm.phone,
+          password: 'LiveStart123',
+          code: authForm.code,
+        }),
+      })
     } else {
-      // 已注册 → 调用 loginByCode
       data = await request<{ token: string }>(
         `/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`,
         { method: 'POST' }
@@ -111,10 +104,9 @@ async function handleAuthSubmit() {
 
     const userRes = await request<any>(`/api/live-start/admin/v1/user/${authForm.phone}`)
     apiState.userId = String(userRes.id)
-    // 保存用户信息，但用原始手机号覆盖后端返回的脱敏手机号
     apiState.currentUser = {
       ...userRes,
-      phone: authForm.phone, // 使用原始手机号，不用脱敏后的
+      phone: authForm.phone,
     }
     persistSession()
 
@@ -138,7 +130,7 @@ async function handleLogout() {
         { method: 'DELETE' }
       )
     } catch {
-      // Swallow logout errors so local session can still be cleared.
+      // Ignore remote logout failures so local session can still be cleared.
     }
   }
 
@@ -147,7 +139,6 @@ async function handleLogout() {
   window.location.reload()
 }
 
-// ---- Composable 入口（返回共享单例） ----
 export function useAuth() {
   return {
     showAuthModal,
@@ -159,4 +150,13 @@ export function useAuth() {
     handleAuthSubmit,
     handleLogout,
   }
+}
+
+export function requireAuth() {
+  if (apiState.token) {
+    return true
+  }
+
+  showAuthModal.value = true
+  return false
 }

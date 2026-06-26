@@ -3,13 +3,18 @@
     <a-card class="glass-panel" :bordered="false">
       <template #title>
         <span style="font-size: 1.15rem; font-weight: 800">
-          <BellOutlined style="margin-right: 8px; color: var(--ant-color-primary)" /> 我的抢票提醒
+          <BellOutlined style="margin-right: 8px; color: var(--ls-color-primary)" /> 我的抢票提醒
         </span>
       </template>
       <template #extra>
-        <a-button type="link" @click="$emit('backToSquare')" style="padding: 0; font-weight: 600">
-          返回演出广场
-        </a-button>
+        <a-space>
+          <a-button type="link" @click="fetchReminders(true)" style="padding: 0; font-weight: 600">
+            刷新提醒
+          </a-button>
+          <a-button type="link" @click="$emit('backToSquare')" style="padding: 0; font-weight: 600">
+            返回演出广场
+          </a-button>
+        </a-space>
       </template>
 
       <a-alert
@@ -45,7 +50,7 @@
                   <span style="font-size: 13px; color: var(--ls-text-secondary)">
                     提醒时间：{{ item.remindTime }}
                   </span>
-                  <span style="font-size: 13px; color: var(--ant-color-primary)">
+                  <span style="font-size: 13px; color: var(--ls-color-primary)">
                     {{ item.reminderMessage }}
                   </span>
                 </div>
@@ -74,6 +79,7 @@ const {
   reminders,
   loading,
   pendingCount,
+  fetchReminders,
   statusColor,
 } = useReminders()
 
