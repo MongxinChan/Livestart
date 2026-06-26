@@ -50,7 +50,9 @@ import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.framework.result.Result;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.SendResult;
+import org.springframework.messaging.MessagingException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -99,6 +101,9 @@ public class TicketOrderServiceImpl implements TicketOrderService {
 
     @Value("${livestart.engine.auto-warm-stock-on-miss:true}")
     private boolean autoWarmStockOnMiss;
+
+    @Value("${livestart.engine.mq.enabled:true}")
+    private boolean mqEnabled;
 
     @Override
     public String generatePathToken(Long skuId) {
@@ -192,14 +197,26 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 .visitorIds(requestParam.getVisitorIds())
                 .build();
 
-        if (localOrderMode) {
+        if (shouldPersistOrderLocally()) {
             persistOrderDirectly(createEvent);
             log.info("[下单] 本地直写模式下单成功，userId={}, skuId={}, orderNo={}",
                     userId, requestParam.getSkuId(), orderNo);
             return orderNo;
         }
 
-        SendResult sendResult = ticketOrderCreateProducer.sendMessage(createEvent);
+        SendResult sendResult;
+        try {
+            sendResult = ticketOrderCreateProducer.sendMessage(createEvent);
+        } catch (Exception ex) {
+            if (shouldFallbackToLocalOrder(ex)) {
+                log.warn("[下单] RocketMQ Topic 路由缺失，回退本地直写下单，orderNo={}, skuId={}",
+                        orderNo, requestParam.getSkuId(), ex);
+                persistOrderDirectly(createEvent);
+                return orderNo;
+            }
+            rollbackPreDeductStock(stockKey, userLimitKey, requestParam.getCount());
+            throw ex;
+        }
         if (!"SEND_OK".equals(sendResult.getSendStatus().name())) {
             log.error("[下单] 异步下单消息投递失败，开始回滚预扣资源，orderNo={}", orderNo);
             rollbackPreDeductStock(stockKey, userLimitKey, requestParam.getCount());
@@ -312,7 +329,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 .userId(order.getUserId())
                 .tradeNo(tradeNo)
                 .build();
-        if (localOrderMode) {
+        if (shouldSkipMqSend()) {
             log.info("[支付成功通知] 本地直写模式已处理支付成功，跳过 RocketMQ 投递，orderNo={}", orderNo);
             return;
         }
@@ -629,6 +646,28 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         String userSuffix = String.format("%04d", userId % 10000);
         String randomSuffix = String.format("%04d", (int) (Math.random() * 10000));
         return timestamp + userSuffix + randomSuffix;
+    }
+
+    private boolean shouldPersistOrderLocally() {
+        return localOrderMode || !mqEnabled;
+    }
+
+    private boolean shouldSkipMqSend() {
+        return shouldPersistOrderLocally();
+    }
+
+    private boolean shouldFallbackToLocalOrder(Exception ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof MQClientException || current instanceof MessagingException) {
+                String message = current.getMessage();
+                if (StrUtil.containsIgnoreCase(message, "No route info of this topic")) {
+                    return true;
+                }
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 
     private TicketSkuDO loadTicketSku(Long skuId) {

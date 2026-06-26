@@ -60,6 +60,7 @@ livestart:
     local-order-mode: ${LIVESTART_ENGINE_LOCAL_ORDER_MODE:false}
     auto-warm-stock-on-miss: true
     mq:
+      # 本地未启 RocketMQ 时可通过 LIVESTART_ENGINE_MQ_ENABLED=false 让下单/支付走直写分支
       enabled: ${LIVESTART_ENGINE_MQ_ENABLED:true}
 
 alipay:
