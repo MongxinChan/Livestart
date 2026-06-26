@@ -4,10 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --mode local-real",
     "dev:mock": "vite --mode development",
     "dev:local": "vite --mode local-real",
-    "dev:real": "vite --mode publish",
+    "dev:publish": "vite --mode publish",
     "build": "vue-tsc -b && vite build --mode publish",
     "build:mock": "vue-tsc -b && vite build --mode development",
     "preview": "vite preview"
