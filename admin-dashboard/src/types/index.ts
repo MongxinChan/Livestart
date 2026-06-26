@@ -123,13 +123,32 @@ export interface SettlementItem {
   id: number
   eventId: number
   eventTitle: string
+  performerName?: string
   totalTickets: number
   totalSalesAmount: number
   commissionRate: number
   commissionAmount: number
   settlementAmount: number
   status: number
+  errorMessage?: string
   createTime: string
+  updateTime: string
+}
+
+export interface SettlementNotificationItem {
+  notificationKey: string
+  settlementId: number
+  eventId: number
+  eventTitle: string
+  performerName?: string
+  status: number
+  type: 'pending' | 'updated' | 'exception'
+  typeLabel: string
+  description: string
+  settlementAmount: number
+  commissionAmount: number
+  totalTickets: number
+  read: boolean
   updateTime: string
 }
 

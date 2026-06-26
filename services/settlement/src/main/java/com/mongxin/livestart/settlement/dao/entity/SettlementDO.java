@@ -40,6 +40,11 @@ public class SettlementDO {
      */
     private Integer status;
 
+    /**
+     * 结算异常信息
+     */
+    private String errorMessage;
+
     private Date createTime;
 
     private Date updateTime;

@@ -1,6 +1,7 @@
 package com.mongxin.livestart.settlement.dto.resp;
 
 import lombok.Data;
+
 import java.math.BigDecimal;
 import java.util.Date;
 
@@ -13,6 +14,8 @@ public class SettlementRespDTO {
 
     private String eventTitle;
 
+    private String performerName;
+
     private Integer totalTickets;
 
     private BigDecimal totalSalesAmount;
@@ -24,6 +27,8 @@ public class SettlementRespDTO {
     private BigDecimal settlementAmount;
 
     private Integer status;
+
+    private String errorMessage;
 
     private Date createTime;
 

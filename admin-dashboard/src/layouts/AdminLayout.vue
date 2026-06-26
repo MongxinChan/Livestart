@@ -72,7 +72,7 @@
                 <div class="notification-panel__header">
                   <div>
                     <div class="notification-panel__title">结算通知</div>
-                    <div class="notification-panel__subtitle">基于当前账号可见结算单实时生成</div>
+                    <div class="notification-panel__subtitle">异常优先展示，点击后自动标记为已读</div>
                   </div>
                   <a-button size="small" @click="refreshNotifications">刷新</a-button>
                 </div>
@@ -80,21 +80,28 @@
                 <a-spin :spinning="notificationLoading">
                   <a-empty
                     v-if="notifications.length === 0"
-                    description="当前没有需要处理的结算通知"
+                    description="当前没有结算通知"
                   />
 
                   <div v-else class="notification-list">
                     <button
                       v-for="item in notifications"
-                      :key="item.id"
+                      :key="item.notificationKey"
                       type="button"
                       class="notification-item"
-                      @click="openSettlementNotification(item.eventId)"
+                      :class="{
+                        'notification-item--unread': !item.read,
+                        'notification-item--exception': item.type === 'exception',
+                      }"
+                      @click="openSettlementNotification(item)"
                     >
                       <div class="notification-item__meta">
-                        <a-tag :color="item.type === 'pending' ? 'orange' : 'blue'">
-                          {{ item.typeLabel }}
-                        </a-tag>
+                        <div class="notification-item__meta-left">
+                          <span v-if="!item.read" class="notification-dot"></span>
+                          <a-tag :color="tagColorOf(item.type)">
+                            {{ item.typeLabel }}
+                          </a-tag>
+                        </div>
                         <span class="notification-item__time">{{ formatNotificationTime(item.updateTime) }}</span>
                       </div>
                       <div class="notification-item__title">{{ item.eventTitle }}</div>
@@ -166,6 +173,7 @@ import {
 } from '@ant-design/icons-vue'
 import { clearAdminSession, getAdminSession, UserRole } from '@/api/http'
 import { useSettlementNotifications } from '@/composables/useSettlementNotifications'
+import type { SettlementNotificationItem } from '@/types'
 
 const router = useRouter()
 const route = useRoute()
@@ -186,6 +194,7 @@ const {
   notifications,
   actionableCount,
   fetchNotifications,
+  markAsRead,
 } = useSettlementNotifications()
 
 watch(
@@ -202,7 +211,7 @@ onMounted(() => {
   }
 
   fetchNotifications().catch(() => {
-    // 由 http 拦截器统一提示错误
+    // 由 http 拦截器统一提示
   })
 })
 
@@ -240,13 +249,20 @@ function handleNotificationOpenChange(open: boolean) {
 
 function refreshNotifications() {
   fetchNotifications(true).catch(() => {
-    // 由 http 拦截器统一提示错误
+    // 由 http 拦截器统一提示
   })
 }
 
-function openSettlementNotification(eventId: number) {
+async function openSettlementNotification(item: SettlementNotificationItem) {
+  if (!item.read) {
+    try {
+      await markAsRead(item.notificationKey)
+    } catch {
+      // 已由 http 拦截器提示
+    }
+  }
   notificationOpen.value = false
-  router.push({ path: '/settlement', query: { eventId: String(eventId) } })
+  router.push({ path: '/settlement', query: { eventId: String(item.eventId) } })
 }
 
 function formatNotificationTime(value?: string) {
@@ -255,11 +271,17 @@ function formatNotificationTime(value?: string) {
   if (!time.isValid()) return value
   return time.format('MM-DD HH:mm')
 }
+
+function tagColorOf(type: SettlementNotificationItem['type']) {
+  if (type === 'exception') return 'red'
+  if (type === 'pending') return 'orange'
+  return 'blue'
+}
 </script>
 
 <style scoped>
 .notification-panel {
-  width: 360px;
+  width: 380px;
 }
 
 .notification-panel__header {
@@ -284,7 +306,7 @@ function formatNotificationTime(value?: string) {
 
 .notification-list {
   display: flex;
-  max-height: 420px;
+  max-height: 440px;
   flex-direction: column;
   gap: 10px;
   overflow: auto;
@@ -307,11 +329,35 @@ function formatNotificationTime(value?: string) {
   box-shadow: 0 10px 24px rgba(22, 119, 255, 0.10);
 }
 
+.notification-item--unread {
+  border-color: #adc6ff;
+  box-shadow: inset 0 0 0 1px rgba(22, 119, 255, 0.12);
+}
+
+.notification-item--exception {
+  background: linear-gradient(180deg, #fff2f0 0%, #fffaf8 100%);
+  border-color: #ffccc7;
+}
+
 .notification-item__meta {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.notification-item__meta-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.notification-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1677ff;
+  flex: 0 0 auto;
 }
 
 .notification-item__time {
