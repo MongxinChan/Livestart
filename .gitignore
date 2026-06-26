@@ -76,3 +76,16 @@ docs/
 logs/
 **/logs/
 
+### JMeter generated artifacts ###
+/jmeter/html_report_*/
+/jmeter/results-*.jtl
+
+### Generated SQL payloads ###
+/sql/generated_*
+
+### Python cache ###
+__pycache__/
+*.pyc
+
+### local ###
+.local
