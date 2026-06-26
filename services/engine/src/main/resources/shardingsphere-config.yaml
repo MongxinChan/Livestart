@@ -64,7 +64,7 @@ rules:
       order_database_inline:
         type: INLINE
         props:
-          algorithm-expression: ds_order_${user_id % 2}
+          algorithm-expression: ds_order_${Math.abs(user_id.hashCode()) % 2}
       order_table_hash_mod:
         type: CLASS_BASED
         props:

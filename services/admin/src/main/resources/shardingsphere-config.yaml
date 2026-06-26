@@ -90,32 +90,32 @@ rules:
       user_db_inline:
         type: INLINE
         props:
-          algorithm-expression: ds_user_${id % 2}
+          algorithm-expression: ds_user_${Math.abs(id.hashCode()) % 2}
       
       user_tbl_inline:
         type: INLINE
         props:
-          algorithm-expression: t_user_${id % 8}
+          algorithm-expression: t_user_${Math.abs(id.hashCode()).intdiv(2) % 8}
       
       user_profile_db_inline:
         type: INLINE
         props:
-          algorithm-expression: ds_user_${user_id % 2}
+          algorithm-expression: ds_user_${Math.abs(user_id.hashCode()) % 2}
       
       user_profile_tbl_inline:
         type: INLINE
         props:
-          algorithm-expression: t_user_profile_${user_id % 8}
+          algorithm-expression: t_user_profile_${Math.abs(user_id.hashCode()).intdiv(2) % 8}
       
       user_visitor_db_inline:
         type: INLINE
         props:
-          algorithm-expression: ds_user_${user_id % 2}
+          algorithm-expression: ds_user_${Math.abs(user_id.hashCode()) % 2}
       
       user_visitor_tbl_inline:
         type: INLINE
         props:
-          algorithm-expression: t_user_visitor_${user_id % 8}
+          algorithm-expression: t_user_visitor_${Math.abs(user_id.hashCode()).intdiv(2) % 8}
 
       # 方式 B：如需使用基于自定义类的 HashMod 算法，可切换为如下 CLASS_BASED 配置：
       # (切换前，需在项目中实现对应的 com.mongxin.livestart.admin.sharding.DBHashModShardingAlgorithm 类)

@@ -684,26 +684,33 @@ INSERT INTO `t_user_phone_mapping` (`phone`, `user_id`) VALUES
   ('13700003001', 3001), ('13700003002', 3002), ('13700003003', 3003), ('13700003004', 3004)
 ON DUPLICATE KEY UPDATE `user_id` = VALUES(`user_id`);
 
+
 -- =============================================================================
 -- 6. 用户分库 ds_user_0 (偶数 user_id % 2 = 0)
 -- =============================================================================
 USE `ds_user_0`;
 
-INSERT INTO `t_user_2` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+INSERT INTO `t_user_5` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
 VALUES (1002, 'fan_zhang', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001002', 1, '张乐迷', 1, 1),
-       (1010, 'fan_huang', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001010', 0, '黄乐迷', 1, 1),
-       (2002, 'artist_wanqing', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002002', 1, '万青乐队', 2, 1),
        (3002, 'venue_admin_sh', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13700003002', 1, '上海梅奔场馆经理', 3, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
 
-INSERT INTO `t_user_4` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
-VALUES (1004, 'fan_li', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001004', 1, '李乐迷', 1, 1),
-       (1012, 'fan_zhao', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001012', 1, '赵乐迷', 1, 1),
-       (2004, 'artist_zhangxueyou', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002004', 1, '张学友', 2, 1),
-       (3004, 'host_modernsky', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13700003004', 1, '摩登天空主办方', 3, 1)
+INSERT INTO `t_user_1` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+VALUES (1010, 'fan_huang', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001010', 0, '黄乐迷', 1, 1),
+       (2002, 'artist_wanqing', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002002', 1, '万青乐队', 2, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
 
 INSERT INTO `t_user_6` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+VALUES (1004, 'fan_li', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001004', 1, '李乐迷', 1, 1),
+       (3004, 'host_modernsky', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13700003004', 1, '摩登天空主办方', 3, 1)
+ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
+
+INSERT INTO `t_user_2` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+VALUES (1012, 'fan_zhao', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001012', 1, '赵乐迷', 1, 1),
+       (2004, 'artist_zhangxueyou', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002004', 1, '张学友', 2, 1)
+ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
+
+INSERT INTO `t_user_7` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
 VALUES (1006, 'fan_chen', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001006', 1, '陈乐迷', 1, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
@@ -711,22 +718,31 @@ INSERT INTO `t_user_0` (`id`, `username`, `password`, `phone`, `is_verified`, `r
 VALUES (1008, 'fan_zhou', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001008', 1, '周乐迷', 1, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
+INSERT INTO `t_user_profile_5` (`user_id`, `mail`, `gender`, `signature`)
+VALUES (1002, 'fan_zhang@test.com', 1, '热爱演唱会'), (3002, 'venue_sh@test.com', 1, '场馆管理')
+ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
+
+INSERT INTO `t_user_profile_1` (`user_id`, `mail`, `gender`, `signature`)
+VALUES (1010, 'fan_huang@test.com', 2, '看遍世界 livehouse'), (2002, 'wanqing@test.com', 0, '万能青年旅店官方')
+ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
+
+INSERT INTO `t_user_profile_6` (`user_id`, `mail`, `gender`, `signature`)
+VALUES (1004, 'fan_li@test.com', 1, '抢票达人'), (3004, 'modernsky@test.com', 1, '摩登天空')
+ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
+
 INSERT INTO `t_user_profile_2` (`user_id`, `mail`, `gender`, `signature`)
-VALUES (1002, 'fan_zhang@test.com', 1, '热爱演唱会'), (1010, 'fan_huang@test.com', 2, '看遍世界 livehouse'),
-       (2002, 'wanqing@test.com', 0, '万能青年旅店官方'), (3002, 'venue_sh@test.com', 1, '场馆管理')
+VALUES (1012, 'fan_zhao@test.com', 2, '不见不散'), (2004, 'zxy@test.com', 1, '学友官方')
 ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
 
-INSERT INTO `t_user_profile_4` (`user_id`, `mail`, `gender`, `signature`)
-VALUES (1004, 'fan_li@test.com', 1, '抢票达人'), (1012, 'fan_zhao@test.com', 2, '不见不散'),
-       (2004, 'zxy@test.com', 1, '学友官方'), (3004, 'modernsky@test.com', 1, '摩登天空')
-ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
-
-INSERT INTO `t_user_visitor_2` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
-VALUES (11002, 1002, '张乐迷', 1, 'AES_ENC_330102199001020002', 'HASH_330102199001020002', '13800001002'),
-       (11010, 1010, '黄乐迷', 1, 'AES_ENC_330102199001020010', 'HASH_330102199001020010', '13800001010')
+INSERT INTO `t_user_visitor_5` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
+VALUES (11002, 1002, '张乐迷', 1, 'AES_ENC_330102199001020002', 'HASH_330102199001020002', '13800001002')
 ON DUPLICATE KEY UPDATE `real_name` = VALUES(`real_name`);
 
-INSERT INTO `t_user_visitor_4` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
+INSERT INTO `t_user_visitor_1` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
+VALUES (11010, 1010, '黄乐迷', 1, 'AES_ENC_330102199001020010', 'HASH_330102199001020010', '13800001010')
+ON DUPLICATE KEY UPDATE `real_name` = VALUES(`real_name`);
+
+INSERT INTO `t_user_visitor_6` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
 VALUES (11004, 1004, '李乐迷', 1, 'AES_ENC_330102199001020004', 'HASH_330102199001020004', '13800001004')
 ON DUPLICATE KEY UPDATE `real_name` = VALUES(`real_name`);
 
@@ -741,21 +757,27 @@ ON DUPLICATE KEY UPDATE `title` = VALUES(`title`), `status` = VALUES(`status`);
 -- =============================================================================
 USE `ds_user_1`;
 
-INSERT INTO `t_user_1` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+INSERT INTO `t_user_4` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
 VALUES (1001, 'fan_wang', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001001', 1, '王乐迷', 1, 1),
-       (1009, 'fan_xu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001009', 1, '徐乐迷', 1, 1),
-       (2001, 'artist_jay', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002001', 1, '周杰伦', 2, 1),
        (3001, 'venue_admin_bj', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13700003001', 1, '北京工体场馆经理', 3, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
 
-INSERT INTO `t_user_3` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
-VALUES (1003, 'fan_liu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001003', 1, '刘乐迷', 1, 1),
-       (1011, 'fan_sun', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001011', 0, '孙乐迷', 1, 1),
-       (2003, 'artist_chongsu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002003', 1, '重塑雕像的权利', 2, 1),
-       (3003, 'host_taihe', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13700003003', 1, '太合音乐主办方', 3, 1)
+INSERT INTO `t_user_0` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+VALUES (1009, 'fan_xu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001009', 1, '徐乐迷', 1, 1),
+       (2001, 'artist_jay', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002001', 1, '周杰伦', 2, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
 
 INSERT INTO `t_user_5` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+VALUES (1003, 'fan_liu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001003', 1, '刘乐迷', 1, 1),
+       (3003, 'host_taihe', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13700003003', 1, '太合音乐主办方', 3, 1)
+ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
+
+INSERT INTO `t_user_1` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
+VALUES (1011, 'fan_sun', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001011', 0, '孙乐迷', 1, 1),
+       (2003, 'artist_chongsu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13900002003', 1, '重塑雕像的权利', 2, 1)
+ON DUPLICATE KEY UPDATE `username` = VALUES(`username`), `phone` = VALUES(`phone`);
+
+INSERT INTO `t_user_6` (`id`, `username`, `password`, `phone`, `is_verified`, `real_name`, `user_type`, `status`)
 VALUES (1005, 'fan_wu', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001005', 1, '吴乐迷', 1, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
@@ -763,21 +785,27 @@ INSERT INTO `t_user_7` (`id`, `username`, `password`, `phone`, `is_verified`, `r
 VALUES (1007, 'fan_zheng', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy', '13800001007', 1, '郑乐迷', 1, 1)
 ON DUPLICATE KEY UPDATE `username` = VALUES(`username`);
 
+INSERT INTO `t_user_profile_4` (`user_id`, `mail`, `gender`, `signature`)
+VALUES (1001, 'fan_wang@test.com', 1, '十年老粉'), (3001, 'venue_bj@test.com', 1, '工体')
+ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
+
+INSERT INTO `t_user_profile_0` (`user_id`, `mail`, `gender`, `signature`)
+VALUES (1009, 'fan_xu@test.com', 1, '日常逛 livehouse'), (2001, 'jay@test.com', 1, '周董官方')
+ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
+
+INSERT INTO `t_user_profile_5` (`user_id`, `mail`, `gender`, `signature`)
+VALUES (1003, 'fan_liu@test.com', 2, '随时准备抢票'), (3003, 'taihe@test.com', 1, '太合')
+ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
+
 INSERT INTO `t_user_profile_1` (`user_id`, `mail`, `gender`, `signature`)
-VALUES (1001, 'fan_wang@test.com', 1, '十年老粉'), (1009, 'fan_xu@test.com', 1, '日常逛 livehouse'),
-       (2001, 'jay@test.com', 1, '周董官方'), (3001, 'venue_bj@test.com', 1, '工体')
+VALUES (1011, 'fan_sun@test.com', 2, '坐前排'), (2003, 'chongsu@test.com', 0, '后朋克')
 ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
 
-INSERT INTO `t_user_profile_3` (`user_id`, `mail`, `gender`, `signature`)
-VALUES (1003, 'fan_liu@test.com', 2, '随时准备抢票'), (1011, 'fan_sun@test.com', 2, '坐前排'),
-       (2003, 'chongsu@test.com', 0, '后朋克'), (3003, 'taihe@test.com', 1, '太合')
-ON DUPLICATE KEY UPDATE `mail` = VALUES(`mail`);
-
-INSERT INTO `t_user_visitor_1` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
+INSERT INTO `t_user_visitor_4` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
 VALUES (11001, 1001, '王乐迷', 1, 'AES_ENC_330102199001020001', 'HASH_330102199001020001', '13800001001')
 ON DUPLICATE KEY UPDATE `real_name` = VALUES(`real_name`);
 
-INSERT INTO `t_user_visitor_3` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
+INSERT INTO `t_user_visitor_5` (`id`, `user_id`, `real_name`, `card_type`, `card_no`, `card_no_hash`, `mobile`)
 VALUES (11003, 1003, '刘乐迷', 1, 'AES_ENC_330102199001020003', 'HASH_330102199001020003', '13800001003')
 ON DUPLICATE KEY UPDATE `real_name` = VALUES(`real_name`);
 
@@ -802,35 +830,35 @@ SELECT `id`,`event_id`,`title`,`original_price`,`selling_price`,`total_stock`,`r
 FROM `live_start`.`t_ticket_sku` WHERE `event_id` BETWEEN 103001 AND 103035
 ON DUPLICATE KEY UPDATE `total_stock` = VALUES(`total_stock`), `remaining_stock` = VALUES(`remaining_stock`);
 
--- 测试订单 (user 1002 → t_order_10，已支付周杰伦看台 2 张)
-INSERT INTO `t_order_10` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1002 → t_order_5，已支付周杰伦看台 2 张)
+INSERT INTO `t_order_5` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000002, 'TEST_ORDER_002', 1002, 1160.00, 1, '2026-06-15 10:01:00', '2026-06-15 10:00:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_10` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_5` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000002, 'TEST_ORDER_002', 1002, 11002, 103001, 200001, NULL, 'CHKCODE_002_A', 0),
        (6000003, 'TEST_ORDER_002', 1002, 11002, 103001, 200001, NULL, 'CHKCODE_002_B', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_10` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_5` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000002, 1002, 200001, 103001, 0, 'CHKCODE_002_A'),
        (7000003, 1002, 200001, 103001, 0, 'CHKCODE_002_B')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
--- 测试订单 (user 1004 → t_order_12，待支付万青 Livehouse 学生票)
-INSERT INTO `t_order_12` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1004 → t_order_6，待支付万青 Livehouse 学生票)
+INSERT INTO `t_order_6` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000004, 'TEST_ORDER_004', 1004, 150.00, 0, NULL, '2026-06-21 14:30:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_12` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_6` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000004, 'TEST_ORDER_004', 1004, 11004, 103007, 200061, NULL, 'CHKCODE_004_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
 
--- 测试订单 (user 1006 → t_order_14，已支付赵雷 Livehouse)
-INSERT INTO `t_order_14` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1006 → t_order_7，已支付赵雷 Livehouse)
+INSERT INTO `t_order_7` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000006, 'TEST_ORDER_006', 1006, 220.00, 1, '2026-06-10 09:15:00', '2026-06-10 09:14:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_14` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_7` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000006, 'TEST_ORDER_006', 1006, 11002, 103013, 200122, NULL, 'CHKCODE_006_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_14` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_7` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000006, 1006, 200122, 103013, 0, 'CHKCODE_006_A')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
@@ -859,55 +887,42 @@ SELECT `id`,`event_id`,`title`,`original_price`,`selling_price`,`total_stock`,`r
 FROM `live_start`.`t_ticket_sku` WHERE `event_id` BETWEEN 103001 AND 103035
 ON DUPLICATE KEY UPDATE `total_stock` = VALUES(`total_stock`), `remaining_stock` = VALUES(`remaining_stock`);
 
--- 测试订单 (user 1001 → t_order_9，已支付五月天看台)
-INSERT INTO `t_order_9` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1001 → t_order_4，已支付五月天看台)
+INSERT INTO `t_order_4` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000001, 'TEST_ORDER_001', 1001, 580.00, 1, '2026-06-12 20:00:00', '2026-06-12 19:59:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_9` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_4` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000001, 'TEST_ORDER_001', 1001, 11001, 103006, 200052, NULL, 'CHKCODE_001_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_9` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_4` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000001, 1001, 200052, 103006, 0, 'CHKCODE_001_A')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
--- 测试订单 (user 1003 → t_order_11，待支付 GAI 周延票)
-INSERT INTO `t_order_11` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1003 → t_order_5，待支付 GAI 周延票)
+INSERT INTO `t_order_5` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000003, 'TEST_ORDER_003', 1003, 220.00, 0, NULL, '2026-06-21 16:00:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_11` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_5` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000005, 'TEST_ORDER_003', 1003, 11003, 103015, 200142, NULL, 'CHKCODE_003_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
 
--- 测试订单 (user 1005 → t_order_13，已取消 周杰伦内场)
-INSERT INTO `t_order_13` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1005 → t_order_6，已取消 周杰伦内场)
+INSERT INTO `t_order_6` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000005, 'TEST_ORDER_005', 1005, 1680.00, 3, NULL, '2026-06-05 13:20:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_13` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_6` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000007, 'TEST_ORDER_005', 1005, 11005, 103001, 200006, NULL, 'CHKCODE_005_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
 
--- 测试订单 (user 1007 → t_order_15，已核销 告五人 VIP)
-INSERT INTO `t_order_15` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1007 → t_order_7，已核销 告五人 VIP)
+INSERT INTO `t_order_7` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000007, 'TEST_ORDER_007', 1007, 480.00, 2, '2026-05-20 10:00:00', '2026-05-20 09:59:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_15` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_7` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000011, 'TEST_ORDER_007', 1007, 11007, 103008, 200074, NULL, 'CHKCODE_007_A', 1)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_15` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_7` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000007, 1007, 200074, 103008, 1, 'CHKCODE_007_A')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
 SET FOREIGN_KEY_CHECKS = 1;
-
--- =============================================================================
--- 清理脚本（默认注释；执行前可取消注释整段单独执行）
--- =============================================================================
--- USE `live_start`;
--- DELETE FROM `t_event_style_relation` WHERE `event_id` BETWEEN 103001 AND 103035;
--- DELETE FROM `t_ticket_sku` WHERE `event_id` BETWEEN 103001 AND 103035;
--- DELETE FROM `t_event_config` WHERE `event_id` BETWEEN 103001 AND 103035;
--- DELETE FROM `t_event` WHERE `id` BETWEEN 103001 AND 103035;
--- DELETE FROM `t_performer_style_relation` WHERE `performer_id` BETWEEN 102001 AND 102016;
--- DELETE FROM `t_performer` WHERE `id` BETWEEN 102001 AND 102016;
--- DELETE FROM `t_venue` WHERE `id` BETWEEN 101001 AND 101010;
--- DELETE FROM `t_style` WHERE `id` BETWEEN 1 AND 17;
