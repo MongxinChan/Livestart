@@ -12,6 +12,7 @@ export interface LiveEvent {
   type: string
   cover: string
   date: string
+  saleStartTime?: string
   venue: string
   city?: string
   artist: string

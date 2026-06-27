@@ -343,15 +343,23 @@ const currentReminder = computed(() => {
 })
 
 const reminderButtonText = computed(() => {
+  if (!props.selectedEvent?.saleStartTime) return '未配置开售时间'
   if (currentReminder.value?.status === 0) return '已预约提醒'
   if (currentReminder.value?.status === 1) return '已完成提醒'
   return '预约开售提醒'
 })
 
-const isReminderDisabled = computed(() => currentReminder.value?.status === 0 || currentReminder.value?.status === 1)
+const isReminderDisabled = computed(
+  () => !props.selectedEvent?.saleStartTime || currentReminder.value?.status === 0 || currentReminder.value?.status === 1
+)
 
 async function handleReminderClick() {
-  if (!props.selectedEvent || isReminderDisabled.value) return
+  if (!props.selectedEvent || isReminderDisabled.value) {
+    if (props.selectedEvent && !props.selectedEvent.saleStartTime) {
+      message.warning('该演出暂未配置开售时间，当前无法预约提醒')
+    }
+    return
+  }
   try {
     await subscribeReminder(props.selectedEvent.id)
     message.success(`已为《${props.selectedEvent.title}》预约开售提醒`)

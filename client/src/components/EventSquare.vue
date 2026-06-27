@@ -265,6 +265,7 @@ void fetchReminders().catch((err) => {
 function getReminderButtonText(event: LiveEvent) {
   const stageMeta = resolveEventStageMeta(event)
   const reminder = getReminderByEventId(event.id)
+  if (!event.saleStartTime) return '未配置开售时间'
   if (reminder?.status === 0) return '已预约提醒'
   if (reminder?.status === 1) return '已完成提醒'
   if (stageMeta.hasStarted) return '演出已开演'
@@ -275,11 +276,14 @@ function getReminderButtonText(event: LiveEvent) {
 function isReminderButtonDisabled(event: LiveEvent) {
   const stageMeta = resolveEventStageMeta(event)
   const reminder = getReminderByEventId(event.id)
-  return stageMeta.canGrab || stageMeta.hasStarted || reminder?.status === 0 || reminder?.status === 1
+  return !event.saleStartTime || stageMeta.canGrab || stageMeta.hasStarted || reminder?.status === 0 || reminder?.status === 1
 }
 
 async function handleReminderClick(event: LiveEvent) {
   if (isReminderButtonDisabled(event)) {
+    if (!event.saleStartTime) {
+      message.warning('该演出暂未配置开售时间，当前无法预约提醒')
+    }
     return
   }
   if (!ensureAuthenticatedAction()) {
