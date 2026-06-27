@@ -74,7 +74,7 @@
                 <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; line-height: 1.35">{{ rec.title }}</h4>
                 <span style="font-size: 12px; color: var(--ls-text-secondary)">{{ rec.venue }}</span>
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px">
-                  <span style="font-weight: 700; font-size: 0.88rem">¥ {{ rec.priceRange }}</span>
+                  <span style="font-weight: 700; font-size: 0.88rem">￥ {{ rec.priceRange }}</span>
                   <a-tag :color="rec.statusColor">{{ rec.status }}</a-tag>
                 </div>
               </div>
@@ -184,7 +184,7 @@
               <span style="font-size: 11px; color: var(--ls-text-secondary)">票价区间</span>
               <div style="font-size: 1rem; font-weight: 800">{{ formatEventPriceRange(event) }}</div>
             </div>
-            <a-button type="primary" size="small" :disabled="!resolveEventStageMeta(event).canGrab" @click.stop="$emit('selectEvent', event)">
+            <a-button type="primary" size="small" :disabled="!resolveEventStageMeta(event).canGrab" @click.stop="handleSelectEvent(event)">
               <template #icon><ThunderboltOutlined /></template>
               {{ resolveEventStageMeta(event).canGrab ? '立即抢票' : '查看阶段' }}
             </a-button>
@@ -264,8 +264,9 @@ void fetchReminders().catch((err) => {
 
 function getReminderButtonText(event: LiveEvent) {
   const stageMeta = resolveEventStageMeta(event)
-  const reminder = getReminderByEventId(event.id)
+  const reminder = getReminderByEventId(event.id, event.stageId)
   if (!event.saleStartTime) return '未配置开售时间'
+  if (!event.stageId) return '待同步开售阶段'
   if (reminder?.status === 0) return '已预约提醒'
   if (reminder?.status === 1) return '已完成提醒'
   if (stageMeta.hasStarted) return '演出已开演'
@@ -275,14 +276,23 @@ function getReminderButtonText(event: LiveEvent) {
 
 function isReminderButtonDisabled(event: LiveEvent) {
   const stageMeta = resolveEventStageMeta(event)
-  const reminder = getReminderByEventId(event.id)
-  return !event.saleStartTime || stageMeta.canGrab || stageMeta.hasStarted || reminder?.status === 0 || reminder?.status === 1
+  const reminder = getReminderByEventId(event.id, event.stageId)
+  return !event.saleStartTime
+    || !event.stageId
+    || stageMeta.canGrab
+    || stageMeta.hasStarted
+    || reminder?.status === 0
+    || reminder?.status === 1
 }
 
 async function handleReminderClick(event: LiveEvent) {
   if (isReminderButtonDisabled(event)) {
     if (!event.saleStartTime) {
       message.warning('该演出暂未配置开售时间，当前无法预约提醒')
+      return
+    }
+    if (!event.stageId) {
+      message.warning('当前活动尚未同步开售阶段，请稍后刷新后再试')
     }
     return
   }
@@ -290,7 +300,7 @@ async function handleReminderClick(event: LiveEvent) {
     return
   }
   try {
-    await subscribeReminder(event.id)
+    await subscribeReminder(event.id, event.stageId as number | string)
     message.success(`已为《${event.title}》预约开售提醒`)
   } catch (err: any) {
     message.error(err.message || '预约提醒失败')

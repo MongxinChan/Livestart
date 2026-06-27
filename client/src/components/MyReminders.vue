@@ -37,8 +37,8 @@
                 <div style="display: flex; flex-direction: column; gap: 8px">
                   <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap">
                     <span style="font-size: 16px; font-weight: 700">{{ item.eventTitle }}</span>
-                    <a-tag :color="item.ticketStage === 2 ? 'orange' : 'blue'">
-                      {{ item.ticketStage === 2 ? '二开' : '一开' }}
+                    <a-tag :color="item.stageNo === 2 ? 'orange' : 'blue'">
+                      {{ item.stageName || (item.stageNo === 2 ? '二开' : '一开') }}
                     </a-tag>
                     <a-tag :color="statusColor(item.status)">
                       {{ item.statusDesc }}

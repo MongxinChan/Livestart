@@ -3,12 +3,20 @@ package com.mongxin.livestart.distribution.service.impl;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.distribution.common.constant.DistributionRedisConstant;
+import com.mongxin.livestart.distribution.common.enums.EventSaleStageStatusEnum;
 import com.mongxin.livestart.distribution.common.enums.EventStatusEnum;
 import com.mongxin.livestart.distribution.dao.entity.EventDO;
+import com.mongxin.livestart.distribution.dao.entity.EventSaleStageDO;
+import com.mongxin.livestart.distribution.dao.entity.EventSaleStageSkuDO;
 import com.mongxin.livestart.distribution.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.distribution.dao.mapper.EventMapper;
+import com.mongxin.livestart.distribution.dao.mapper.EventSaleStageMapper;
+import com.mongxin.livestart.distribution.dao.mapper.EventSaleStageSkuMapper;
 import com.mongxin.livestart.distribution.dao.mapper.TicketSkuMapper;
 import com.mongxin.livestart.distribution.dto.req.EventPublishReqDTO;
+import com.mongxin.livestart.distribution.dto.req.SaleStageParamDTO;
+import com.mongxin.livestart.distribution.dto.req.SaleStageSkuParamDTO;
+import com.mongxin.livestart.distribution.dto.req.TicketSkuParam;
 import com.mongxin.livestart.distribution.service.EventService;
 import com.mongxin.livestart.distribution.service.XxlJobApiService;
 import com.mongxin.livestart.framework.exception.ServiceException;
@@ -18,11 +26,16 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Event publishing service with immediate or scheduled ticket release support.
+ * Event publishing service with multi-stage ticket release support.
  */
 @Slf4j
 @Service
@@ -30,14 +43,18 @@ import java.util.Date;
 public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implements EventService {
 
     private final TicketSkuMapper ticketSkuMapper;
+    private final EventSaleStageMapper eventSaleStageMapper;
+    private final EventSaleStageSkuMapper eventSaleStageSkuMapper;
     private final StringRedisTemplate stringRedisTemplate;
     private final XxlJobApiService xxlJobApiService;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void publishEvent(EventPublishReqDTO requestParam) {
-        boolean immediateRelease = requestParam.getSaleStartTime() == null
-                || requestParam.getSaleStartTime().before(new Date());
+        validatePublishRequest(requestParam);
+
+        Date earliestSaleStartTime = resolveEarliestSaleStartTime(requestParam);
+        boolean immediateRelease = earliestSaleStartTime == null || !earliestSaleStartTime.after(new Date());
 
         EventDO eventDO = EventDO.builder()
                 .title(requestParam.getTitle())
@@ -47,7 +64,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
                 .eventType(resolveEventType(requestParam.getVenueId()))
                 .startTime(requestParam.getEventTime())
                 .eventTime(requestParam.getEventTime())
-                .saleStartTime(requestParam.getSaleStartTime())
+                .saleStartTime(earliestSaleStartTime)
                 .status(immediateRelease ? EventStatusEnum.ON_SALE.getCode() : EventStatusEnum.PENDING_SALE.getCode())
                 .build();
 
@@ -55,58 +72,159 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             throw new ServiceException("Failed to save event");
         }
 
-        if (CollUtil.isNotEmpty(requestParam.getSkus())) {
-            for (EventPublishReqDTO.TicketSkuParam skuParam : requestParam.getSkus()) {
-                TicketSkuDO skuDO = TicketSkuDO.builder()
-                        .eventId(eventDO.getId())
-                        .title(skuParam.getTitle())
-                        .originalPrice(skuParam.getSellingPrice())
-                        .sellingPrice(skuParam.getSellingPrice())
-                        .totalStock(skuParam.getTotalStock())
-                        .remainingStock(skuParam.getTotalStock())
-                        .limitNum(skuParam.getLimitNum() != null ? skuParam.getLimitNum() : 2)
-                        .version(0)
-                        .build();
+        Map<String, TicketSkuDO> savedSkuMap = saveTicketSkus(eventDO.getId(), requestParam.getSkus(), immediateRelease);
+        List<EventSaleStageDO> savedStages = saveSaleStages(eventDO.getId(), requestParam.getSaleStages(), savedSkuMap);
 
-                int inserted = ticketSkuMapper.insert(skuDO);
-                if (inserted <= 0) {
-                    throw new ServiceException("Failed to save ticket sku");
-                }
-
-                if (immediateRelease) {
-                    String redisKey = String.format(DistributionRedisConstant.TICKET_STOCK_KEY, skuDO.getId());
-                    try {
-                        stringRedisTemplate.opsForValue().set(redisKey, String.valueOf(skuDO.getRemainingStock()));
-                        log.info("[Ticket Publish] Preheated Redis stock. key={}, stock={}",
-                                redisKey, skuDO.getRemainingStock());
-                    } catch (Exception e) {
-                        log.error("[Ticket Publish] Failed to preheat Redis stock. key={}", redisKey, e);
-                        throw new ServiceException("Failed to preheat Redis stock");
-                    }
-                }
-            }
+        if (!immediateRelease && CollUtil.isNotEmpty(savedStages)) {
+            registerEarliestStageJob(eventDO, savedStages);
         }
 
-        if (!immediateRelease) {
-            try {
-                String cronExpression = dateToCron(requestParam.getSaleStartTime());
-                int jobId = xxlJobApiService.addTicketReleaseJob(eventDO.getId(), eventDO.getTitle(), cronExpression);
+        log.info("[Event Publish] Event published successfully. eventId={}, artistName={}, stageCount={}, releaseMode={}",
+                eventDO.getId(), eventDO.getArtistName(), savedStages.size(), immediateRelease ? "IMMEDIATE" : "SCHEDULED");
+    }
 
-                EventDO updateDO = new EventDO();
-                updateDO.setId(eventDO.getId());
-                updateDO.setXxlJobId(jobId);
-                updateById(updateDO);
+    private void validatePublishRequest(EventPublishReqDTO requestParam) {
+        if (CollUtil.isEmpty(requestParam.getSkus())) {
+            throw new ServiceException("Ticket sku config cannot be empty");
+        }
+        if (CollUtil.isEmpty(requestParam.getSaleStages())) {
+            throw new ServiceException("Sale stages cannot be empty");
+        }
+    }
 
-                log.info("[Event Publish] Registered scheduled release job. eventId={}, jobId={}, saleStartTime={}",
-                        eventDO.getId(), jobId, requestParam.getSaleStartTime());
-            } catch (Exception e) {
-                log.error("[Event Publish] Failed to register scheduled release job. eventId={}", eventDO.getId(), e);
-                log.warn("[Event Publish] Event was saved, but XXL-JOB registration failed. Register it manually if needed.");
+    private Map<String, TicketSkuDO> saveTicketSkus(Long eventId, List<TicketSkuParam> skus, boolean immediateRelease) {
+        Map<String, TicketSkuDO> skuMap = new HashMap<>(skus.size());
+        for (TicketSkuParam skuParam : skus) {
+            TicketSkuDO skuDO = TicketSkuDO.builder()
+                    .eventId(eventId)
+                    .title(skuParam.getTitle())
+                    .originalPrice(skuParam.getSellingPrice())
+                    .sellingPrice(skuParam.getSellingPrice())
+                    .totalStock(skuParam.getTotalStock())
+                    .remainingStock(immediateRelease ? skuParam.getTotalStock() : 0)
+                    .limitNum(skuParam.getLimitNum() != null ? skuParam.getLimitNum() : 2)
+                    .version(0)
+                    .build();
+
+            if (ticketSkuMapper.insert(skuDO) <= 0) {
+                throw new ServiceException("Failed to save ticket sku");
+            }
+
+            if (immediateRelease) {
+                preheatRedisStock(skuDO);
+            }
+            skuMap.put(skuDO.getTitle(), skuDO);
+        }
+        return skuMap;
+    }
+
+    private List<EventSaleStageDO> saveSaleStages(Long eventId,
+                                                  List<SaleStageParamDTO> saleStages,
+                                                  Map<String, TicketSkuDO> savedSkuMap) {
+        List<SaleStageParamDTO> sortedStages = saleStages.stream()
+                .sorted(Comparator.comparing(SaleStageParamDTO::getSaleStartTime)
+                        .thenComparing(SaleStageParamDTO::getStageNo))
+                .toList();
+        List<EventSaleStageDO> savedStages = new ArrayList<>(sortedStages.size());
+
+        for (SaleStageParamDTO stageParam : sortedStages) {
+            EventSaleStageDO stageDO = EventSaleStageDO.builder()
+                    .eventId(eventId)
+                    .stageNo(stageParam.getStageNo())
+                    .stageName(stageParam.getStageName())
+                    .saleStartTime(stageParam.getSaleStartTime())
+                    .status(resolveStageStatus(stageParam.getSaleStartTime()))
+                    .remark(stageParam.getRemark())
+                    .build();
+
+            if (eventSaleStageMapper.insert(stageDO) <= 0) {
+                throw new ServiceException("Failed to save sale stage");
+            }
+
+            saveStageSkuConfigs(eventId, stageDO.getId(), stageParam.getSkuConfigs(), savedSkuMap);
+            savedStages.add(stageDO);
+        }
+        return savedStages;
+    }
+
+    private void saveStageSkuConfigs(Long eventId,
+                                     Long stageId,
+                                     List<SaleStageSkuParamDTO> skuConfigs,
+                                     Map<String, TicketSkuDO> savedSkuMap) {
+        for (SaleStageSkuParamDTO skuConfig : skuConfigs) {
+            TicketSkuDO ticketSkuDO = savedSkuMap.get(skuConfig.getSkuTitle());
+            if (ticketSkuDO == null) {
+                throw new ServiceException("Sale stage references unknown sku title: " + skuConfig.getSkuTitle());
+            }
+
+            EventSaleStageSkuDO stageSkuDO = EventSaleStageSkuDO.builder()
+                    .stageId(stageId)
+                    .eventId(eventId)
+                    .ticketSkuId(ticketSkuDO.getId())
+                    .releaseStock(skuConfig.getReleaseStock())
+                    .releasedFlag(0)
+                    .build();
+            if (eventSaleStageSkuMapper.insert(stageSkuDO) <= 0) {
+                throw new ServiceException("Failed to save sale stage sku config");
             }
         }
+    }
 
-        log.info("[Event Publish] Event published successfully. eventId={}, artistName={}, releaseMode={}",
-                eventDO.getId(), eventDO.getArtistName(), immediateRelease ? "IMMEDIATE" : "SCHEDULED");
+    private void registerEarliestStageJob(EventDO eventDO, List<EventSaleStageDO> savedStages) {
+        EventSaleStageDO earliestStage = savedStages.stream()
+                .min(Comparator.comparing(EventSaleStageDO::getSaleStartTime)
+                        .thenComparing(EventSaleStageDO::getStageNo))
+                .orElseThrow(() -> new ServiceException("No sale stage saved"));
+
+        try {
+            String cronExpression = dateToCron(earliestStage.getSaleStartTime());
+            int jobId = xxlJobApiService.addTicketReleaseJob(eventDO.getId(), eventDO.getTitle(), cronExpression);
+
+            EventDO eventUpdateDO = new EventDO();
+            eventUpdateDO.setId(eventDO.getId());
+            eventUpdateDO.setXxlJobId(jobId);
+            updateById(eventUpdateDO);
+
+            EventSaleStageDO stageUpdateDO = new EventSaleStageDO();
+            stageUpdateDO.setId(earliestStage.getId());
+            stageUpdateDO.setXxlJobId(jobId);
+            eventSaleStageMapper.updateById(stageUpdateDO);
+
+            log.info("[Event Publish] Registered earliest stage release job. eventId={}, stageId={}, jobId={}, saleStartTime={}",
+                    eventDO.getId(), earliestStage.getId(), jobId, earliestStage.getSaleStartTime());
+        } catch (Exception e) {
+            log.error("[Event Publish] Failed to register scheduled release job. eventId={}", eventDO.getId(), e);
+            log.warn("[Event Publish] Event and stage configs were saved, but XXL-JOB registration failed.");
+        }
+    }
+
+    private void preheatRedisStock(TicketSkuDO skuDO) {
+        String redisKey = String.format(DistributionRedisConstant.TICKET_STOCK_KEY, skuDO.getId());
+        try {
+            stringRedisTemplate.opsForValue().set(redisKey, String.valueOf(skuDO.getRemainingStock()));
+            log.info("[Ticket Publish] Preheated Redis stock. key={}, stock={}", redisKey, skuDO.getRemainingStock());
+        } catch (Exception e) {
+            log.error("[Ticket Publish] Failed to preheat Redis stock. key={}", redisKey, e);
+            throw new ServiceException("Failed to preheat Redis stock");
+        }
+    }
+
+    private Date resolveEarliestSaleStartTime(EventPublishReqDTO requestParam) {
+        if (CollUtil.isNotEmpty(requestParam.getSaleStages())) {
+            return requestParam.getSaleStages().stream()
+                    .map(SaleStageParamDTO::getSaleStartTime)
+                    .filter(date -> date != null)
+                    .min(Date::compareTo)
+                    .orElse(requestParam.getSaleStartTime());
+        }
+        return requestParam.getSaleStartTime();
+    }
+
+    private Integer resolveStageStatus(Date saleStartTime) {
+        if (saleStartTime == null || !saleStartTime.after(new Date())) {
+            return EventSaleStageStatusEnum.OPENED.getCode();
+        }
+        return EventSaleStageStatusEnum.PENDING.getCode();
     }
 
     /**

@@ -57,7 +57,7 @@
                   <a-space>
                     <a-tag v-if="sku.stock <= 0" color="error">该规格已售罄</a-tag>
                     <a-tag v-else color="success">余 {{ sku.stock }} 张</a-tag>
-                    <span style="font-weight: 800; font-size: 1.05rem">¥{{ sku.price }}</span>
+                    <span style="font-weight: 800; font-size: 1.05rem">￥{{ sku.price }}</span>
                   </a-space>
                 </div>
               </a-radio-button>
@@ -115,7 +115,7 @@
               <div v-if="grabStatus === 'idle'">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px">
                   <span style="font-size: 13px; color: var(--ls-text-secondary)">合计：</span>
-                  <span style="font-size: 1.5rem; font-weight: 800">¥{{ totalPrice }}</span>
+                  <span style="font-size: 1.5rem; font-weight: 800">￥{{ totalPrice }}</span>
                 </div>
                 <div style="margin-bottom: 12px; font-size: 12px; color: var(--ls-text-secondary)">
                   当前阶段：<span style="font-weight: 700; color: var(--ls-color-primary)">{{ eventStageMeta.statusText }}</span>
@@ -339,29 +339,37 @@ void fetchReminders()
 
 const currentReminder = computed(() => {
   if (!props.selectedEvent) return undefined
-  return getReminderByEventId(props.selectedEvent.id)
+  return getReminderByEventId(props.selectedEvent.id, props.selectedEvent.stageId)
 })
 
 const reminderButtonText = computed(() => {
   if (!props.selectedEvent?.saleStartTime) return '未配置开售时间'
+  if (!props.selectedEvent?.stageId) return '待同步开售阶段'
   if (currentReminder.value?.status === 0) return '已预约提醒'
   if (currentReminder.value?.status === 1) return '已完成提醒'
   return '预约开售提醒'
 })
 
 const isReminderDisabled = computed(
-  () => !props.selectedEvent?.saleStartTime || currentReminder.value?.status === 0 || currentReminder.value?.status === 1
+  () => !props.selectedEvent?.saleStartTime
+    || !props.selectedEvent?.stageId
+    || currentReminder.value?.status === 0
+    || currentReminder.value?.status === 1
 )
 
 async function handleReminderClick() {
   if (!props.selectedEvent || isReminderDisabled.value) {
     if (props.selectedEvent && !props.selectedEvent.saleStartTime) {
       message.warning('该演出暂未配置开售时间，当前无法预约提醒')
+      return
+    }
+    if (props.selectedEvent && !props.selectedEvent.stageId) {
+      message.warning('当前活动尚未同步开售阶段，请稍后刷新后再试')
     }
     return
   }
   try {
-    await subscribeReminder(props.selectedEvent.id)
+    await subscribeReminder(props.selectedEvent.id, props.selectedEvent.stageId as number | string)
     message.success(`已为《${props.selectedEvent.title}》预约开售提醒`)
   } catch (err: any) {
     message.error(err.message || '预约提醒失败')

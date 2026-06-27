@@ -8,64 +8,73 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
 /**
- * 演唱会发布请求 DTO
+ * 演出发布请求传输对象 DTO。
+ * 用于从商家后台分发/发布演出信息至分销系统。
  */
 @Data
-@Schema(description = "演唱会演出发布请求")
+@Schema(description = "演出发布请求")
 public class EventPublishReqDTO {
 
+    /**
+     * 演出标题
+     */
     @Schema(description = "演出标题", requiredMode = Schema.RequiredMode.REQUIRED, example = "周杰伦 2026 嘉年华演唱会")
     @NotBlank(message = "演出标题不能为空")
     private String title;
 
-    @Schema(description = "主演艺人ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "9527")
-    @NotNull(message = "主演艺人ID不能为空")
+    /**
+     * 主演艺人 ID
+     */
+    @Schema(description = "主演艺人 ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "9527")
+    @NotNull(message = "主演艺人 ID 不能为空")
     private Long artistId;
 
+    /**
+     * 主演艺人姓名
+     */
     @Schema(description = "主演艺人姓名", requiredMode = Schema.RequiredMode.REQUIRED, example = "周杰伦")
     @NotBlank(message = "艺人姓名不能为空")
     private String artistName;
 
+    /**
+     * 演出开始时间
+     */
     @Schema(description = "演出开始时间", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "演出开始时间不能为空")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date eventTime;
 
-    @Schema(description = "关联场馆ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "101001")
-    @NotNull(message = "关联场馆ID不能为空")
+    /**
+     * 关联场馆 ID
+     */
+    @Schema(description = "关联场馆 ID", requiredMode = Schema.RequiredMode.REQUIRED, example = "101001")
+    @NotNull(message = "关联场馆 ID 不能为空")
     private Long venueId;
 
-    @Schema(description = "门票开售时间（不传则立即开售）", example = "2026-06-15 10:00:00")
+    /**
+     * 兼容字段：活动最早开售时间（多阶段售票下以第一阶段开售时间为准，本字段可选传）
+     */
+    @Schema(description = "兼容字段，活动最早开售时间可不传", example = "2026-06-15 10:00:00")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date saleStartTime;
 
-    @Schema(description = "票档库存设置", requiredMode = Schema.RequiredMode.REQUIRED)
-    @NotEmpty(message = "门票票档不能为空")
+    /**
+     * 票档配置列表
+     */
+    @Schema(description = "票档配置", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotEmpty(message = "票档不能为空")
     @Valid
     private List<TicketSkuParam> skus;
 
-    @Data
-    @Schema(description = "门票票档参数")
-    public static class TicketSkuParam {
-
-        @Schema(description = "票档名称 (如: 看台680, 内场1280)", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotBlank(message = "票档名称不能为空")
-        private String title;
-
-        @Schema(description = "门票售价", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull(message = "售价不能为空")
-        private BigDecimal sellingPrice;
-
-        @Schema(description = "发售总库存", requiredMode = Schema.RequiredMode.REQUIRED)
-        @NotNull(message = "发售库存不能为空")
-        private Integer totalStock;
-
-        @Schema(description = "单人限购张数", defaultValue = "2")
-        private Integer limitNum;
-    }
+    /**
+     * 开售阶段配置列表（支持多阶段，如：一开、二开）
+     */
+    @Schema(description = "开售阶段配置", requiredMode = Schema.RequiredMode.REQUIRED)
+    @NotEmpty(message = "开售阶段不能为空")
+    @Valid
+    private List<SaleStageParamDTO> saleStages;
 }

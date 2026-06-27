@@ -13,6 +13,9 @@ export interface LiveEvent {
   cover: string
   date: string
   saleStartTime?: string
+  stageId?: number | string
+  stageNo?: number
+  stageName?: string
   venue: string
   city?: string
   artist: string
@@ -103,6 +106,9 @@ export interface TicketReminder {
   id: number | string
   eventId: number | string
   eventTitle: string
+  stageId?: number | string
+  stageNo?: number
+  stageName?: string
   ticketStage: number
   status: number
   statusDesc: string
