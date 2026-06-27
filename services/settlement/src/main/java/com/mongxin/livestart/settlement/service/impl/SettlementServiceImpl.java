@@ -69,10 +69,10 @@ public class SettlementServiceImpl implements SettlementService {
         }
 
         StringBuilder fromSql = new StringBuilder("""
-                FROM live_start.t_settlement s
-                LEFT JOIN live_start.t_event e ON s.event_id = e.id
-                LEFT JOIN live_start.t_event_performer ep ON e.id = ep.event_id
-                LEFT JOIN live_start.t_performer p ON ep.performer_id = p.id
+                FROM t_settlement s
+                LEFT JOIN t_event e ON s.event_id = e.id
+                LEFT JOIN t_event_performer ep ON e.id = ep.event_id
+                LEFT JOIN t_performer p ON ep.performer_id = p.id
                 WHERE 1 = 1
                 """);
         List<Object> args = new ArrayList<>();
@@ -270,7 +270,7 @@ public class SettlementServiceImpl implements SettlementService {
         }
 
         Set<String> readKeys = new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT notification_key FROM live_start.t_settlement_notification_read WHERE user_id = ?",
+                "SELECT notification_key FROM t_settlement_notification_read WHERE user_id = ?",
                 String.class,
                 userId
         ));
@@ -296,7 +296,7 @@ public class SettlementServiceImpl implements SettlementService {
             throw new ServiceException("通知标识不能为空");
         }
         jdbcTemplate.update("""
-                INSERT INTO live_start.t_settlement_notification_read (user_id, notification_key, read_time)
+                INSERT INTO t_settlement_notification_read (user_id, notification_key, read_time)
                 VALUES (?, ?, ?)
                 ON DUPLICATE KEY UPDATE read_time = VALUES(read_time)
                 """, userId, notificationKey, new Timestamp(System.currentTimeMillis()));
@@ -431,7 +431,7 @@ public class SettlementServiceImpl implements SettlementService {
         }
 
         List<Long> venueIds = jdbcTemplate.queryForList(
-                "SELECT id FROM live_start.t_venue WHERE owner_user_id = ?",
+                "SELECT id FROM t_venue WHERE owner_user_id = ?",
                 Long.class,
                 Long.valueOf(userId)
         );
@@ -440,7 +440,7 @@ public class SettlementServiceImpl implements SettlementService {
         }
         String inSql = venueIds.stream().map(v -> "?").collect(Collectors.joining(","));
         return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM live_start.t_event WHERE venue_id IN (" + inSql + ") ORDER BY id DESC",
+                "SELECT id FROM t_event WHERE venue_id IN (" + inSql + ") ORDER BY id DESC",
                 Long.class,
                 venueIds.toArray()
         ));
@@ -456,7 +456,7 @@ public class SettlementServiceImpl implements SettlementService {
 
     private Set<Long> queryAllEventIds() {
         return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM live_start.t_event ORDER BY id DESC",
+                "SELECT id FROM t_event ORDER BY id DESC",
                 Long.class
         ));
     }
@@ -497,7 +497,7 @@ public class SettlementServiceImpl implements SettlementService {
     private String queryEventTitle(Long eventId) {
         try {
             return jdbcTemplate.queryForObject(
-                    "SELECT title FROM live_start.t_event WHERE id = ?",
+                    "SELECT title FROM t_event WHERE id = ?",
                     String.class,
                     eventId
             );
@@ -510,8 +510,12 @@ public class SettlementServiceImpl implements SettlementService {
         if (CollUtil.isEmpty(eventIds)) {
             return Collections.emptyList();
         }
+        Map<Long, BigDecimal> skuPriceMap = querySkuPriceMap(eventIds);
+        if (skuPriceMap.isEmpty()) {
+            return Collections.emptyList();
+        }
         return ORDER_DATABASES.stream()
-                .flatMap(database -> scanDatabaseShards(database, eventIds).stream())
+                .flatMap(database -> scanDatabaseShards(database, eventIds, skuPriceMap).stream())
                 .collect(Collectors.toList());
     }
 
@@ -575,37 +579,40 @@ public class SettlementServiceImpl implements SettlementService {
                 .build();
     }
 
-    private List<SettlementShardRespDTO> scanDatabaseShards(String database, Set<Long> eventIds) {
+    private List<SettlementShardRespDTO> scanDatabaseShards(String database, Set<Long> eventIds, Map<Long, BigDecimal> skuPriceMap) {
         return Collections.unmodifiableList(
                 java.util.stream.IntStream.range(0, SHARDING_TABLES_COUNT)
-                        .mapToObj(shardIndex -> scanSingleShard(database, shardIndex, eventIds))
+                        .mapToObj(shardIndex -> scanSingleShard(database, shardIndex, eventIds, skuPriceMap))
                         .collect(Collectors.toList())
         );
     }
 
-    private SettlementShardRespDTO scanSingleShard(String database, int shardIndex, Set<Long> eventIds) {
+    private SettlementShardRespDTO scanSingleShard(String database, int shardIndex, Set<Long> eventIds, Map<Long, BigDecimal> skuPriceMap) {
         String inSql = eventIds.size() == 1
                 ? "oi.event_id = ?"
                 : "oi.event_id IN (" + eventIds.stream().map(id -> "?").collect(Collectors.joining(",")) + ")";
         String queryOrdersSql = String.format("""
-                SELECT COUNT(*) AS ticket_count,
-                       COALESCE(SUM(sku.selling_price), 0) AS revenue
+                SELECT oi.sku_id, COUNT(*) AS ticket_count
                 FROM `%s`.t_order_item_%d oi
-                JOIN live_start.t_ticket_sku sku ON oi.sku_id = sku.id
                 JOIN `%s`.t_order_%d o ON oi.order_no = o.order_no
                 WHERE %s AND (o.status = 1 OR o.status = 2)
+                GROUP BY oi.sku_id
                 """, database, shardIndex, database, shardIndex, inSql);
 
         try {
-            SettlementAggRow row = jdbcTemplate.queryForObject(queryOrdersSql, (ResultSet rs, int rowNum) -> {
-                SettlementAggRow aggRow = new SettlementAggRow();
-                aggRow.ticketCount = rs.getLong("ticket_count");
-                aggRow.revenue = rs.getBigDecimal("revenue");
-                return aggRow;
+            long[] totalTicketCount = {0L};
+            BigDecimal[] totalRevenue = {BigDecimal.ZERO};
+
+            jdbcTemplate.query(queryOrdersSql, rs -> {
+                long skuId = rs.getLong("sku_id");
+                long count = rs.getLong("ticket_count");
+                BigDecimal price = skuPriceMap.getOrDefault(skuId, BigDecimal.ZERO);
+                totalTicketCount[0] += count;
+                totalRevenue[0] = totalRevenue[0].add(price.multiply(BigDecimal.valueOf(count)));
             }, eventIds.toArray());
 
-            long ticketCount = row == null ? 0L : row.ticketCount;
-            BigDecimal revenue = row == null || row.revenue == null ? BigDecimal.ZERO : row.revenue.setScale(2, RoundingMode.HALF_UP);
+            long ticketCount = totalTicketCount[0];
+            BigDecimal revenue = totalRevenue[0].setScale(2, RoundingMode.HALF_UP);
             BigDecimal commissionAmount = revenue.multiply(DEFAULT_COMMISSION_RATE).setScale(2, RoundingMode.HALF_UP);
             BigDecimal settlementAmount = revenue.subtract(commissionAmount).setScale(2, RoundingMode.HALF_UP);
             return SettlementShardRespDTO.builder()
@@ -617,8 +624,22 @@ public class SettlementServiceImpl implements SettlementService {
                     .settlementAmount(settlementAmount)
                     .build();
         } catch (Exception ex) {
+            log.error("扫描分库分表核对资金失败，物理库={}，分片={}", database, shardIndex, ex);
             throw new ServiceException("扫描分库分表核对资金失败，结算终止");
         }
+    }
+
+    private Map<Long, BigDecimal> querySkuPriceMap(Set<Long> eventIds) {
+        if (CollUtil.isEmpty(eventIds)) {
+            return Collections.emptyMap();
+        }
+        String inSql = eventIds.stream().map(id -> "?").collect(Collectors.joining(","));
+        String sql = "SELECT id, selling_price FROM t_ticket_sku WHERE event_id IN (" + inSql + ")";
+        Map<Long, BigDecimal> priceMap = new HashMap<>();
+        jdbcTemplate.query(sql, rs -> {
+            priceMap.put(rs.getLong("id"), rs.getBigDecimal("selling_price"));
+        }, eventIds.toArray());
+        return priceMap;
     }
 
     private int defaultInt(Integer value) {
