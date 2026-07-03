@@ -1,10 +1,11 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
+import dayjs from 'dayjs'
 import { eventApi } from '@/api/event'
 import { performerApi } from '@/api/performer'
 import { styleApi } from '@/api/style'
 import { eventConfigApi, type EventConfigItem } from '@/api/eventConfig'
-import type { EventItem } from '@/types'
+import type { EventItem, SaleStageItem } from '@/types'
 
 export const eventStatusLabels: Record<number, string> = {
   0: '已下架',
@@ -18,6 +19,31 @@ export const eventStatusColors: Record<number, string> = {
   1: 'orange',
   2: 'green',
   3: 'red',
+}
+
+function createDefaultSaleStage(stageNo: number): SaleStageItem {
+  return {
+    stageNo,
+    stageName: stageNo === 1 ? '预售第一阶段' : `预售第 ${stageNo} 阶段`,
+    saleStartTime: '',
+    remark: '',
+  }
+}
+
+function normalizeSaleStages(stages?: SaleStageItem[], fallbackTicketStage?: number): SaleStageItem[] {
+  if (stages && stages.length > 0) {
+    return stages
+      .map((item, index) => ({
+        stageNo: item.stageNo || index + 1,
+        stageName: item.stageName || (item.stageNo === 1 ? '预售第一阶段' : `预售第 ${item.stageNo || index + 1} 阶段`),
+        saleStartTime: item.saleStartTime || '',
+        remark: item.remark || '',
+      }))
+      .sort((a, b) => a.stageNo - b.stageNo)
+  }
+
+  const ticketStage = fallbackTicketStage && fallbackTicketStage > 1 ? fallbackTicketStage : 1
+  return Array.from({ length: ticketStage }, (_, index) => createDefaultSaleStage(index + 1))
 }
 
 export function useEventList() {
@@ -43,7 +69,7 @@ export function useEventList() {
       const res = await performerApi.page({ current: 1, size: 100 })
       performerOptions.value = res?.records || []
     } catch {
-      // 忽略错误
+      // ignore
     }
   }
 
@@ -52,7 +78,7 @@ export function useEventList() {
       const res = await styleApi.page({ current: 1, size: 100 })
       styleOptions.value = res?.records || []
     } catch {
-      // 忽略错误
+      // ignore
     }
   }
 
@@ -73,8 +99,21 @@ export function useEventList() {
     posterUrl: '',
     performerId: null as number | null,
     ticketStage: 1,
+    saleStages: [createDefaultSaleStage(1)] as SaleStageItem[],
     styleIds: [] as number[],
   })
+
+  const stageCount = computed(() => formData.saleStages.length)
+
+  function syncSaleStageMeta() {
+    formData.saleStages = formData.saleStages
+      .map((item, index) => ({
+        ...item,
+        stageNo: index + 1,
+        stageName: item.stageName || (index === 0 ? '预售第一阶段' : `预售第 ${index + 1} 阶段`),
+      }))
+    formData.ticketStage = formData.saleStages.length
+  }
 
   function resetForm() {
     editingId.value = null
@@ -85,24 +124,64 @@ export function useEventList() {
     formData.posterUrl = ''
     formData.performerId = null
     formData.ticketStage = 1
+    formData.saleStages = [createDefaultSaleStage(1)]
     formData.styleIds = []
   }
 
-  function openForm(record?: EventItem) {
+  function addSaleStage() {
+    const nextStageNo = formData.saleStages.length + 1
+    formData.saleStages.push(createDefaultSaleStage(nextStageNo))
+    syncSaleStageMeta()
+  }
+
+  function removeSaleStage(index: number) {
+    if (formData.saleStages.length <= 1) {
+      message.warning('至少需要保留一个开售阶段')
+      return
+    }
+    formData.saleStages.splice(index, 1)
+    syncSaleStageMeta()
+  }
+
+  async function openForm(record?: EventItem) {
     if (record) {
-      editingId.value = record.id
-      formData.title = record.title
-      formData.eventType = record.eventType
-      formData.venueId = record.venueId
-      formData.startTime = record.startTime
-      formData.posterUrl = record.posterUrl
-      formData.performerId = (record as any).performerId || null
-      formData.ticketStage = record.ticketStage || 1
-      formData.styleIds = (record as any).styleIds || []
+      const detail = await eventApi.getById(record.id)
+      editingId.value = detail.id
+      formData.title = detail.title
+      formData.eventType = detail.eventType
+      formData.venueId = detail.venueId
+      formData.startTime = detail.startTime
+      formData.posterUrl = detail.posterUrl
+      formData.performerId = detail.performerId || null
+      formData.ticketStage = detail.ticketStage || 1
+      formData.saleStages = normalizeSaleStages(detail.saleStages, detail.ticketStage)
+      formData.styleIds = (detail as any).styleIds || []
     } else {
       resetForm()
     }
+    syncSaleStageMeta()
     formVisible.value = true
+  }
+
+  function validateSaleStages() {
+    if (!formData.saleStages.length) {
+      message.warning('请至少配置一个开售阶段')
+      return false
+    }
+    const hasEmptyTime = formData.saleStages.some((item) => !item.saleStartTime)
+    if (hasEmptyTime) {
+      message.warning('请填写所有开售阶段的开售时间')
+      return false
+    }
+
+    const orderedTimes = formData.saleStages.map((item) => dayjs(item.saleStartTime).valueOf())
+    for (let i = 1; i < orderedTimes.length; i += 1) {
+      if (orderedTimes[i] < orderedTimes[i - 1]) {
+        message.warning('开售阶段时间需要按顺序递增')
+        return false
+      }
+    }
+    return true
   }
 
   async function onSubmit() {
@@ -110,13 +189,28 @@ export function useEventList() {
       message.warning('请填写必填项')
       return
     }
+    if (!validateSaleStages()) {
+      return
+    }
+
     submitting.value = true
     try {
+      const payload = {
+        ...formData,
+        ticketStage: formData.saleStages.length,
+        saleStages: formData.saleStages.map((item, index) => ({
+          stageNo: index + 1,
+          stageName: item.stageName,
+          saleStartTime: item.saleStartTime,
+          remark: item.remark,
+        })),
+      }
+
       if (editingId.value) {
-        await eventApi.update({ id: editingId.value, ...formData })
+        await eventApi.update({ id: editingId.value, ...payload })
         message.success('更新成功')
       } else {
-        await eventApi.create(formData)
+        await eventApi.create(payload)
         message.success('创建成功')
       }
       formVisible.value = false
@@ -170,7 +264,7 @@ export function useEventList() {
       const res = await eventConfigApi.getByEventId(record.id)
       if (res) Object.assign(configData, res)
     } catch {
-      // 如没有配置记录则继续使用默认值
+      // ignore and keep default values
     }
     configVisible.value = true
   }
@@ -223,7 +317,7 @@ export function useEventList() {
     if (key === 'delete') {
       Modal.confirm({
         title: '确认删除？',
-        content: `将删除演出「${record.title}」，此操作不可恢复。`,
+        content: `将删除演出《${record.title}》，此操作不可恢复。`,
         okType: 'danger',
         onOk: async () => {
           await eventApi.delete(record.id)
@@ -250,6 +344,9 @@ export function useEventList() {
     submitting,
     editingId,
     formData,
+    stageCount,
+    addSaleStage,
+    removeSaleStage,
     configVisible,
     configSubmitting,
     configEventId,

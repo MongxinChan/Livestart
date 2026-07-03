@@ -35,3 +35,10 @@ LiveStart 是专门为演唱会、Livehouse 演出设计的在线抢票引擎。
 - **极速启动**：支持**免 NPM 依赖双击直接运行**（离线高真 Mock 模式）与 **Vite + 网关反向代理真实联调**双核自适应启动！
 
 具体详细说明及开发操作请查阅：[client/README.md](./client/README.md)
+## Docker 补充说明
+
+当前仓库的 Docker 资源主要位于 `docker/xxl-job/docker-compose.yml`，用于启动 XXL-JOB Admin，方便本地联调 `distribution` 服务中的定时放票、开售提醒等任务调度能力。
+
+项目目前**没有**提供整套微服务的一键 Compose 编排；前端、网关和各业务服务仍建议按本地开发方式分别启动。
+
+如需具体启动方法、依赖要求和访问地址，请查看 `client/README.md` 中新增的 `Docker 说明` 章节。

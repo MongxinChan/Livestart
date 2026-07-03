@@ -9,7 +9,13 @@
       @change="onChange"
     >
       <template #bodyCell="{ column, record }">
-        <template v-if="column.key === 'status'">
+        <template v-if="column.key === 'eventTitle'">
+          <div class="event-cell">
+            <div class="event-title">{{ record.eventTitle }}</div>
+            <div class="event-subline">艺人：{{ record.performerName || '未绑定' }}</div>
+          </div>
+        </template>
+        <template v-else-if="column.key === 'status'">
           <a-tag :color="statusMeta[record.status as SettlementStatusValue].color">
             {{ statusMeta[record.status as SettlementStatusValue].label }}
           </a-tag>
@@ -30,7 +36,7 @@
 
 <script setup lang="ts">
 import type { SettlementItem } from '@/types'
-import { SETTLEMENT_STATUS_META, type AntTablePaginationChange, type SettlementStatusValue } from './settlement.types'
+import { SETTLEMENT_STATUS_META, type AntTableChange, type SettlementSortField, type SettlementSortOrder, type SettlementStatusValue } from './settlement.types'
 
 interface Props {
   columns: any[]
@@ -40,7 +46,7 @@ interface Props {
 }
 
 interface Emits {
-  (e: 'change', pag: AntTablePaginationChange): void
+  (e: 'change', pag: AntTableChange): void
 }
 
 defineProps<Props>()
@@ -48,8 +54,13 @@ const emit = defineEmits<Emits>()
 
 const statusMeta = SETTLEMENT_STATUS_META
 
-function onChange(pag: AntTablePaginationChange) {
-  emit('change', pag)
+function onChange(pag: { current?: number; pageSize?: number }, _filters: unknown, sorter: any) {
+  emit('change', {
+    current: pag.current || 1,
+    pageSize: pag.pageSize || 10,
+    sortField: sorter?.field as SettlementSortField | undefined,
+    sortOrder: sorter?.order as SettlementSortOrder | undefined,
+  })
 }
 
 function formatAmount(value?: number) {
@@ -64,6 +75,21 @@ function formatAmount(value?: number) {
 </script>
 
 <style scoped>
+.event-cell {
+  min-width: 220px;
+}
+
+.event-title {
+  color: #1f1f1f;
+  font-weight: 600;
+}
+
+.event-subline {
+  margin-top: 2px;
+  color: #8c8c8c;
+  font-size: 12px;
+}
+
 .amount-revenue {
   color: #52c41a;
   font-weight: 600;

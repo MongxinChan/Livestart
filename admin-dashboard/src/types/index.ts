@@ -1,3 +1,10 @@
+export interface SaleStageItem {
+  stageNo: number
+  stageName: string
+  saleStartTime: string
+  remark?: string
+}
+
 export interface EventItem {
   id: number
   title: string
@@ -9,6 +16,7 @@ export interface EventItem {
   performerId?: number
   performerName?: string
   ticketStage?: number
+  saleStages?: SaleStageItem[]
 }
 
 export interface EventSaveReq {
@@ -19,6 +27,7 @@ export interface EventSaveReq {
   posterUrl: string
   performerId?: number | null
   ticketStage?: number
+  saleStages?: SaleStageItem[]
 }
 
 export interface EventUpdateReq extends EventSaveReq {

@@ -19,9 +19,14 @@ export interface SettlementRow extends Omit<SettlementItem, 'status'> {
   status: SettlementStatusValue
 }
 
-export interface AntTablePaginationChange {
+export type SettlementSortField = 'eventId' | 'totalTickets' | 'revenue' | 'commission' | 'updateTime'
+export type SettlementSortOrder = 'ascend' | 'descend'
+
+export interface AntTableChange {
   current: number
   pageSize: number
+  sortField?: SettlementSortField
+  sortOrder?: SettlementSortOrder
 }
 
 export interface StatCardConfig {

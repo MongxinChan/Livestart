@@ -115,8 +115,10 @@
               </div>
             </template>
 
-            <a-badge :count="actionableCount" :offset="[-4, 4]">
-              <BellOutlined style="font-size: 18px; cursor: pointer" />
+            <a-badge :count="actionableCount" :offset="[-2, 6]">
+              <div class="notification-trigger" :class="{ 'notification-trigger--active': actionableCount > 0 }">
+                <BellOutlined class="notification-trigger__icon" />
+              </div>
             </a-badge>
           </a-popover>
 
@@ -282,6 +284,37 @@ function tagColorOf(type: SettlementNotificationItem['type']) {
 <style scoped>
 .notification-panel {
   width: 380px;
+}
+
+.notification-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid #d9d9d9;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #f5f5f5 100%);
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.notification-trigger:hover {
+  border-color: #91caff;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(22, 119, 255, 0.16);
+}
+
+.notification-trigger--active {
+  border-color: #ffd666;
+  background: linear-gradient(180deg, #fff7e6 0%, #ffe7ba 100%);
+  box-shadow: 0 10px 24px rgba(250, 173, 20, 0.22);
+}
+
+.notification-trigger__icon {
+  color: #d48806;
+  font-size: 18px;
 }
 
 .notification-panel__header {
