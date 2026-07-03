@@ -79,6 +79,13 @@ logs/
 ### JMeter generated artifacts ###
 /jmeter/html_report_*/
 /jmeter/results-*.jtl
+/jmeter/users_bulk_registered_*.csv
+/jmeter/users_bulk_seckill_fresh_*.csv
+/jmeter/users_scenario3_bulk.csv
+/jmeter/users_scenario3_registered*.csv
+/jmeter/users_seckill_fresh_*.csv
+/jmeter/users_seckill_smoke_5.csv
+/jmeter/users_seed_failed.txt
 
 ### Generated SQL payloads ###
 /sql/generated_*
