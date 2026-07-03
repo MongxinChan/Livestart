@@ -1,1 +1,1 @@
-export { useAuth } from '@/composables/useAuth'
+export { requireAuth, useAuth } from '@/composables/useAuth'

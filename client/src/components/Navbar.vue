@@ -1,14 +1,11 @@
 <template>
   <header :class="['ls-header', { 'ls-header--scrolled': isScrolled }]">
     <div class="ls-header-inner">
-
-      <!-- Logo -->
       <div class="ls-logo" @click="$emit('clickLogo')">
         <ThunderboltOutlined class="ls-logo-icon" />
         <span class="text-gradient ls-logo-text">LIVESTART</span>
       </div>
 
-      <!-- 主导航 Tab -->
       <nav class="ls-nav">
         <button
           v-for="item in navOptions"
@@ -22,10 +19,7 @@
         </button>
       </nav>
 
-      <!-- 右侧控制区 -->
       <div class="ls-header-right">
-
-        <!-- Mock/网关开关 -->
         <div v-if="isMockEnv" class="ls-mock-toggle">
           <a-badge :status="apiState.isMock ? 'default' : 'success'" />
           <span class="ls-mock-label">{{ apiState.isMock ? '离线 Mock' : '网关联调' }}</span>
@@ -37,13 +31,12 @@
           />
         </div>
 
-        <!-- 搜索框（收缩/展开） -->
         <div :class="['ls-search-wrap', { expanded: navSearchVisible }]">
           <Transition name="ls-search">
             <div v-if="navSearchVisible" class="ls-search-box">
               <a-auto-complete
                 :value="navSearchQuery"
-                :options="navSuggest.map(s => ({ value: s }))"
+                :options="navSuggest.map((s) => ({ value: s }))"
                 placeholder="搜索演出、艺人..."
                 class="ls-search-input"
                 :open="navSuggest.length > 0"
@@ -63,7 +56,6 @@
           </a-tooltip>
         </div>
 
-        <!-- 主题切换（纯图标） -->
         <a-tooltip title="切换主题" placement="bottom">
           <a-dropdown :trigger="['click']">
             <button class="ls-icon-btn">
@@ -75,7 +67,7 @@
                   <a-space>
                     <span>{{ t.icon }}</span>
                     <span>{{ t.name }}</span>
-                    <CheckOutlined v-if="activeTheme === t.id" style="color: var(--ant-color-primary)" />
+                    <CheckOutlined v-if="activeTheme === t.id" style="color: var(--ls-color-primary)" />
                   </a-space>
                 </a-menu-item>
               </a-menu>
@@ -83,7 +75,6 @@
           </a-dropdown>
         </a-tooltip>
 
-        <!-- 用户区域 -->
         <template v-if="currentUser">
           <a-dropdown :trigger="['click']">
             <div class="ls-user-trigger">
@@ -111,7 +102,6 @@
             登录 / 注册
           </a-button>
         </template>
-
       </div>
     </div>
   </header>
@@ -131,7 +121,7 @@ import { apiState } from '@/composables/infra/useRequest'
 
 const isMockEnv = import.meta.env.VITE_USE_MOCK === 'true'
 
-const props = defineProps<{
+defineProps<{
   activeView: string
   navOptions: Array<{ value: string; label: string; icon: any }>
   isScrolled: boolean
@@ -164,7 +154,6 @@ function onSearchBlur() {
 </script>
 
 <style scoped>
-/* ---- 导航栏容器 ---- */
 .ls-header {
   position: sticky;
   top: 0;
@@ -180,7 +169,6 @@ function onSearchBlur() {
   width: 100%;
 }
 
-/* Scroll 后加深效果 */
 .ls-header--scrolled {
   background: color-mix(in srgb, var(--ls-nav-bg) 95%, transparent);
   backdrop-filter: blur(24px);
@@ -198,7 +186,6 @@ function onSearchBlur() {
   margin: 0 auto;
 }
 
-/* ---- Logo ---- */
 .ls-logo {
   display: flex;
   align-items: center;
@@ -206,10 +193,12 @@ function onSearchBlur() {
   cursor: pointer;
   flex-shrink: 0;
 }
+
 .ls-logo-icon {
   font-size: 24px;
   animation: heartbeat 2s infinite ease-in-out;
 }
+
 .ls-logo-text {
   font-size: 22px;
   font-weight: 800;
@@ -217,7 +206,6 @@ function onSearchBlur() {
   font-family: 'Outfit', sans-serif;
 }
 
-/* ---- 主导航 Tab ---- */
 .ls-nav {
   display: flex;
   align-items: center;
@@ -250,13 +238,14 @@ function onSearchBlur() {
 }
 
 .ls-nav-tab.active {
-  color: var(--ant-color-primary);
+  color: var(--ls-color-primary);
 }
 
 .ls-nav-tab-icon {
   font-size: 15px;
   transition: transform 0.2s ease;
 }
+
 .ls-nav-tab:hover .ls-nav-tab-icon {
   transform: scale(1.15);
 }
@@ -265,7 +254,6 @@ function onSearchBlur() {
   white-space: nowrap;
 }
 
-/* 激活态下划线 */
 .ls-nav-tab-underline {
   position: absolute;
   bottom: 0;
@@ -273,16 +261,16 @@ function onSearchBlur() {
   transform: translateX(-50%) scaleX(0);
   width: 60%;
   height: 2px;
-  background: var(--ant-color-primary);
+  background: var(--ls-color-primary);
   border-radius: 2px;
   transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   box-shadow: 0 0 8px rgba(var(--ls-accent-rgb), 0.5);
 }
+
 .ls-nav-tab.active .ls-nav-tab-underline {
   transform: translateX(-50%) scaleX(1);
 }
 
-/* ---- 右侧控制区 ---- */
 .ls-header-right {
   display: flex;
   align-items: center;
@@ -290,7 +278,6 @@ function onSearchBlur() {
   flex-shrink: 0;
 }
 
-/* Mock 开关 */
 .ls-mock-toggle {
   display: flex;
   align-items: center;
@@ -302,11 +289,11 @@ function onSearchBlur() {
   background: rgba(var(--ls-accent-rgb), 0.05);
   border: 1px solid rgba(var(--ls-accent-rgb), 0.1);
 }
+
 .ls-mock-label {
   white-space: nowrap;
 }
 
-/* 通用图标按钮 */
 .ls-icon-btn {
   display: flex;
   align-items: center;
@@ -322,13 +309,13 @@ function onSearchBlur() {
   transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
   flex-shrink: 0;
 }
+
 .ls-icon-btn:hover {
   background: rgba(var(--ls-accent-rgb), 0.15);
-  color: var(--ant-color-primary);
+  color: var(--ls-color-primary);
   transform: scale(1.08);
 }
 
-/* ---- 搜索框 ---- */
 .ls-search-wrap {
   display: flex;
   align-items: center;
@@ -343,22 +330,22 @@ function onSearchBlur() {
   width: 220px;
 }
 
-/* 搜索框展开动画 */
 .ls-search-enter-active,
 .ls-search-leave-active {
   transition: width 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
 }
+
 .ls-search-enter-from,
 .ls-search-leave-to {
   width: 0 !important;
   opacity: 0;
 }
+
 .ls-search-enter-to {
   width: 220px;
   opacity: 1;
 }
 
-/* ---- 用户区域 ---- */
 .ls-user-trigger {
   display: flex;
   align-items: center;
@@ -369,10 +356,12 @@ function onSearchBlur() {
   border: 1px solid transparent;
   transition: background 0.2s, border-color 0.2s;
 }
+
 .ls-user-trigger:hover {
   background: rgba(var(--ls-accent-rgb), 0.08);
   border-color: rgba(var(--ls-accent-rgb), 0.15);
 }
+
 .ls-user-name {
   font-size: 13px;
   font-weight: 600;
@@ -386,15 +375,16 @@ function onSearchBlur() {
   white-space: nowrap;
 }
 
-/* ---- 响应式 ---- */
 @media (max-width: 1024px) {
   .ls-logo-text {
     font-size: 18px;
     letter-spacing: 0.05rem;
   }
+
   .ls-mock-label {
     display: none;
   }
+
   .ls-user-name {
     max-width: 60px;
   }
@@ -404,21 +394,27 @@ function onSearchBlur() {
   .ls-header {
     padding: 0 16px;
   }
+
   .ls-logo-text {
     display: none;
   }
+
   .ls-search-wrap {
     display: none;
   }
+
   .ls-mock-toggle {
     display: none;
   }
+
   .ls-header-inner {
     gap: 12px;
   }
+
   .ls-nav-tab-label {
     display: none;
   }
+
   .ls-nav-tab {
     padding: 6px 12px;
   }

@@ -1,5 +1,5 @@
 <template>
-  <a-config-provider :theme="currentAntTheme">
+  <a-config-provider :theme="currentAntTheme" :get-popup-container="getPopupContainer">
     <a-layout :style="rootStyle" class="ls-app-root">
       <Navbar
         :active-view="activeNavKey"
@@ -83,6 +83,10 @@ function onNavSearchBlur() {
   if (!navSearchQuery.value) {
     navSearchVisible.value = false
   }
+}
+
+function getPopupContainer() {
+  return document.querySelector('.ls-app-root') as HTMLElement || document.body
 }
 
 watch(

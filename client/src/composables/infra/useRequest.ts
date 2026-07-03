@@ -11,10 +11,22 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
   }
 
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`
+  const fallbackUserId =
+    apiState.currentUser && 'id' in apiState.currentUser && apiState.currentUser.id != null
+      ? String(apiState.currentUser.id)
+      : ''
+  const resolvedUserId = apiState.userId || fallbackUserId
+  const resolvedUsername =
+    apiState.currentUser?.username ||
+    apiState.currentUser?.realName ||
+    apiState.phone ||
+    ''
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     token: apiState.token,
+    userId: resolvedUserId,
+    username: resolvedUsername,
     phone: apiState.phone || apiState.currentUser?.phone || '',
     ...((options.headers as Record<string, string>) || {}),
   }
