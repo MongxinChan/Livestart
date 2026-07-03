@@ -22,7 +22,7 @@
                   <a-tag :color="eventStageMeta.stageColor">{{ eventStageMeta.stageLabel }}</a-tag>
                 </a-space>
                 <h1 style="font-size: 1.8rem; font-weight: 800; margin: 16px 0 10px">{{ event.title }}</h1>
-                <p style="font-size: 14px; color: var(--ls-text-secondary); line-height: 1.8">
+                <p style="font-size: 14px; color: var(--ant-text-secondary); line-height: 1.8">
                   {{ event.artist }} · {{ event.date }} · {{ event.venue }}
                   <template v-if="event.city"> · {{ event.city }}</template>
                 </p>
@@ -89,6 +89,7 @@ import { message } from 'ant-design-vue'
 import { fetchEventById } from '@/composables/event/useEventCatalog'
 import { useEventAccess } from '@/composables/event/useEventAccess'
 import { formatEventPriceRange } from '@/composables/event/useEventSquare'
+import { requireAuth } from '@/composables/useAuth'
 import { resolveEventStageMeta } from '@/utils/eventStage'
 import type { LiveEvent } from '@/types'
 
@@ -137,6 +138,9 @@ function goBackToSquare() {
 
 function enterCabin() {
   if (!event.value) return
+  if (!requireAuth()) {
+    return
+  }
   allowCabinEntry(event.value)
   void router.push({ name: 'OrderCabin', params: { id: event.value.id } })
 }

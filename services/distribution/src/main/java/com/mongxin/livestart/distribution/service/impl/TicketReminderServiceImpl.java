@@ -3,11 +3,13 @@ package com.mongxin.livestart.distribution.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.distribution.common.biz.user.UserContext;
-import com.mongxin.livestart.distribution.common.enums.EventStatusEnum;
+import com.mongxin.livestart.distribution.common.enums.EventSaleStageStatusEnum;
 import com.mongxin.livestart.distribution.common.enums.TicketReminderStatusEnum;
 import com.mongxin.livestart.distribution.dao.entity.EventDO;
+import com.mongxin.livestart.distribution.dao.entity.EventSaleStageDO;
 import com.mongxin.livestart.distribution.dao.entity.TicketReminderDO;
 import com.mongxin.livestart.distribution.dao.mapper.EventMapper;
+import com.mongxin.livestart.distribution.dao.mapper.EventSaleStageMapper;
 import com.mongxin.livestart.distribution.dao.mapper.TicketReminderMapper;
 import com.mongxin.livestart.distribution.dto.req.TicketReminderCreateReqDTO;
 import com.mongxin.livestart.distribution.dto.resp.TicketReminderRespDTO;
@@ -33,6 +35,7 @@ public class TicketReminderServiceImpl extends ServiceImpl<TicketReminderMapper,
 
     private final TicketReminderMapper ticketReminderMapper;
     private final EventMapper eventMapper;
+    private final EventSaleStageMapper eventSaleStageMapper;
     private final XxlJobApiService xxlJobApiService;
 
     @Value("${xxl.job.reminder-lead-minutes:10}")
@@ -49,19 +52,25 @@ public class TicketReminderServiceImpl extends ServiceImpl<TicketReminderMapper,
         if (event == null) {
             throw new ClientException("Event does not exist");
         }
-        if (event.getSaleStartTime() == null) {
-            throw new ClientException("This event does not have a sale start time configured");
+
+        EventSaleStageDO saleStage = eventSaleStageMapper.selectById(requestParam.getStageId());
+        if (saleStage == null || !event.getId().equals(saleStage.getEventId())) {
+            throw new ClientException("Sale stage does not exist");
         }
-        if (event.getStatus() != null && event.getStatus() == EventStatusEnum.ON_SALE.getCode()) {
-            throw new ClientException("This event is already on sale");
+        if (saleStage.getSaleStartTime() == null) {
+            throw new ClientException("This sale stage does not have a sale start time configured");
         }
-        if (event.getSaleStartTime().before(new Date())) {
-            throw new ClientException("This event sale time has already passed");
+        if (saleStage.getStatus() != null && saleStage.getStatus() == EventSaleStageStatusEnum.OPENED.getCode()) {
+            throw new ClientException("This sale stage is already on sale");
+        }
+        if (saleStage.getSaleStartTime().before(new Date())) {
+            throw new ClientException("This sale stage time has already passed");
         }
 
         TicketReminderDO existingReminder = ticketReminderMapper.selectOne(
                 Wrappers.lambdaQuery(TicketReminderDO.class)
                         .eq(TicketReminderDO::getEventId, requestParam.getEventId())
+                        .eq(TicketReminderDO::getStageId, requestParam.getStageId())
                         .eq(TicketReminderDO::getUserId, userId)
                         .eq(TicketReminderDO::getStatus, TicketReminderStatusEnum.PENDING.getCode())
                         .last("limit 1"));
@@ -69,18 +78,21 @@ public class TicketReminderServiceImpl extends ServiceImpl<TicketReminderMapper,
             return existingReminder.getId();
         }
 
-        Date remindTime = calculateRemindTime(event.getSaleStartTime());
+        Date remindTime = calculateRemindTime(saleStage.getSaleStartTime());
         TicketReminderDO reminder = TicketReminderDO.builder()
                 .eventId(event.getId())
                 .userId(userId)
                 .username(UserContext.getUsername())
                 .phone(UserContext.getPhone())
                 .eventTitle(event.getTitle())
-                .ticketStage(resolveTicketStage(event))
-                .saleStartTime(event.getSaleStartTime())
+                .stageId(saleStage.getId())
+                .stageNo(saleStage.getStageNo())
+                .stageName(saleStage.getStageName())
+                .ticketStage(saleStage.getStageNo())
+                .saleStartTime(saleStage.getSaleStartTime())
                 .remindTime(remindTime)
                 .status(TicketReminderStatusEnum.PENDING.getCode())
-                .reminderMessage(buildReminderMessage(event))
+                .reminderMessage(buildReminderMessage(event, saleStage))
                 .build();
         if (ticketReminderMapper.insert(reminder) <= 0) {
             throw new ServiceException("Failed to create reminder subscription");
@@ -89,19 +101,19 @@ public class TicketReminderServiceImpl extends ServiceImpl<TicketReminderMapper,
         Integer jobId = null;
         if (xxlJobEnabled) {
             String cronExpression = dateToCron(remindTime);
-            jobId = xxlJobApiService.addTicketReminderJob(reminder.getId(), event.getTitle(), cronExpression);
+            jobId = xxlJobApiService.addTicketReminderJob(reminder.getId(), buildJobTitle(event, saleStage), cronExpression);
 
             TicketReminderDO updateDO = new TicketReminderDO();
             updateDO.setId(reminder.getId());
             updateDO.setXxlJobId(jobId);
             ticketReminderMapper.updateById(updateDO);
         } else {
-            log.warn("[Ticket Reminder] XXL-JOB is disabled in local mode. reminderId={}, eventId={}, remindTime={}",
-                    reminder.getId(), event.getId(), remindTime);
+            log.warn("[Ticket Reminder] XXL-JOB is disabled in local mode. reminderId={}, eventId={}, stageId={}, remindTime={}",
+                    reminder.getId(), event.getId(), saleStage.getId(), remindTime);
         }
 
-        log.info("[Ticket Reminder] Reminder subscribed. reminderId={}, eventId={}, userId={}, remindTime={}, jobId={}",
-                reminder.getId(), event.getId(), userId, remindTime, jobId);
+        log.info("[Ticket Reminder] Reminder subscribed. reminderId={}, eventId={}, stageId={}, userId={}, remindTime={}, jobId={}",
+                reminder.getId(), event.getId(), saleStage.getId(), userId, remindTime, jobId);
         return reminder.getId();
     }
 
@@ -133,8 +145,8 @@ public class TicketReminderServiceImpl extends ServiceImpl<TicketReminderMapper,
         updateDO.setReminderMessage(reminder.getReminderMessage());
         ticketReminderMapper.updateById(updateDO);
 
-        log.info("[Ticket Reminder] Reminder delivered. reminderId={}, userId={}, phone={}, eventTitle={}",
-                reminderId, reminder.getUserId(), reminder.getPhone(), reminder.getEventTitle());
+        log.info("[Ticket Reminder] Reminder delivered. reminderId={}, userId={}, phone={}, eventTitle={}, stageId={}, stageName={}",
+                reminderId, reminder.getUserId(), reminder.getPhone(), reminder.getEventTitle(), reminder.getStageId(), reminder.getStageName());
     }
 
     private TicketReminderRespDTO convertToResp(TicketReminderDO reminder) {
@@ -164,12 +176,12 @@ public class TicketReminderServiceImpl extends ServiceImpl<TicketReminderMapper,
         return remindTime;
     }
 
-    private Integer resolveTicketStage(EventDO event) {
-        return event.getStatus() != null && event.getStatus().equals(EventStatusEnum.PENDING_SALE.getCode()) ? 1 : 2;
+    private String buildReminderMessage(EventDO event, EventSaleStageDO saleStage) {
+        return String.format("演出《%s》的%s即将开售，请及时进入抢票页准备下单。", event.getTitle(), saleStage.getStageName());
     }
 
-    private String buildReminderMessage(EventDO event) {
-        return String.format("演出《%s》即将开售，请及时进入抢票页准备下单。", event.getTitle());
+    private String buildJobTitle(EventDO event, EventSaleStageDO saleStage) {
+        return event.getTitle() + " - " + saleStage.getStageName();
     }
 
     private String dateToCron(Date date) {

@@ -36,9 +36,10 @@ export function resolveEventStageMeta(event: LiveEvent | null | undefined): Even
   const stageLabel = event.ticketStage === 2 ? '二开' : '一开'
   const stageColor = event.ticketStage === 2 ? 'orange' : 'blue'
   const startAt = event.date ? new Date(event.date) : null
-  const hasStarted = typeof event.started === 'boolean'
-    ? event.started
-    : !!startAt && !Number.isNaN(startAt.getTime()) && startAt.getTime() <= Date.now()
+  const hasStarted =
+    typeof event.started === 'boolean'
+      ? event.started
+      : !!startAt && !Number.isNaN(startAt.getTime()) && startAt.getTime() <= Date.now()
   const startTimeText = formatDateTime(event.date)
   const backendStatusText = event.statusText?.trim()
 
@@ -46,7 +47,7 @@ export function resolveEventStageMeta(event: LiveEvent | null | undefined): Even
     return {
       stageLabel,
       stageColor,
-      statusText: backendStatusText || '演唱会已开演',
+      statusText: backendStatusText || '演出已开演',
       timeText: startTimeText ? `开演时间：${startTimeText}` : '',
       canGrab: false,
       hasStarted: true,
@@ -54,7 +55,7 @@ export function resolveEventStageMeta(event: LiveEvent | null | undefined): Even
   }
 
   if (backendStatusText) {
-    const canGrab = backendStatusText.includes('抢票中')
+    const canGrab = backendStatusText.includes('抢票中') || backendStatusText.includes('开售')
     return {
       stageLabel,
       stageColor,
