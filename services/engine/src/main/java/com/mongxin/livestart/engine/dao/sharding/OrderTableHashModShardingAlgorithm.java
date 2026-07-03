@@ -20,7 +20,8 @@ public class OrderTableHashModShardingAlgorithm implements StandardShardingAlgor
     @Override
     public String doSharding(Collection<String> availableTargetNames, PreciseShardingValue<Long> shardingValue) {
         long userId = shardingValue.getValue();
-        int tableIndex = (int) (userId % SHARDING_COUNT);
+        int hash = Long.hashCode(userId) & Integer.MAX_VALUE;
+        int tableIndex = (hash / 2) % SHARDING_COUNT;
         String logicTableName = shardingValue.getLogicTableName();
         String targetTableName = logicTableName + "_" + tableIndex;
         for (String tableName : availableTargetNames) {

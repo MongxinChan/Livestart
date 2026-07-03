@@ -802,35 +802,35 @@ SELECT `id`,`event_id`,`title`,`original_price`,`selling_price`,`total_stock`,`r
 FROM `live_start`.`t_ticket_sku` WHERE `event_id` BETWEEN 103001 AND 103035
 ON DUPLICATE KEY UPDATE `total_stock` = VALUES(`total_stock`), `remaining_stock` = VALUES(`remaining_stock`);
 
--- 测试订单 (user 1002 → t_order_10，已支付周杰伦看台 2 张)
-INSERT INTO `t_order_10` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1002 → t_order_5，已支付周杰伦看台 2 张)
+INSERT INTO `t_order_5` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000002, 'TEST_ORDER_002', 1002, 1160.00, 1, '2026-06-15 10:01:00', '2026-06-15 10:00:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_10` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_5` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000002, 'TEST_ORDER_002', 1002, 11002, 103001, 200001, NULL, 'CHKCODE_002_A', 0),
        (6000003, 'TEST_ORDER_002', 1002, 11002, 103001, 200001, NULL, 'CHKCODE_002_B', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_10` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_5` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000002, 1002, 200001, 103001, 0, 'CHKCODE_002_A'),
        (7000003, 1002, 200001, 103001, 0, 'CHKCODE_002_B')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
--- 测试订单 (user 1004 → t_order_12，待支付万青 Livehouse 学生票)
-INSERT INTO `t_order_12` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1004 → t_order_6，待支付万青 Livehouse 学生票)
+INSERT INTO `t_order_6` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000004, 'TEST_ORDER_004', 1004, 150.00, 0, NULL, '2026-06-21 14:30:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_12` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_6` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000004, 'TEST_ORDER_004', 1004, 11004, 103007, 200061, NULL, 'CHKCODE_004_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
 
--- 测试订单 (user 1006 → t_order_14，已支付赵雷 Livehouse)
-INSERT INTO `t_order_14` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1006 → t_order_7，已支付赵雷 Livehouse)
+INSERT INTO `t_order_7` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000006, 'TEST_ORDER_006', 1006, 220.00, 1, '2026-06-10 09:15:00', '2026-06-10 09:14:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_14` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_7` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000006, 'TEST_ORDER_006', 1006, 11002, 103013, 200122, NULL, 'CHKCODE_006_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_14` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_7` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000006, 1006, 200122, 103013, 0, 'CHKCODE_006_A')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
@@ -859,41 +859,41 @@ SELECT `id`,`event_id`,`title`,`original_price`,`selling_price`,`total_stock`,`r
 FROM `live_start`.`t_ticket_sku` WHERE `event_id` BETWEEN 103001 AND 103035
 ON DUPLICATE KEY UPDATE `total_stock` = VALUES(`total_stock`), `remaining_stock` = VALUES(`remaining_stock`);
 
--- 测试订单 (user 1001 → t_order_9，已支付五月天看台)
-INSERT INTO `t_order_9` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1001 → t_order_4，已支付五月天看台)
+INSERT INTO `t_order_4` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000001, 'TEST_ORDER_001', 1001, 580.00, 1, '2026-06-12 20:00:00', '2026-06-12 19:59:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_9` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_4` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000001, 'TEST_ORDER_001', 1001, 11001, 103006, 200052, NULL, 'CHKCODE_001_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_9` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_4` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000001, 1001, 200052, 103006, 0, 'CHKCODE_001_A')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
--- 测试订单 (user 1003 → t_order_11，待支付 GAI 周延票)
-INSERT INTO `t_order_11` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1003 → t_order_5，待支付 GAI 周延票)
+INSERT INTO `t_order_5` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000003, 'TEST_ORDER_003', 1003, 220.00, 0, NULL, '2026-06-21 16:00:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_11` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_5` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000005, 'TEST_ORDER_003', 1003, 11003, 103015, 200142, NULL, 'CHKCODE_003_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
 
--- 测试订单 (user 1005 → t_order_13，已取消 周杰伦内场)
-INSERT INTO `t_order_13` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1005 → t_order_6，已取消 周杰伦内场)
+INSERT INTO `t_order_6` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000005, 'TEST_ORDER_005', 1005, 1680.00, 3, NULL, '2026-06-05 13:20:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_13` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_6` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000007, 'TEST_ORDER_005', 1005, 11005, 103001, 200006, NULL, 'CHKCODE_005_A', 0)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
 
--- 测试订单 (user 1007 → t_order_15，已核销 告五人 VIP)
-INSERT INTO `t_order_15` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
+-- 测试订单 (user 1007 → t_order_7，已核销 告五人 VIP)
+INSERT INTO `t_order_7` (`id`, `order_no`, `user_id`, `total_amount`, `status`, `pay_time`, `create_time`)
 VALUES (5000007, 'TEST_ORDER_007', 1007, 480.00, 2, '2026-05-20 10:00:00', '2026-05-20 09:59:00')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
-INSERT INTO `t_order_item_15` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
+INSERT INTO `t_order_item_7` (`id`, `order_no`, `user_id`, `visitor_id`, `event_id`, `sku_id`, `seat_id`, `check_code`, `is_checked`)
 VALUES (6000011, 'TEST_ORDER_007', 1007, 11007, 103008, 200074, NULL, 'CHKCODE_007_A', 1)
 ON DUPLICATE KEY UPDATE `is_checked` = VALUES(`is_checked`);
-INSERT INTO `t_user_ticket_15` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
+INSERT INTO `t_user_ticket_7` (`id`, `user_id`, `ticket_sku_id`, `event_id`, `status`, `check_code`)
 VALUES (7000007, 1007, 200074, 103008, 1, 'CHKCODE_007_A')
 ON DUPLICATE KEY UPDATE `status` = VALUES(`status`);
 
