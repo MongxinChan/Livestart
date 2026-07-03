@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jmeterTestPlan version="1.2" properties="5.0" jmeter="5.5">
+  <hashTree>
+    <TestPlan guiclass="TestPlanGui" testclass="TestPlan" testname="LiveStart Minimal Order Create Fixed" enabled="true">
+      <stringProp name="TestPlan.comments">基于压力版裁剪的最小下单链路：观演人列表 - token - 创建订单 - 我的订单</stringProp>
+      <boolProp name="TestPlan.functional_mode">false</boolProp>
+      <boolProp name="TestPlan.tearDown_on_shutdown">true</boolProp>
+      <boolProp name="TestPlan.serialize_threadgroups">false</boolProp>
+      <elementProp name="TestPlan.user_defined_variables" elementType="Arguments" guiclass="ArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+        <collectionProp name="Arguments.arguments">
+          <elementProp name="PROTO" elementType="Argument">
+            <stringProp name="Argument.name">PROTO</stringProp>
+            <stringProp name="Argument.value">http</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="HOST" elementType="Argument">
+            <stringProp name="Argument.name">HOST</stringProp>
+            <stringProp name="Argument.value">127.0.0.1</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="ADMIN_PORT" elementType="Argument">
+            <stringProp name="Argument.name">ADMIN_PORT</stringProp>
+            <stringProp name="Argument.value">8002</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="ENGINE_PORT" elementType="Argument">
+            <stringProp name="Argument.name">ENGINE_PORT</stringProp>
+            <stringProp name="Argument.value">8004</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="TG_THREADS" elementType="Argument">
+            <stringProp name="Argument.name">TG_THREADS</stringProp>
+            <stringProp name="Argument.value">${__P(TG_THREADS,1)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="TG_RAMP_TIME" elementType="Argument">
+            <stringProp name="Argument.name">TG_RAMP_TIME</stringProp>
+            <stringProp name="Argument.value">${__P(TG_RAMP_TIME,1)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+          <elementProp name="TG_LOOPS" elementType="Argument">
+            <stringProp name="Argument.name">TG_LOOPS</stringProp>
+            <stringProp name="Argument.value">${__P(TG_LOOPS,1)}</stringProp>
+            <stringProp name="Argument.metadata">=</stringProp>
+          </elementProp>
+        </collectionProp>
+      </elementProp>
+      <stringProp name="TestPlan.user_define_classpath"></stringProp>
+    </TestPlan>
+    <hashTree>
+      <CSVDataSet guiclass="TestBeanGUI" testclass="CSVDataSet" testname="Scenario3 CSV" enabled="true">
+        <stringProp name="delimiter">,</stringProp>
+        <stringProp name="fileEncoding">UTF-8</stringProp>
+        <stringProp name="filename">${__P(SCENARIO3_CSV,users_scenario3_registered_test.csv)}</stringProp>
+        <boolProp name="ignoreFirstLine">true</boolProp>
+        <boolProp name="quotedData">false</boolProp>
+        <boolProp name="recycle">false</boolProp>
+        <stringProp name="shareMode">group</stringProp>
+        <boolProp name="stopThread">true</boolProp>
+        <stringProp name="variableNames">phone,userId,username,visitorId,skuId</stringProp>
+      </CSVDataSet>
+      <hashTree/>
+      <ThreadGroup guiclass="ThreadGroupGui" testclass="ThreadGroup" testname="Minimal Fixed Order Flow" enabled="true">
+        <stringProp name="ThreadGroup.on_sample_error">continue</stringProp>
+        <elementProp name="ThreadGroup.main_controller" elementType="LoopController" guiclass="LoopControlPanel" testclass="LoopController" testname="Loop Controller" enabled="true">
+          <boolProp name="LoopController.continue_forever">false</boolProp>
+          <stringProp name="LoopController.loops">${TG_LOOPS}</stringProp>
+        </elementProp>
+        <stringProp name="ThreadGroup.num_threads">${TG_THREADS}</stringProp>
+        <stringProp name="ThreadGroup.ramp_time">${TG_RAMP_TIME}</stringProp>
+        <boolProp name="ThreadGroup.scheduler">false</boolProp>
+        <stringProp name="ThreadGroup.duration"></stringProp>
+        <stringProp name="ThreadGroup.delay"></stringProp>
+        <boolProp name="ThreadGroup.same_user_on_next_iteration">true</boolProp>
+      </ThreadGroup>
+      <hashTree>
+        <HeaderManager guiclass="HeaderPanel" testclass="HeaderManager" testname="HTTP Headers" enabled="true">
+          <collectionProp name="HeaderManager.headers">
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">Content-Type</stringProp>
+              <stringProp name="Header.value">application/json;charset=UTF-8</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">userId</stringProp>
+              <stringProp name="Header.value">${userId}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">username</stringProp>
+              <stringProp name="Header.value">${username}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">phone</stringProp>
+              <stringProp name="Header.value">${phone}</stringProp>
+            </elementProp>
+            <elementProp name="" elementType="Header">
+              <stringProp name="Header.name">userType</stringProp>
+              <stringProp name="Header.value">${__P(USER_TYPE,1)}</stringProp>
+            </elementProp>
+          </collectionProp>
+        </HeaderManager>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP - Visitor List" enabled="true">
+          <elementProp name="HTTParguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments"/>
+          </elementProp>
+          <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
+          <stringProp name="HTTPSampler.port">${ADMIN_PORT}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${PROTO}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">/api/live-start/admin/v1/visitor/list</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+          <stringProp name="HTTPSampler.response_timeout"></stringProp>
+        </HTTPSamplerProxy>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP - Generate Path Token" enabled="true">
+          <elementProp name="HTTParguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="skuId" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">${skuId}</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+                <boolProp name="HTTPArgument.use_equals">true</boolProp>
+                <stringProp name="Argument.name">skuId</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
+          <stringProp name="HTTPSampler.port">${ENGINE_PORT}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${PROTO}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">/api/engine/order/token?skuId=${skuId}</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+          <stringProp name="HTTPSampler.response_timeout"></stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="Assert - PathToken Code OK" enabled="true">
+            <stringProp name="JSON_PATH">$.code</stringProp>
+            <stringProp name="EXPECTED_VALUE">0</stringProp>
+            <boolProp name="JSONVALIDATION">true</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">true</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="Assert - PathToken Not Empty" enabled="true">
+            <stringProp name="JSON_PATH">$.data</stringProp>
+            <stringProp name="EXPECTED_VALUE">.+</stringProp>
+            <boolProp name="JSONVALIDATION">true</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">true</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+          <JSONPostProcessor guiclass="JSONPostProcessorGui" testclass="JSONPostProcessor" testname="JSON Extractor - pathToken" enabled="true">
+            <stringProp name="JSONPostProcessor.referenceNames">pathToken</stringProp>
+            <stringProp name="JSONPostProcessor.jsonPathExprs">$.data</stringProp>
+            <stringProp name="JSONPostProcessor.match_numbers">1</stringProp>
+            <stringProp name="JSONPostProcessor.defaultValues">invalid_token</stringProp>
+          </JSONPostProcessor>
+          <hashTree/>
+        </hashTree>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Create Order" enabled="true">
+          <stringProp name="cacheKey">minimal-fixed-create-order-http</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script">import java.net.HttpURLConnection
+import java.net.URL
+import java.nio.charset.StandardCharsets
+
+def url = new URL("${vars.get('PROTO')}://${vars.get('HOST')}:${vars.get('ENGINE_PORT')}/api/engine/order/create/${vars.get('pathToken')}")
+def conn = (HttpURLConnection) url.openConnection()
+conn.setRequestMethod("POST")
+conn.setDoOutput(true)
+conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8")
+conn.setRequestProperty("userId", vars.get("userId"))
+conn.setRequestProperty("username", vars.get("username"))
+conn.setRequestProperty("phone", vars.get("phone"))
+conn.setRequestProperty("userType", props.get("USER_TYPE") ?: "1")
+
+def requestBody = "{\"skuId\":${vars.get('skuId')},\"count\":1,\"visitorIds\":[${vars.get('visitorId')}]}"
+def payload = requestBody.getBytes(StandardCharsets.UTF_8)
+conn.setFixedLengthStreamingMode(payload.length)
+prev.setSamplerData("POST " + url.toString() + "\n" + requestBody)
+conn.outputStream.withCloseable { it.write(payload) }
+
+def status = conn.responseCode
+def stream = status &gt;= 400 ? conn.errorStream : conn.inputStream
+def responseText = stream != null ? stream.getText("UTF-8") : ""
+
+prev.setSampleLabel("JSR223 - Create Order")
+prev.setSuccessful(status == 200 &amp;&amp; responseText.contains('"code":"0"'))
+prev.setResponseCode(String.valueOf(status))
+prev.setResponseMessage(prev.isSuccessful() ? (conn.responseMessage ?: "") : ("create order failed: " + responseText))
+prev.setResponseData(responseText, "UTF-8")
+prev.setDataType(org.apache.jmeter.samplers.SampleResult.TEXT)
+
+def matcher = (responseText =~ /"data":"([^"]+)"/)
+if (matcher.find()) {
+    vars.put("orderNo", matcher.group(1))
+} else {
+    vars.put("orderNo", "invalid_order")
+}
+
+conn.disconnect()</stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Wait Order Detail" enabled="true">
+          <stringProp name="cacheKey">minimal-fixed-wait-order-detail</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script"><![CDATA[import groovy.json.JsonSlurper
+import java.net.HttpURLConnection
+import java.net.URL
+
+def orderNo = vars.get("orderNo")
+def responseText = ""
+def statusCode = 0
+def parsed = null
+def success = false
+def maxAttempts = (props.get("ORDER_DETAIL_RETRY_ATTEMPTS") ?: "20") as int
+def sleepMs = (props.get("ORDER_DETAIL_RETRY_SLEEP_MS") ?: "100") as long
+
+for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+    def url = new URL("${vars.get('PROTO')}://${vars.get('HOST')}:${vars.get('ENGINE_PORT')}/api/engine/order/detail/${orderNo}")
+    def conn = (HttpURLConnection) url.openConnection()
+    conn.setRequestMethod("GET")
+    conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8")
+    conn.setRequestProperty("userId", vars.get("userId"))
+    conn.setRequestProperty("username", vars.get("username"))
+    conn.setRequestProperty("phone", vars.get("phone"))
+    conn.setRequestProperty("userType", props.get("USER_TYPE") ?: "1")
+
+    statusCode = conn.responseCode
+    def stream = statusCode >= 400 ? conn.errorStream : conn.inputStream
+    responseText = stream != null ? stream.getText("UTF-8") : ""
+    conn.disconnect()
+
+    try {
+        parsed = new JsonSlurper().parseText(responseText)
+        if (statusCode == 200 && parsed?.code?.toString() == "0" && parsed?.data?.orderNo?.toString() == orderNo && parsed?.data?.totalAmount != null) {
+            success = true
+            break
+        }
+    } catch (Exception ignored) {
+        parsed = null
+    }
+
+    Thread.sleep(sleepMs)
+}
+
+prev.setSampleLabel("JSR223 - Wait Order Detail")
+prev.setSuccessful(success)
+prev.setResponseCode(String.valueOf(statusCode))
+prev.setResponseMessage(success ? "order detail ready" : ("order detail not ready: " + responseText))
+prev.setResponseData(responseText, "UTF-8")
+prev.setDataType(org.apache.jmeter.samplers.SampleResult.TEXT)
+
+if (success) {
+    vars.put("payAmount", parsed.data.totalAmount.toString())
+    vars.put("orderStatusBeforePay", parsed.data.status?.toString() ?: "")
+} else {
+    vars.put("payAmount", "0")
+}]]></stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Pay Callback" enabled="true">
+          <stringProp name="cacheKey">minimal-fixed-pay-callback</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script"><![CDATA[import java.net.HttpURLConnection
+import java.net.URL
+import java.nio.charset.StandardCharsets
+
+def orderNo = vars.get("orderNo")
+def tradeNo = "JMeter-" + orderNo + "-" + System.nanoTime()
+vars.put("tradeNo", tradeNo)
+
+def url = new URL("${vars.get('PROTO')}://${vars.get('HOST')}:${vars.get('ENGINE_PORT')}/api/engine/order/pay-callback")
+def conn = (HttpURLConnection) url.openConnection()
+conn.setRequestMethod("POST")
+conn.setDoOutput(true)
+conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8")
+conn.setRequestProperty("userId", vars.get("userId"))
+conn.setRequestProperty("username", vars.get("username"))
+conn.setRequestProperty("phone", vars.get("phone"))
+conn.setRequestProperty("userType", props.get("USER_TYPE") ?: "1")
+
+def requestBody = "{\"orderNo\":\"${orderNo}\",\"tradeNo\":\"${tradeNo}\",\"payAmount\":${vars.get('payAmount')}}"
+def payload = requestBody.getBytes(StandardCharsets.UTF_8)
+conn.setFixedLengthStreamingMode(payload.length)
+prev.setSamplerData("POST " + url.toString() + "\n" + requestBody)
+conn.outputStream.withCloseable { it.write(payload) }
+
+def status = conn.responseCode
+def stream = status >= 400 ? conn.errorStream : conn.inputStream
+def responseText = stream != null ? stream.getText("UTF-8") : ""
+
+prev.setSampleLabel("JSR223 - Pay Callback")
+prev.setSuccessful(status == 200 && responseText.contains('"code":"0"'))
+prev.setResponseCode(String.valueOf(status))
+prev.setResponseMessage(prev.isSuccessful() ? "pay callback success" : ("pay callback failed: " + responseText))
+prev.setResponseData(responseText, "UTF-8")
+prev.setDataType(org.apache.jmeter.samplers.SampleResult.TEXT)
+
+conn.disconnect()]]></stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Verify Paid Detail" enabled="true">
+          <stringProp name="cacheKey">minimal-fixed-verify-paid-detail</stringProp>
+          <stringProp name="filename"></stringProp>
+          <stringProp name="parameters"></stringProp>
+          <stringProp name="scriptLanguage">groovy</stringProp>
+          <stringProp name="script"><![CDATA[import groovy.json.JsonSlurper
+import java.net.HttpURLConnection
+import java.net.URL
+
+def orderNo = vars.get("orderNo")
+def responseText = ""
+def statusCode = 0
+def parsed = null
+def success = false
+def maxAttempts = (props.get("VERIFY_PAID_RETRY_ATTEMPTS") ?: "10") as int
+def sleepMs = (props.get("VERIFY_PAID_RETRY_SLEEP_MS") ?: "100") as long
+
+for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+    def url = new URL("${vars.get('PROTO')}://${vars.get('HOST')}:${vars.get('ENGINE_PORT')}/api/engine/order/detail/${orderNo}")
+    def conn = (HttpURLConnection) url.openConnection()
+    conn.setRequestMethod("GET")
+    conn.setRequestProperty("Content-Type", "application/json;charset=UTF-8")
+    conn.setRequestProperty("userId", vars.get("userId"))
+    conn.setRequestProperty("username", vars.get("username"))
+    conn.setRequestProperty("phone", vars.get("phone"))
+    conn.setRequestProperty("userType", props.get("USER_TYPE") ?: "1")
+
+    statusCode = conn.responseCode
+    def stream = statusCode >= 400 ? conn.errorStream : conn.inputStream
+    responseText = stream != null ? stream.getText("UTF-8") : ""
+    conn.disconnect()
+
+    try {
+        parsed = new JsonSlurper().parseText(responseText)
+        if (statusCode == 200 && parsed?.code?.toString() == "0" && parsed?.data?.status?.toString() == "1") {
+            success = true
+            break
+        }
+    } catch (Exception ignored) {
+        parsed = null
+    }
+
+    Thread.sleep(sleepMs)
+}
+
+prev.setSampleLabel("JSR223 - Verify Paid Detail")
+prev.setSuccessful(success)
+prev.setResponseCode(String.valueOf(statusCode))
+prev.setResponseMessage(success ? "order paid" : ("order not paid: " + responseText))
+prev.setResponseData(responseText, "UTF-8")
+prev.setDataType(org.apache.jmeter.samplers.SampleResult.TEXT)]]></stringProp>
+        </JSR223Sampler>
+        <hashTree/>
+        <HTTPSamplerProxy guiclass="HttpTestSampleGui" testclass="HTTPSamplerProxy" testname="HTTP - Order Page" enabled="true">
+          <elementProp name="HTTParguments" elementType="Arguments" guiclass="HTTPArgumentsPanel" testclass="Arguments" testname="User Defined Variables" enabled="true">
+            <collectionProp name="Arguments.arguments">
+              <elementProp name="current" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">1</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+                <boolProp name="HTTPArgument.use_equals">true</boolProp>
+                <stringProp name="Argument.name">current</stringProp>
+              </elementProp>
+              <elementProp name="size" elementType="HTTPArgument">
+                <boolProp name="HTTPArgument.always_encode">false</boolProp>
+                <stringProp name="Argument.value">10</stringProp>
+                <stringProp name="Argument.metadata">=</stringProp>
+                <boolProp name="HTTPArgument.use_equals">true</boolProp>
+                <stringProp name="Argument.name">size</stringProp>
+              </elementProp>
+            </collectionProp>
+          </elementProp>
+          <stringProp name="HTTPSampler.domain">${HOST}</stringProp>
+          <stringProp name="HTTPSampler.port">${ENGINE_PORT}</stringProp>
+          <stringProp name="HTTPSampler.protocol">${PROTO}</stringProp>
+          <stringProp name="HTTPSampler.contentEncoding">UTF-8</stringProp>
+          <stringProp name="HTTPSampler.path">/api/engine/order/page</stringProp>
+          <stringProp name="HTTPSampler.method">GET</stringProp>
+          <boolProp name="HTTPSampler.follow_redirects">true</boolProp>
+          <boolProp name="HTTPSampler.auto_redirects">false</boolProp>
+          <boolProp name="HTTPSampler.use_keepalive">true</boolProp>
+          <boolProp name="HTTPSampler.DO_MULTIPART_POST">false</boolProp>
+          <stringProp name="HTTPSampler.embedded_url_re"></stringProp>
+          <stringProp name="HTTPSampler.connect_timeout"></stringProp>
+          <stringProp name="HTTPSampler.response_timeout"></stringProp>
+        </HTTPSamplerProxy>
+        <hashTree>
+          <JSONPathAssertion guiclass="JSONPathAssertionGui" testclass="JSONPathAssertion" testname="Assert - Order Page Code OK" enabled="true">
+            <stringProp name="JSON_PATH">$.code</stringProp>
+            <stringProp name="EXPECTED_VALUE">0</stringProp>
+            <boolProp name="JSONVALIDATION">true</boolProp>
+            <boolProp name="EXPECT_NULL">false</boolProp>
+            <boolProp name="INVERT">false</boolProp>
+            <boolProp name="ISREGEX">true</boolProp>
+          </JSONPathAssertion>
+          <hashTree/>
+        </hashTree>
+      </hashTree>
+      <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告" enabled="true">
+        <boolProp name="ResultCollector.error_logging">false</boolProp>
+        <objProp>
+          <name>saveConfig</name>
+          <value class="SampleSaveConfiguration">
+            <time>true</time>
+            <latency>true</latency>
+            <timestamp>true</timestamp>
+            <success>true</success>
+            <label>true</label>
+            <code>true</code>
+            <message>true</message>
+            <threadName>true</threadName>
+            <dataType>true</dataType>
+            <encoding>false</encoding>
+            <assertions>true</assertions>
+            <subresults>true</subresults>
+            <responseData>true</responseData>
+            <samplerData>true</samplerData>
+            <xml>false</xml>
+            <fieldNames>true</fieldNames>
+            <responseHeaders>false</responseHeaders>
+            <requestHeaders>false</requestHeaders>
+            <responseDataOnError>true</responseDataOnError>
+            <saveAssertionResultsFailureMessage>true</saveAssertionResultsFailureMessage>
+            <assertionsResultsToSave>0</assertionsResultsToSave>
+            <bytes>true</bytes>
+            <sentBytes>true</sentBytes>
+            <url>true</url>
+            <threadCounts>true</threadCounts>
+            <idleTime>true</idleTime>
+            <connectTime>true</connectTime>
+          </value>
+        </objProp>
+        <stringProp name="filename"></stringProp>
+      </ResultCollector>
+      <hashTree/>
+    </hashTree>
+  </hashTree>
+</jmeterTestPlan>
