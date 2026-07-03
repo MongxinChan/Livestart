@@ -18,6 +18,7 @@
         @search-select="onNavSearchSelect"
         @search-blur="onNavSearchBlur"
         @theme-change="onThemeChange"
+        @open-profile="openProfile"
         @open-visitor-modal="showVisitorModal = true"
         @open-auth-modal="showAuthModal = true"
         @logout="handleLogout"
@@ -72,6 +73,10 @@ const activeNavKey = computed(() => String(route.meta.navKey || 'square'))
 
 function navigateTo(view: string) {
   onNavChange(view)
+}
+
+function openProfile() {
+  void router.push({ name: 'Profile' })
 }
 
 function onNavSearchSelect(val: string) {

@@ -150,18 +150,43 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 .eq(UserDO::getPhone, requestParam.getPhone());
         UserDO userDO = baseMapper.selectOne(queryWrapper);
         if (userDO == null) {
-            return;
+            throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
 
         // 第一步：更新核心基座数据表 (DO)
-        LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class)
-                .eq(UserDO::getPhone, requestParam.getPhone());
-        baseMapper.update(BeanUtil.toBean(requestParam, UserDO.class), updateWrapper);
+        UserDO userUpdate = new UserDO();
+        userUpdate.setId(userDO.getId());
+        if (StrUtil.isNotBlank(requestParam.getUsername())) {
+            userUpdate.setUsername(requestParam.getUsername().trim());
+        }
+        if (StrUtil.isNotBlank(requestParam.getRealName())) {
+            userUpdate.setRealName(requestParam.getRealName().trim());
+        }
+        if (StrUtil.isNotBlank(requestParam.getPassword())) {
+            userUpdate.setPassword(BCrypt.hashpw(requestParam.getPassword(), BCrypt.gensalt()));
+        }
+        baseMapper.updateById(userUpdate);
 
         // 第二步：将社交相关的例如性别，签名同步录入从表 (ProfileDO)
-        UserProfileDO userProfileDO = BeanUtil.toBean(requestParam, UserProfileDO.class);
-        userProfileDO.setUserId(userDO.getId());
-        userProfileMapper.updateById(userProfileDO);
+        UserProfileDO profileUpdate = new UserProfileDO();
+        profileUpdate.setUserId(userDO.getId());
+        profileUpdate.setMail(trimToNull(requestParam.getMail()));
+        profileUpdate.setAvatar(trimToNull(requestParam.getAvatar()));
+        profileUpdate.setGender(requestParam.getGender());
+        profileUpdate.setBirthday(requestParam.getBirthday());
+        profileUpdate.setSignature(trimToNull(requestParam.getSignature()));
+
+        UserProfileDO existingProfile = userProfileMapper.selectById(userDO.getId());
+        if (existingProfile == null) {
+            userProfileMapper.insert(profileUpdate);
+        } else {
+            userProfileMapper.updateById(profileUpdate);
+        }
+    }
+
+    private String trimToNull(String value) {
+        String trimmed = StrUtil.trim(value);
+        return StrUtil.isBlank(trimmed) ? null : trimmed;
     }
 
     @Override

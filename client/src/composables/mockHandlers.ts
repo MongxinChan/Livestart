@@ -8,6 +8,28 @@ function getMockEventPrices(event: (typeof mockEvents)[number]) {
 export async function handleMockRequest(url: string, options: RequestInit = {}) {
   return new Promise((resolve, reject) => {
     window.setTimeout(() => {
+      if (url.includes('/api/live-start/admin/v1/user/avatar') && options.method === 'POST') {
+        const file = options.body instanceof FormData ? options.body.get('file') : null
+        resolve(file instanceof File ? URL.createObjectURL(file) : '')
+        return
+      }
+
+      if (url.includes('/api/live-start/admin/v1/user') && options.method === 'PUT') {
+        const reqData = JSON.parse((options.body as string) || '{}')
+        apiState.currentUser = {
+          ...(apiState.currentUser || {}),
+          ...reqData,
+          phone: reqData.phone || apiState.phone,
+        }
+        resolve(true)
+        return
+      }
+
+      if (url.includes('/api/live-start/admin/v1/user/') && (!options.method || options.method === 'GET')) {
+        resolve(apiState.currentUser)
+        return
+      }
+
       if (url.includes('/api/live-start/engine/event/') && !url.endsWith('/list')) {
         const eventId = Number(url.substring(url.lastIndexOf('/') + 1))
         const event = mockEvents.find((item) => Number(item.id) === eventId) ?? null
@@ -102,9 +124,9 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
 
         mockOrders.unshift({
           orderNo,
-          title: targetEvent ? targetEvent.title : '热门演出票',
+          eventTitle: targetEvent ? targetEvent.title : '热门演出票',
           skuId: reqData.skuId,
-          skuName: sku ? sku.name : '普通票',
+          skuTitle: sku ? sku.name : '普通票',
           price: sku ? sku.price : 100,
           count: reqData.count,
           totalAmount: (sku ? sku.price : 100) * reqData.count,

@@ -5,6 +5,10 @@ server:
 spring:
     application:
         name: live-start-admin
+    servlet:
+        multipart:
+            max-file-size: 10MB
+            max-request-size: 10MB
     # 采用极简的 JDBC 驱动加载模式，通过独立的 shardingsphere-config.yaml 驱动分库分表
     datasource:
         driver-class-name: org.apache.shardingsphere.driver.ShardingSphereDriver
@@ -29,7 +33,7 @@ mybatis-plus:
 aliyun:
     oss:
         endpoint: ${ALIYUN_OSS_ENDPOINT:oss-cn-beijing.aliyuncs.com}
-        bucket-name: ${ALIYUN_OSS_BUCKET_NAME:seig-web-oss}
+        bucket-name: ${ALIYUN_OSS_BUCKET_NAME:gzus-web-oss}
         # 敏感密钥完全通过环境变量注入，不设置默认值
         access-key-id: ${ALIYUN_OSS_ACCESS_KEY_ID}
         access-key-secret: ${ALIYUN_OSS_ACCESS_KEY_SECRET}

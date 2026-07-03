@@ -11,6 +11,7 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
   }
 
   const fullUrl = url.startsWith('http') ? url : `${API_BASE}${url}`
+  const isFormData = options.body instanceof FormData
   const fallbackUserId =
     apiState.currentUser && 'id' in apiState.currentUser && apiState.currentUser.id != null
       ? String(apiState.currentUser.id)
@@ -23,12 +24,14 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
     ''
 
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
     token: apiState.token,
     userId: resolvedUserId,
     username: resolvedUsername,
     phone: apiState.phone || apiState.currentUser?.phone || '',
     ...((options.headers as Record<string, string>) || {}),
+  }
+  if (!isFormData && !headers['Content-Type']) {
+    headers['Content-Type'] = 'application/json'
   }
 
   const response = await fetch(fullUrl, { ...options, headers })

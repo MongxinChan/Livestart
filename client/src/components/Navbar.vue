@@ -78,13 +78,21 @@
         <template v-if="currentUser">
           <a-dropdown :trigger="['click']">
             <div class="ls-user-trigger">
-              <a-avatar :size="30" style="background: var(--ls-logo-gradient, #1890ff); flex-shrink: 0">
+              <a-avatar
+                :size="30"
+                :src="currentUser.avatar || undefined"
+                style="background: var(--ls-logo-gradient, #1890ff); flex-shrink: 0"
+              >
                 {{ (currentUser.realName || currentUser.username || 'U').substring(0, 1) }}
               </a-avatar>
               <span class="ls-user-name">{{ currentUser.realName || currentUser.username }}</span>
             </div>
             <template #overlay>
               <a-menu>
+                <a-menu-item key="profile" @click="$emit('openProfile')">
+                  <template #icon><UserOutlined /></template>
+                  个人资料
+                </a-menu-item>
                 <a-menu-item key="visitor" @click="$emit('openVisitorModal')">
                   <template #icon><TeamOutlined /></template>
                   常用观演人
@@ -113,6 +121,7 @@ import {
   BgColorsOutlined,
   CheckOutlined,
   TeamOutlined,
+  UserOutlined,
   LogoutOutlined,
   SearchOutlined,
   CloseOutlined,
@@ -140,6 +149,7 @@ const emit = defineEmits<{
   (e: 'searchInput', keyword: string): void
   (e: 'searchSelect', keyword: string): void
   (e: 'themeChange', themeEvent: any): void
+  (e: 'openProfile'): void
   (e: 'openVisitorModal'): void
   (e: 'openAuthModal'): void
   (e: 'logout'): void

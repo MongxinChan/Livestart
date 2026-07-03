@@ -37,9 +37,9 @@ export type OrderStatus = 0 | 1 | 2 | 3
 
 export interface Order {
   orderNo: string
-  title: string
+  eventTitle: string
   skuId: number | string
-  skuName: string
+  skuTitle: string
   price: number
   count: number
   totalAmount: number
@@ -117,4 +117,4 @@ export interface TicketReminder {
   reminderMessage: string
 }
 
-export type ViewId = 'square' | 'cabin' | 'orders' | 'reminders'
+export type ViewId = 'square' | 'cabin' | 'orders' | 'reminders' | 'profile'

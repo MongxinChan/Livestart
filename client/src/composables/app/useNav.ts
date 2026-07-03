@@ -32,6 +32,13 @@ export function useNav() {
         return
       }
       void router.push({ name: 'Reminders' })
+      return
+    }
+    if (view === 'profile') {
+      if (!requireAuth()) {
+        return
+      }
+      void router.push({ name: 'Profile' })
     }
   }
 

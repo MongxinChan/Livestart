@@ -10,6 +10,10 @@ export interface CurrentUser {
   username?: string
   realName?: string
   phone?: string
+  avatar?: string
+  mail?: string
+  signature?: string
+  gender?: number
 }
 
 function isPhoneValid(phone?: string): boolean {
@@ -42,7 +46,7 @@ function loadInitialState() {
   
   if (isMock) {
     const storedUser = readStoredUser()
-    const defaultUser = { username: '陈孟欣(模拟开发)', realName: '陈孟欣', phone: '13012345678' }
+    const defaultUser: CurrentUser = { username: '陈孟欣(模拟开发)', realName: '陈孟欣', phone: '13012345678' }
     return {
       isMock: true,
       gatewayUrl: 'http://localhost:8888',

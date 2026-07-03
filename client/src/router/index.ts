@@ -46,6 +46,12 @@ const router = createRouter({
           component: () => import('@/views/reminders/Index.vue'),
           meta: { title: '我的提醒', navKey: 'reminders', requiresAuth: true },
         },
+        {
+          path: 'profile',
+          name: 'Profile',
+          component: () => import('@/views/profile/Index.vue'),
+          meta: { title: '个人资料', navKey: 'profile', requiresAuth: true },
+        },
       ],
     },
   ],
