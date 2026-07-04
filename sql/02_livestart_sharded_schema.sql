@@ -185,7 +185,7 @@ CREATE TABLE `t_order_template` (
   `order_no` varchar(64) COLLATE utf8mb4_unicode_ci NOT NULL COMMENT '订单流水号',
   `user_id` bigint NOT NULL COMMENT '下单用户ID(Sharding Key)',
   `total_amount` decimal(10,2) NOT NULL COMMENT '订单实付总额',
-  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态 0:待支付 1:已支付 2:已核销 3:已取消',
+  `status` tinyint(1) NOT NULL DEFAULT '0' COMMENT '状态 0:待支付 1:已支付 2:已取消 3:已退票',
   `pay_time` datetime DEFAULT NULL COMMENT '支付完成时间',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

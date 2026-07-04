@@ -3,7 +3,9 @@ package com.mongxin.livestart.engine.dao.sharding;
 import org.apache.shardingsphere.sharding.api.sharding.standard.PreciseShardingValue;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -36,6 +38,23 @@ class OrderTableHashModShardingAlgorithmTest {
         );
 
         assertEquals("t_order_" + expectedIndex, actual);
+    }
+
+    @Test
+    void shouldCoverAllPhysicalShardsWithDatabaseStrategy() {
+        Set<String> physicalShards = new HashSet<>();
+
+        for (long userId = 1; userId <= 4096; userId++) {
+            int hash = Long.hashCode(userId) & Integer.MAX_VALUE;
+            int databaseIndex = hash % 2;
+            String tableName = algorithm.doSharding(
+                    availableTables,
+                    new PreciseShardingValue<>("t_order", "user_id", null, userId)
+            );
+            physicalShards.add("ds_order_" + databaseIndex + "." + tableName);
+        }
+
+        assertEquals(32, physicalShards.size());
     }
 
     private void assertRoute(long userId) {
