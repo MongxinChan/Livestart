@@ -37,11 +37,33 @@
 
 ## 秒杀 MQ 压测
 
-运行 MQ 秒杀下单链路：
+运行 MQ 秒杀下单链路。脚本默认使用仓库内的 `jmeter\users_bulk_seckill_smoke_5.csv` 做 smoke 压测，产物输出到 `jmeter\results-seckill-mq*.jtl` 和 `jmeter\html_report_seckill_mq\index.html`：
 
 ```powershell
 .\tools\run_jmeter_seckill_mq.ps1
 ```
+
+常用参数：
+
+```powershell
+.\tools\run_jmeter_seckill_mq.ps1 `
+  -UsersCsvPath .\jmeter\users_seckill_fresh_5000.csv `
+  -TgThreads 100 `
+  -TgRampTime 1 `
+  -TgLoops 400 `
+  -TargetHost 127.0.0.1 `
+  -EnginePort 8004
+```
+
+脚本会依次查找 `-JMeterBin`、`JMETER_HOME\bin\jmeter.bat`、PATH 中的 `jmeter(.bat)` 和常见本机安装路径；如果 JMeter 或 Java 不在环境变量里，可以显式指定：
+
+```powershell
+.\tools\run_jmeter_seckill_mq.ps1 `
+  -JMeterBin "D:\03_Software\Apache\jmeter-5.6.3\bin\jmeter.bat" `
+  -JdkHome "C:\Program Files\Java\jdk-17"
+```
+
+脚本会预检 JMX、CSV 表头、JMeter、Java，并通过 `-JSECKILL_CSV` 把 CSV 绝对路径传入 JMeter；不再依赖固定复制到 `users_seckill_fresh_5000.csv`。
 
 ## RocketMQ 本地启动
 
