@@ -2,7 +2,7 @@ import http from './http'
 import type { UserItem, VisitorItem, PageResult } from '@/types'
 
 export interface CurrentUserResp {
-  id: number
+  id: string
   username: string
   realName?: string
   phone?: string
@@ -11,13 +11,28 @@ export interface CurrentUserResp {
 }
 
 export const userApi = {
-  page: (params?: { current?: number; size?: number }) =>
+  page: (params?: {
+    current?: number
+    size?: number
+    sortField?: string
+    sortOrder?: string | null
+    userType?: number | undefined
+    phone?: string
+  }) =>
     http.get<any, PageResult<UserItem>>('/api/live-start/admin/v1/user/page', { params }),
 
-  visitors: (userId: number) =>
+  visitors: (userId: string) =>
     http.get<any, VisitorItem[]>(`/api/live-start/admin/v1/visitor/list/${userId}`),
 
-  /** 获取当前登录用户完整画像（含 userType，用于角色守卫） */
   me: () =>
     http.get<any, CurrentUserResp>('/api/live-start/admin/v1/user/me'),
+
+  updateUserType: (userId: string, userType: number) =>
+    http.put<any, void>('/api/live-start/admin/v1/user/type', null, { params: { userId, userType } }),
+
+  updateStatus: (userId: string, status: number) =>
+    http.put<any, void>('/api/live-start/admin/v1/user/status', null, { params: { userId, status } }),
+
+  bindVenueAdmin: (data: { userId: string; venueId: number }) =>
+    http.put<any, void>('/api/live-start/admin/v1/user/venue-admin', data),
 }

@@ -1,6 +1,7 @@
 <template>
   <a-layout style="min-height: 100vh">
     <a-layout-sider
+      v-if="!navPulledIn"
       v-model:collapsed="collapsed"
       collapsible
       :trigger="null"
@@ -47,8 +48,13 @@
         <div class="admin-header-left">
           <component
             :is="collapsed ? MenuUnfoldOutlined : MenuFoldOutlined"
-            style="font-size: 18px; cursor: pointer"
+            class="admin-header-icon"
             @click="collapsed = !collapsed"
+          />
+          <DoubleLeftOutlined
+            class="admin-header-icon"
+            title="收起侧边导航"
+            @click="pullNavIn"
           />
 
           <a-breadcrumb>
@@ -125,7 +131,7 @@
           <a-dropdown>
             <a-space style="cursor: pointer">
               <a-avatar :size="28" style="background: #1677ff">{{ adminRealName.charAt(0) }}</a-avatar>
-              <span style="font-weight: 500">{{ adminRealName }}</span>
+              <span style="font-weight: 500 ; color: #1677ff">{{ adminRealName }}</span>
               <DownOutlined />
             </a-space>
 
@@ -154,6 +160,16 @@
         </div>
       </a-layout-content>
     </a-layout>
+
+    <button
+      v-if="navPulledIn"
+      type="button"
+      class="sidebar-restore-trigger"
+      title="展开侧边导航"
+      @click="restoreNav"
+    >
+      <DoubleRightOutlined />
+    </button>
   </a-layout>
 </template>
 
@@ -166,6 +182,8 @@ import {
   AppstoreOutlined,
   BellOutlined,
   DashboardOutlined,
+  DoubleLeftOutlined,
+  DoubleRightOutlined,
   DownOutlined,
   FundOutlined,
   MenuFoldOutlined,
@@ -181,6 +199,7 @@ const router = useRouter()
 const route = useRoute()
 
 const collapsed = ref(false)
+const navPulledIn = ref(false)
 const selectedKeys = ref<string[]>([route.path])
 const adminRealName = ref('系统管理员')
 const notificationOpen = ref(false)
@@ -240,6 +259,14 @@ function handleMenuClick({ key }: { key: string }) {
 
 function onMenuClick({ key }: { key: string }) {
   router.push(key)
+}
+
+function pullNavIn() {
+  navPulledIn.value = true
+}
+
+function restoreNav() {
+  navPulledIn.value = false
 }
 
 function handleNotificationOpenChange(open: boolean) {
@@ -455,6 +482,18 @@ function tagColorOf(type: SettlementNotificationItem['type']) {
   gap: 16px;
 }
 
+.admin-header-icon {
+  color: #262626;
+  font-size: 18px;
+  cursor: pointer;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.admin-header-icon:hover {
+  color: #1677ff;
+  transform: translateY(-1px);
+}
+
 .admin-header-right {
   display: flex;
   align-items: center;
@@ -474,5 +513,32 @@ function tagColorOf(type: SettlementNotificationItem['type']) {
   text-align: center;
   background: #fff;
   border-top: 1px solid #f0f0f0;
+}
+
+.sidebar-restore-trigger {
+  position: fixed;
+  top: 50%;
+  left: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 58px;
+  border: 1px solid #d9d9d9;
+  border-left: 0;
+  border-radius: 0 8px 8px 0;
+  background: #ffffff;
+  color: #1677ff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.14);
+  cursor: pointer;
+  transform: translateY(-50%);
+  transition: width 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.sidebar-restore-trigger:hover {
+  width: 36px;
+  background: #e6f4ff;
+  box-shadow: 0 10px 28px rgba(22, 119, 255, 0.22);
 }
 </style>

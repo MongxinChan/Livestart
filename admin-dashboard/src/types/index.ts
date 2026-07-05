@@ -40,6 +40,7 @@ export interface VenueItem {
   city: string
   address: string
   capacity: number
+  ownerUserId?: string
 }
 
 export interface VenueSaveReq {
@@ -47,6 +48,7 @@ export interface VenueSaveReq {
   city: string
   address: string
   capacity: number
+  ownerUserId?: string | null
 }
 
 export interface TicketSkuItem {
@@ -95,21 +97,25 @@ export interface PerformerSaveReq {
 }
 
 export interface UserItem {
-  id: number
+  id: string
   username: string
   realName: string
   phone: string
   mail: string
+  isVerified?: number
+  userType?: number
+  status?: number
   createTime: string
 }
 
 export interface VisitorItem {
-  id: number
-  userId: number
+  id: string
+  userId: string
   realName: string
-  idType: number
-  idCard: string
-  phone: string
+  cardType?: number
+  cardTypeDesc?: string
+  cardNo: string
+  mobile: string
 }
 
 export interface OrderItem {
@@ -119,8 +125,10 @@ export interface OrderItem {
   username: string
   eventId: number
   eventTitle: string
+  venueId?: number
+  venueName?: string
   skuId: number
-  skuName: string
+  skuTitle: string
   ticketCount: number
   totalAmount: number
   status: number

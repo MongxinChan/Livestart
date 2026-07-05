@@ -4,8 +4,9 @@ import dayjs from 'dayjs'
 import { eventApi } from '@/api/event'
 import { performerApi } from '@/api/performer'
 import { styleApi } from '@/api/style'
+import { venueApi } from '@/api/venue'
 import { eventConfigApi, type EventConfigItem } from '@/api/eventConfig'
-import type { EventItem, SaleStageItem } from '@/types'
+import type { EventItem, SaleStageItem, VenueItem } from '@/types'
 
 export const eventStatusLabels: Record<number, string> = {
   0: '已下架',
@@ -46,12 +47,46 @@ function normalizeSaleStages(stages?: SaleStageItem[], fallbackTicketStage?: num
   return Array.from({ length: ticketStage }, (_, index) => createDefaultSaleStage(index + 1))
 }
 
+function getNow() {
+  return dayjs()
+}
+
+function isBeforeNow(value?: string) {
+  return !!value && dayjs(value).isBefore(getNow())
+}
+
+function disabledPastDate(current: dayjs.Dayjs) {
+  return current && current.endOf('day').isBefore(getNow())
+}
+
+function disabledPastTime(current: dayjs.Dayjs | null) {
+  const selected = current || getNow()
+  const now = getNow()
+
+  if (!selected.isSame(now, 'day')) {
+    return {}
+  }
+
+  return {
+    disabledHours: () => Array.from({ length: now.hour() }, (_, index) => index),
+    disabledMinutes: (selectedHour: number) =>
+      selectedHour === now.hour()
+        ? Array.from({ length: now.minute() }, (_, index) => index)
+        : [],
+    disabledSeconds: (selectedHour: number, selectedMinute: number) =>
+      selectedHour === now.hour() && selectedMinute === now.minute()
+        ? Array.from({ length: now.second() }, (_, index) => index)
+        : [],
+  }
+}
+
 export function useEventList() {
   const loading = ref(false)
   const list = ref<EventItem[]>([])
   const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
   const performerOptions = ref<any[]>([])
   const styleOptions = ref<any[]>([])
+  const venueOptions = ref<{ label: string; value: number }[]>([])
 
   async function fetchList() {
     loading.value = true
@@ -174,6 +209,12 @@ export function useEventList() {
       return false
     }
 
+    const hasPastTime = formData.saleStages.some((item) => isBeforeNow(item.saleStartTime))
+    if (hasPastTime) {
+      message.warning('开售时间不得早于当前时间')
+      return false
+    }
+
     const orderedTimes = formData.saleStages.map((item) => dayjs(item.saleStartTime).valueOf())
     for (let i = 1; i < orderedTimes.length; i += 1) {
       if (orderedTimes[i] < orderedTimes[i - 1]) {
@@ -181,12 +222,36 @@ export function useEventList() {
         return false
       }
     }
+    const eventTime = dayjs(formData.startTime).valueOf()
+    const hasStageAfterEvent = orderedTimes.some((time) => time > eventTime)
+    if (hasStageAfterEvent) {
+      message.warning('开售时间不得晚于演出时间')
+      return false
+    }
     return true
+  }
+
+  async function fetchVenueOptions() {
+    try {
+      const res = await venueApi.page({ current: 1, size: 500 })
+      const records = res?.records || []
+      venueOptions.value = records.map((venue: VenueItem) => ({
+        label: `${venue.name} · ${venue.city || '未知城市'} · ID:${venue.id}`,
+        value: venue.id,
+      }))
+    } catch {
+      venueOptions.value = []
+      message.warning('场馆列表加载失败，请稍后重试')
+    }
   }
 
   async function onSubmit() {
     if (!formData.title || !formData.startTime || !formData.venueId) {
       message.warning('请填写必填项')
+      return
+    }
+    if (isBeforeNow(formData.startTime)) {
+      message.warning('演出时间不得早于当前时间')
       return
     }
     if (!validateSaleStages()) {
@@ -332,6 +397,7 @@ export function useEventList() {
     void fetchList()
     void fetchPerformerOptions()
     void fetchStyleOptions()
+    void fetchVenueOptions()
   })
 
   return {
@@ -340,11 +406,14 @@ export function useEventList() {
     pagination,
     performerOptions,
     styleOptions,
+    venueOptions,
     formVisible,
     submitting,
     editingId,
     formData,
     stageCount,
+    disabledPastDate,
+    disabledPastTime,
     addSaleStage,
     removeSaleStage,
     configVisible,

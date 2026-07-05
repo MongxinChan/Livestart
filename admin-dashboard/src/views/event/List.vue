@@ -97,7 +97,7 @@
           </a-radio-group>
         </a-form-item>
         <a-form-item label="关联场馆" required>
-          <a-input-number v-model:value="formData.venueId" :min="1" placeholder="场馆 ID" style="width: 100%" />
+          <a-select v-model:value="formData.venueId" placeholder="选择场馆" show-search option-filter-prop="label" :options="venueOptions" />
         </a-form-item>
         <a-form-item label="出演艺人">
           <a-select v-model:value="formData.performerId" placeholder="选择歌手/艺人（可选）" allow-clear>
@@ -125,6 +125,8 @@
             format="YYYY-MM-DD HH:mm:ss"
             style="width: 100%"
             value-format="YYYY-MM-DD HH:mm:ss"
+            :disabled-date="disabledPastDate"
+            :disabled-time="disabledPastTime"
           />
         </a-form-item>
         <a-form-item label="海报图片">
@@ -164,6 +166,8 @@
                       format="YYYY-MM-DD HH:mm:ss"
                       value-format="YYYY-MM-DD HH:mm:ss"
                       style="width: 100%"
+                      :disabled-date="disabledPastDate"
+                      :disabled-time="disabledPastTime"
                     />
                   </a-form-item>
                 </a-col>
@@ -260,11 +264,14 @@ const {
   pagination,
   performerOptions,
   styleOptions,
+  venueOptions,
   formVisible,
   submitting,
   editingId,
   formData,
   stageCount,
+  disabledPastDate,
+  disabledPastTime,
   addSaleStage,
   removeSaleStage,
   configVisible,

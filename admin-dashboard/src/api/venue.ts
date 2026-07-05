@@ -13,4 +13,7 @@ export const venueApi = {
 
   delete: (id: number) =>
     http.delete<any, void>(`/api/live-start/merchant-admin/venue/delete/${id}`),
+
+  get: (id: number) =>
+    http.get<any, VenueItem>(`/api/live-start/merchant-admin/venue/${id}`),
 }

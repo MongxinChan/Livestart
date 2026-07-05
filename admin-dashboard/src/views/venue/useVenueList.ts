@@ -8,7 +8,14 @@ import { venueTableColumns } from './columns'
 export function useVenueList() {
   const loading = ref(false)
   const list = ref<VenueItem[]>([])
-  const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
+  const pagination = reactive({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+    showSizeChanger: true,
+    pageSizeOptions: ['10', '20', '50', '100'],
+    showTotal: (total: number) => `共 ${total} 条`,
+  })
 
   async function fetchList() {
     loading.value = true
@@ -23,6 +30,7 @@ export function useVenueList() {
 
   function onTableChange(pag: any) {
     pagination.current = pag.current
+    pagination.pageSize = pag.pageSize
     void fetchList()
   }
 
