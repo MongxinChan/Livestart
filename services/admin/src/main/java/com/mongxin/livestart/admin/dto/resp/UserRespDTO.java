@@ -87,4 +87,8 @@ public class UserRespDTO {
      * 生日
      */
     private Date birthday;
+
+    private Date createTime;
+
+    private Date updateTime;
 }

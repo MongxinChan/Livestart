@@ -5,6 +5,7 @@ import com.mongxin.livestart.admin.common.convention.result.Results;
 import com.mongxin.livestart.admin.dto.req.UserLoginReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserRegisterReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
+import com.mongxin.livestart.admin.dto.req.UserVenueAdminBindReqDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
 import com.mongxin.livestart.admin.service.UserService;
@@ -135,8 +136,12 @@ public class UserController {
     @GetMapping("/api/live-start/admin/v1/user/page")
     public Result<IPage<UserRespDTO>> pageUser(
             @RequestParam(value = "current", defaultValue = "1") int current,
-            @RequestParam(value = "size", defaultValue = "10") int size) {
-        return Results.success(userService.pageUser(current, size));
+            @RequestParam(value = "size", defaultValue = "10") int size,
+            @RequestParam(value = "sortField", required = false) String sortField,
+            @RequestParam(value = "sortOrder", required = false) String sortOrder,
+            @RequestParam(value = "userType", required = false) Integer userType,
+            @RequestParam(value = "phone", required = false) String phone) {
+        return Results.success(userService.pageUser(current, size, sortField, sortOrder, userType, phone));
     }
 
     /**
@@ -164,9 +169,31 @@ public class UserController {
      */
     @PutMapping("/api/live-start/admin/v1/user/promote-admin")
     public Result<Void> promoteToAdmin(
-            @RequestParam("phone") String phone,
+            @RequestParam("userId") Long userId,
             @RequestParam("userType") Integer userType) {
-        userService.updateUserType(phone, userType);
+        userService.updateUserType(userId, userType);
+        return Results.success();
+    }
+
+    @PutMapping("/api/live-start/admin/v1/user/type")
+    public Result<Void> updateUserType(
+            @RequestParam("userId") Long userId,
+            @RequestParam("userType") Integer userType) {
+        userService.updateUserType(userId, userType);
+        return Results.success();
+    }
+
+    @PutMapping("/api/live-start/admin/v1/user/status")
+    public Result<Void> updateUserStatus(
+            @RequestParam("userId") Long userId,
+            @RequestParam("status") Integer status) {
+        userService.updateUserStatus(userId, status);
+        return Results.success();
+    }
+
+    @PutMapping("/api/live-start/admin/v1/user/venue-admin")
+    public Result<Void> bindVenueAdmin(@RequestBody @Validated UserVenueAdminBindReqDTO requestParam) {
+        userService.bindVenueAdmin(requestParam.getUserId(), requestParam.getVenueId());
         return Results.success();
     }
 

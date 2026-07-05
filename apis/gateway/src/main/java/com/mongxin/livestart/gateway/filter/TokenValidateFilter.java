@@ -11,6 +11,7 @@ import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -37,7 +38,6 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
             "/api/live-start/admin/v1/has-phone/**",
             "/api/live-start/admin/v1/actual/**",
             "/api/live-start/admin/v1/user/check-login",
-            "/api/live-start/admin/v1/user/promote-admin",
             "/api/live-start/engine/order/pay/alipay/notify",
             "/api/engine/order/pay/alipay/notify",
             "/api/live-start/engine/event/**",
@@ -45,14 +45,14 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
     );
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-    private static final List<String> TRUSTED_HEADERS = List.of("userId", "username", "realName", "userType");
+    private static final List<String> TRUSTED_HEADERS = List.of("userId", "username", "phone", "realName", "userType");
 
     private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String requestPath = exchange.getRequest().getPath().value();
-        if (isSkipPath(requestPath)) {
+        if (isSkipPath(exchange)) {
             log.debug("[Gateway-Auth] Skip auth for path={}", requestPath);
             return chain.filter(stripTrustedHeaders(exchange));
         }
@@ -102,8 +102,16 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
         return 0;
     }
 
-    private boolean isSkipPath(String requestPath) {
+    private boolean isSkipPath(ServerWebExchange exchange) {
+        String requestPath = exchange.getRequest().getPath().value();
+        HttpMethod method = exchange.getRequest().getMethod();
+        if (HttpMethod.POST.equals(method) && "/api/live-start/admin/v1/user".equals(requestPath)) {
+            return true;
+        }
         for (String skipPath : SKIP_PATHS) {
+            if ("/api/live-start/admin/v1/user".equals(skipPath)) {
+                continue;
+            }
             if (PATH_MATCHER.match(skipPath, requestPath)) {
                 return true;
             }

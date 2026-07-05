@@ -90,7 +90,7 @@ public interface UserService extends IService<UserDO> {
      * @param size 每页大小
      * @return 分页结果
      */
-    IPage<UserRespDTO> pageUser(int current, int size);
+    IPage<UserRespDTO> pageUser(int current, int size, String sortField, String sortOrder, Integer userType, String phone);
 
     /**
      * 发送登录验证码
@@ -114,7 +114,11 @@ public interface UserService extends IService<UserDO> {
      * @param phone 手机号
      * @param userType 用户类型（1=乐迷 2=艺人 3=场地管理员 4=超管）
      */
-    void updateUserType(String phone, Integer userType);
+    void updateUserType(Long userId, Integer userType);
+
+    void updateUserStatus(Long userId, Integer status);
+
+    void bindVenueAdmin(Long userId, Long venueId);
 
     List<UserRespDTO> listSimpleUsersByIds(List<Long> userIds);
 }

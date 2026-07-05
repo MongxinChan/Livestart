@@ -5,13 +5,22 @@ import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
-
+import com.alibaba.fastjson2.JSON;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.mongxin.livestart.admin.common.biz.user.UserContext;
 import com.mongxin.livestart.admin.common.convention.exception.ClientException;
 import com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum;
 import com.mongxin.livestart.admin.dao.entity.UserDO;
 import com.mongxin.livestart.admin.dao.entity.UserProfileDO;
+import com.mongxin.livestart.admin.dao.entity.VenueDO;
 import com.mongxin.livestart.admin.dao.mapper.UserMapper;
 import com.mongxin.livestart.admin.dao.mapper.UserProfileMapper;
+import com.mongxin.livestart.admin.dao.mapper.VenueMapper;
 import com.mongxin.livestart.admin.dto.req.UserLoginReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserRegisterReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
@@ -20,13 +29,6 @@ import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
 import com.mongxin.livestart.admin.service.UserService;
 import com.mongxin.livestart.admin.toolkit.MinioUtil;
 import com.mongxin.livestart.admin.toolkit.OssUtil;
-import com.alibaba.fastjson2.JSON;
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
-import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
-import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
@@ -40,7 +42,6 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
-
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -48,11 +49,10 @@ import java.util.concurrent.TimeUnit;
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.USER_LOGIN_PHONE_INDEX_KEY;
-import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.*;
+import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.PHONE_EXIST;
+import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.USER_EXIST;
+import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.USER_SAVE_ERROR;
 
-/**
- * 用户接口实现层
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -61,10 +61,17 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
-    // 注入 Profile 以开启双表连通
     private final UserProfileMapper userProfileMapper;
+    private final VenueMapper venueMapper;
     private final OssUtil ossUtil;
     private final MinioUtil minioUtil;
+
+    private static final int USER_TYPE_FAN = 1;
+    private static final int USER_TYPE_ARTIST = 2;
+    private static final int USER_TYPE_VENUE_ADMIN = 3;
+    private static final int USER_TYPE_SUPER_ADMIN = 4;
+    private static final int USER_STATUS_BANNED = 0;
+    private static final int USER_STATUS_NORMAL = 1;
 
     @Override
     public UserRespDTO getUserByPhone(String phone) {
@@ -76,7 +83,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         UserRespDTO result = new UserRespDTO();
         BeanUtils.copyProperties(userDO, result);
-        // 主副表拼装：追加社交资料档案
         UserProfileDO userProfileDO = userProfileMapper.selectById(userDO.getId());
         if (userProfileDO != null) {
             BeanUtils.copyProperties(userProfileDO, result);
@@ -86,7 +92,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public Boolean availablePhone(String phone) {
-        // 如果布隆过滤器存在 phone，说明不可以用
         return !userRegisterCachePenetrationBloomFilter.contains(phone);
     }
 
@@ -97,43 +102,36 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             throw new ClientException(UserErrorCodeEnum.PHONE_EXIST);
         }
 
-        // 可选验证码校验：前端 client 端注册时传 code，后台管理端不传时跳过
         if (StrUtil.isNotBlank(requestParam.getCode())) {
             String cacheCode = stringRedisTemplate.opsForValue().get("login_code:" + requestParam.getPhone());
             if (cacheCode == null || !cacheCode.equals(requestParam.getCode())) {
                 throw new ClientException("验证码错误或已失效");
             }
-            // 校验通过，清理验证码缓存
             stringRedisTemplate.delete("login_code:" + requestParam.getPhone());
         }
 
         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getPhone());
         if (!lock.tryLock()) {
             throw new ClientException(PHONE_EXIST);
-            // 这儿的逻辑是如果获取不到锁就抛用户名存在，有先者A先行，其大概率不会出错，而后者B,C如果刚好别人在获取锁，
-            // 而且还没获取到，就证明比别人慢，避免其在此阻塞，直接抛异常
         }
+
         try {
             UserDO userDO = BeanUtil.toBean(requestParam, UserDO.class);
-
-            // 盲盒逻辑：如果未传网名，系统默认按 Live_随机数 分发
             if (StrUtil.isBlank(userDO.getUsername())) {
                 userDO.setUsername("Live_" + RandomUtil.randomString(4));
             }
 
-            // 改写：生产级密文哈希加盐入库
             userDO.setPassword(BCrypt.hashpw(requestParam.getPassword(), BCrypt.gensalt()));
             int inserted = baseMapper.insert(userDO);
             if (inserted < 1) {
                 throw new ClientException(USER_SAVE_ERROR);
             }
-            // 连坐：顺滑插入初始空社交档案，保障 ID 底座一致！
+
             UserProfileDO userProfileDO = new UserProfileDO();
             userProfileDO.setUserId(userDO.getId());
             userProfileMapper.insert(userProfileDO);
 
             userRegisterCachePenetrationBloomFilter.add(requestParam.getPhone());
-            // 注册即登录：直接为新用户签发 token
             return issueToken(userDO, requestParam.getPhone());
         } catch (DuplicateKeyException ex) {
             throw new ClientException(USER_EXIST);
@@ -145,15 +143,20 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void update(UserUpdateReqDTO requestParam) {
-        // 必须要先获取由于查询传来的 user 的唯一性主键ID
+        String currentPhone = UserContext.getPhone();
+        String targetPhone = StrUtil.blankToDefault(currentPhone, requestParam.getPhone());
+        if (StrUtil.isBlank(targetPhone)) {
+            throw new ClientException("当前用户未登录，请重新登录");
+        }
+
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
-                .eq(UserDO::getPhone, requestParam.getPhone());
+                .eq(UserDO::getPhone, targetPhone)
+                .eq(UserDO::getDelFlag, 0);
         UserDO userDO = baseMapper.selectOne(queryWrapper);
         if (userDO == null) {
             throw new ClientException(UserErrorCodeEnum.USER_NULL);
         }
 
-        // 第一步：更新核心基座数据表 (DO)
         UserDO userUpdate = new UserDO();
         userUpdate.setId(userDO.getId());
         if (StrUtil.isNotBlank(requestParam.getUsername())) {
@@ -167,7 +170,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         baseMapper.updateById(userUpdate);
 
-        // 第二步：将社交相关的例如性别，签名同步录入从表 (ProfileDO)
         UserProfileDO profileUpdate = new UserProfileDO();
         profileUpdate.setUserId(userDO.getId());
         profileUpdate.setMail(trimToNull(requestParam.getMail()));
@@ -195,11 +197,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 .eq(UserDO::getPhone, requestParam.getPhone())
                 .eq(UserDO::getDelFlag, 0);
         UserDO userDO = baseMapper.selectOne(queryWrapper);
-        // 安全拦截：禁止等值明文比对，强硬升级为 CheckPW 解密器校验
-        if (userDO == null || !BCrypt.checkpw(requestParam.getPassword(), userDO.getPassword())) {
-            throw new ClientException("该手机号绑定的用户不存在或密文校验失败！！！！");
+        if (userDO != null && Integer.valueOf(0).equals(userDO.getStatus())) {
+            throw new ClientException("该账户已被封禁，请联系超级管理员");
         }
-        // 复用未过期的旧会话：通过反向索引查到 token 后，确认主存仍存在再续期
+        if (userDO == null || !BCrypt.checkpw(requestParam.getPassword(), userDO.getPassword())) {
+            throw new ClientException("该手机号绑定的用户不存在或密码校验失败");
+        }
+
         String existingToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + requestParam.getPhone());
         if (StrUtil.isNotBlank(existingToken)
                 && Boolean.TRUE.equals(stringRedisTemplate.hasKey(USER_LOGIN_KEY + existingToken))) {
@@ -220,7 +224,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public void logout(String phone, String token) {
-        // 幂等退出：优先清理 token 维度主存，再清理反向索引；token 缺失时回退到反向索引查询
         if (StrUtil.isNotBlank(token)) {
             stringRedisTemplate.delete(USER_LOGIN_KEY + token);
         } else if (StrUtil.isNotBlank(phone)) {
@@ -244,25 +247,42 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public String uploadAvatarByMinio(MultipartFile file) throws Exception {
-        // 修正：将原先误写的 log.finalize 改为标准的日志输出
         log.info("【用户服务】开始通过本地 MinIO 上传用户头像, 文件名: {}", file.getOriginalFilename());
-
-        // 1. 严谨的防御式判空，防止空文件进入业务流
         if (file == null || file.isEmpty()) {
             throw new ClientException("上传的头像文件不能为空");
         }
-
-        // 2. 无需任何包装，直接把原生的 file 对象转发给底层工具类
         return minioUtil.upload(file);
     }
 
     @Override
-    public IPage<UserRespDTO> pageUser(int current, int size) {
+    public IPage<UserRespDTO> pageUser(int current, int size, String sortField, String sortOrder, Integer userType, String phone) {
+        assertSuperAdmin();
         Page<UserDO> page = new Page<>(current, size);
-        Page<UserDO> userPage = baseMapper.selectPage(page, Wrappers.lambdaQuery(UserDO.class).eq(UserDO::getDelFlag, 0));
-        
+        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getDelFlag, 0);
+        if (userType != null) {
+            if (userType < USER_TYPE_FAN || userType > USER_TYPE_SUPER_ADMIN) {
+                throw new ClientException("\u7528\u6237\u7c7b\u578b\u5fc5\u987b\u5728 1-4 \u4e4b\u95f4");
+            }
+            queryWrapper.eq(UserDO::getUserType, userType);
+        }
+        if (StrUtil.isNotBlank(phone)) {
+            String phoneKeyword = phone.trim();
+            if (!phoneKeyword.matches("\\d{3,11}")) {
+                throw new ClientException("\u624b\u673a\u53f7\u641c\u7d22\u4ec5\u652f\u6301\u8f93\u5165 3-11 \u4f4d\u6570\u5b57");
+            }
+            queryWrapper.like(UserDO::getPhone, phoneKeyword);
+        }
+        if ("id".equalsIgnoreCase(sortField)) {
+            boolean asc = "ascend".equalsIgnoreCase(sortOrder) || "asc".equalsIgnoreCase(sortOrder);
+            queryWrapper.orderBy(true, asc, UserDO::getId);
+        } else {
+            queryWrapper.orderByDesc(UserDO::getId);
+        }
+
+        Page<UserDO> userPage = baseMapper.selectPage(page, queryWrapper);
         Page<UserRespDTO> resultPage = new Page<>(current, size, userPage.getTotal());
-        java.util.List<UserRespDTO> records = userPage.getRecords().stream().map(userDO -> {
+        List<UserRespDTO> records = userPage.getRecords().stream().map(userDO -> {
             UserRespDTO resp = new UserRespDTO();
             BeanUtils.copyProperties(userDO, resp);
             UserProfileDO profile = userProfileMapper.selectById(userDO.getId());
@@ -270,7 +290,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 BeanUtils.copyProperties(profile, resp);
             }
             return resp;
-        }).collect(java.util.stream.Collectors.toList());
+        }).toList();
         resultPage.setRecords(records);
         return resultPage;
     }
@@ -295,8 +315,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (cacheCode == null || !cacheCode.equals(code)) {
             throw new ClientException("验证码错误或已失效");
         }
-        
-        // 校验通过，清理验证码缓存
+
         stringRedisTemplate.delete("login_code:" + phone);
 
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
@@ -305,30 +324,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         UserDO userDO = baseMapper.selectOne(queryWrapper);
 
         if (userDO == null) {
-            // 用户不存在，隐式自动注册
             userDO = new UserDO();
             userDO.setPhone(phone);
             userDO.setUsername("Live_" + RandomUtil.randomString(4));
-            // 自动注册的默认加密密码，安全占位
             userDO.setPassword(BCrypt.hashpw("LiveStart123", BCrypt.gensalt()));
             userDO.setIsVerified(0);
             userDO.setStatus(1);
             userDO.setUserType(1);
-            
+
             try {
                 int inserted = baseMapper.insert(userDO);
                 if (inserted < 1) {
                     throw new ClientException("自动注册插入失败");
                 }
-                // 初始化社交档案
                 UserProfileDO userProfileDO = new UserProfileDO();
                 userProfileDO.setUserId(userDO.getId());
                 userProfileMapper.insert(userProfileDO);
-
-                // 同步加入布隆过滤器以保证全局判定正确
                 userRegisterCachePenetrationBloomFilter.add(phone);
             } catch (DuplicateKeyException ex) {
-                // 并发重复注册保护，重新查一次
                 userDO = baseMapper.selectOne(queryWrapper);
                 if (userDO == null) {
                     throw new ClientException("用户注册并发异常，请稍后重试");
@@ -336,21 +349,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             }
         }
 
-        // 签发 Token (复用之前的 Hash Token 设计)
+        if (Integer.valueOf(0).equals(userDO.getStatus())) {
+            throw new ClientException("该账户已被封禁，请联系超级管理员");
+        }
+
         return issueToken(userDO, phone);
     }
 
-    /**
-     * 为已存在的用户签发 token：每次登录生成新 token，覆盖旧会话，确保单设备登录或多设备使用最新会话。
-     */
     private UserLoginRespDTO issueToken(UserDO userDO, String phone) {
-        // 删除旧会话（如果存在），确保每次登录都是全新的 token
         String oldToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + phone);
         if (StrUtil.isNotBlank(oldToken)) {
             stringRedisTemplate.delete(USER_LOGIN_KEY + oldToken);
         }
 
-        // 生成新的 UUID token，主存 token→用户 JSON，反向索引 phone→token
         String uuid = UUID.randomUUID().toString();
         stringRedisTemplate.opsForValue().set(USER_LOGIN_KEY + uuid, JSON.toJSONString(userDO), 30L, TimeUnit.DAYS);
         stringRedisTemplate.opsForValue().set(USER_LOGIN_PHONE_INDEX_KEY + phone, uuid, 30L, TimeUnit.DAYS);
@@ -358,33 +369,165 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     }
 
     @Override
-    public void updateUserType(String phone, Integer userType) {
-        if (StrUtil.isBlank(phone) || userType == null) {
-            throw new ClientException("手机号和用户类型不能为空");
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserType(Long userId, Integer userType) {
+        assertSuperAdmin();
+        if (userId == null || userType == null) {
+            throw new ClientException("\u7528\u6237ID\u548c\u7528\u6237\u7c7b\u578b\u4e0d\u80fd\u4e3a\u7a7a");
         }
-        if (userType < 1 || userType > 4) {
-            throw new ClientException("用户类型必须在 1-4 之间");
+        if (userType != USER_TYPE_FAN && userType != USER_TYPE_ARTIST && userType != USER_TYPE_VENUE_ADMIN) {
+            throw new ClientException("\u7528\u6237\u7c7b\u578b\u53ea\u80fd\u5207\u6362\u4e3a\u666e\u901a\u7528\u6237\u3001\u827a\u4eba\u6216\u573a\u5730\u7ba1\u7406\u5458");
         }
 
-        LambdaUpdateWrapper<UserDO> updateWrapper = Wrappers.lambdaUpdate(UserDO.class)
-                .eq(UserDO::getPhone, phone)
-                .eq(UserDO::getDelFlag, 0);
+        UserDO existingUser = baseMapper.selectOne(Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getId, userId)
+                .eq(UserDO::getDelFlag, 0));
+        if (existingUser == null) {
+            throw new ClientException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u5df2\u5220\u9664");
+        }
+        assertNotSelf(existingUser.getId(), "\u4e0d\u80fd\u4fee\u6539\u81ea\u5df1\u7684\u7528\u6237\u7c7b\u578b");
+        assertTargetNotSuperAdmin(existingUser);
+        if (userType == USER_TYPE_VENUE_ADMIN) {
+            throw new ClientException("\u8bbe\u7f6e\u573a\u5730\u7ba1\u7406\u5458\u5fc5\u987b\u5148\u7ed1\u5b9a\u573a\u9986");
+        }
 
         UserDO userDO = new UserDO();
         userDO.setUserType(userType);
-
-        int updated = baseMapper.update(userDO, updateWrapper);
+        int updated = baseMapper.update(userDO, Wrappers.lambdaUpdate(UserDO.class)
+                .eq(UserDO::getId, userId)
+                .eq(UserDO::getDelFlag, 0));
         if (updated < 1) {
-            throw new ClientException("用户不存在或更新失败");
+            throw new ClientException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u66f4\u65b0\u5931\u8d25");
         }
 
-        // 更新后强制下次重新登录：通过反向索引清除 token 主存与索引本身
+        clearLoginCache(existingUser.getPhone());
+        unbindOwnedVenues(existingUser.getId());
+        log.info("Updated user type and cleared login cache, userId={}, userType={}", userId, userType);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserStatus(Long userId, Integer status) {
+        assertSuperAdmin();
+        if (userId == null || status == null) {
+            throw new ClientException("\u7528\u6237ID\u548c\u8d26\u53f7\u72b6\u6001\u4e0d\u80fd\u4e3a\u7a7a");
+        }
+        if (status != USER_STATUS_BANNED && status != USER_STATUS_NORMAL) {
+            throw new ClientException("\u8d26\u53f7\u72b6\u6001\u5fc5\u987b\u4e3a 0 \u6216 1");
+        }
+
+        UserDO existingUser = baseMapper.selectOne(Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getId, userId)
+                .eq(UserDO::getDelFlag, 0));
+        if (existingUser == null) {
+            throw new ClientException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u5df2\u5220\u9664");
+        }
+        assertNotSelf(existingUser.getId(), "\u4e0d\u80fd\u5c01\u7981\u6216\u89e3\u5c01\u81ea\u5df1");
+        assertTargetNotSuperAdmin(existingUser);
+
+        UserDO userDO = new UserDO();
+        userDO.setStatus(status);
+        int updated = baseMapper.update(userDO, Wrappers.lambdaUpdate(UserDO.class)
+                .eq(UserDO::getId, userId)
+                .eq(UserDO::getDelFlag, 0));
+        if (updated < 1) {
+            throw new ClientException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u66f4\u65b0\u5931\u8d25");
+        }
+
+        clearLoginCache(existingUser.getPhone());
+        log.info("Updated user status and cleared login cache, userId={}, status={}", userId, status);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void bindVenueAdmin(Long userId, Long venueId) {
+        assertSuperAdmin();
+        if (userId == null || venueId == null) {
+            throw new ClientException("\u7528\u6237ID\u548c\u573a\u9986ID\u4e0d\u80fd\u4e3a\u7a7a");
+        }
+
+        UserDO existingUser = baseMapper.selectOne(Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getId, userId)
+                .eq(UserDO::getDelFlag, 0));
+        if (existingUser == null) {
+            throw new ClientException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u5df2\u5220\u9664");
+        }
+        assertNotSelf(existingUser.getId(), "\u4e0d\u80fd\u628a\u81ea\u5df1\u8bbe\u7f6e\u4e3a\u573a\u5730\u7ba1\u7406\u5458");
+        assertTargetNotSuperAdmin(existingUser);
+        if (Integer.valueOf(USER_STATUS_BANNED).equals(existingUser.getStatus())) {
+            throw new ClientException("\u5c01\u7981\u7528\u6237\u4e0d\u80fd\u8bbe\u7f6e\u4e3a\u573a\u5730\u7ba1\u7406\u5458");
+        }
+
+        VenueDO venue = venueMapper.selectById(venueId);
+        if (venue == null) {
+            throw new ClientException("\u573a\u9986\u4e0d\u5b58\u5728");
+        }
+        if (venue.getOwnerUserId() != null && !venue.getOwnerUserId().equals(userId)) {
+            throw new ClientException("\u8be5\u573a\u9986\u5df2\u7ed1\u5b9a\u5176\u4ed6\u573a\u5730\u7ba1\u7406\u5458");
+        }
+
+        UserDO userDO = new UserDO();
+        userDO.setUserType(USER_TYPE_VENUE_ADMIN);
+        int updated = baseMapper.update(userDO, Wrappers.lambdaUpdate(UserDO.class)
+                .eq(UserDO::getId, userId)
+                .eq(UserDO::getDelFlag, 0));
+        if (updated < 1) {
+            throw new ClientException("\u7528\u6237\u4e0d\u5b58\u5728\u6216\u66f4\u65b0\u5931\u8d25");
+        }
+
+        unbindOwnedVenues(userId);
+        venueMapper.update(null, Wrappers.lambdaUpdate(VenueDO.class)
+                .eq(VenueDO::getId, venueId)
+                .set(VenueDO::getOwnerUserId, userId));
+        clearLoginCache(existingUser.getPhone());
+        log.info("Bound venue admin and cleared login cache, userId={}, venueId={}", userId, venueId);
+    }
+
+    private void unbindOwnedVenues(Long userId) {
+        if (userId == null) {
+            return;
+        }
+        venueMapper.update(null, Wrappers.lambdaUpdate(VenueDO.class)
+                .eq(VenueDO::getOwnerUserId, userId)
+                .set(VenueDO::getOwnerUserId, null));
+    }
+
+    private void clearLoginCache(String phone) {
+        if (StrUtil.isBlank(phone)) {
+            return;
+        }
         String oldToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + phone);
         if (StrUtil.isNotBlank(oldToken)) {
             stringRedisTemplate.delete(USER_LOGIN_KEY + oldToken);
         }
         stringRedisTemplate.delete(USER_LOGIN_PHONE_INDEX_KEY + phone);
-        log.info("已将手机号 {} 的用户类型更新为 {}，并清除登录缓存", phone, userType);
+    }
+
+
+    private void assertSuperAdmin() {
+        String currentUserId = UserContext.getUserId();
+        if (StrUtil.isBlank(currentUserId)) {
+            throw new ClientException("\u4ec5\u8d85\u7ea7\u7ba1\u7406\u5458\u53ef\u64cd\u4f5c\u7528\u6237\u7ba1\u7406");
+        }
+        UserDO currentUser = baseMapper.selectOne(Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getId, Long.valueOf(currentUserId))
+                .eq(UserDO::getDelFlag, 0));
+        if (currentUser == null || !Integer.valueOf(USER_TYPE_SUPER_ADMIN).equals(currentUser.getUserType())) {
+            throw new ClientException("\u4ec5\u8d85\u7ea7\u7ba1\u7406\u5458\u53ef\u64cd\u4f5c\u7528\u6237\u7ba1\u7406");
+        }
+    }
+
+    private void assertNotSelf(Long targetUserId, String message) {
+        String currentUserId = UserContext.getUserId();
+        if (targetUserId != null && targetUserId.toString().equals(currentUserId)) {
+            throw new ClientException(message);
+        }
+    }
+
+    private void assertTargetNotSuperAdmin(UserDO existingUser) {
+        if (existingUser != null && Integer.valueOf(USER_TYPE_SUPER_ADMIN).equals(existingUser.getUserType())) {
+            throw new ClientException("\u4e0d\u80fd\u5728\u7528\u6237\u7ba1\u7406\u4e2d\u4fee\u6539\u8d85\u7ea7\u7ba1\u7406\u5458\u8d26\u53f7");
+        }
     }
 
     @Override
