@@ -38,4 +38,9 @@ public class VenueDO {
      * 场馆总容纳人数
      */
     private Integer capacity;
+
+    /**
+     * 归属场地管理员用户 ID，NULL 表示未绑定
+     */
+    private Long ownerUserId;
 }

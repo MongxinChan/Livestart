@@ -39,4 +39,10 @@ public class VenueSaveReqDTO {
      */
     @Schema(description = "场馆总容纳人数", example = "5000")
     private Integer capacity;
+
+    /**
+     * 归属场地管理员用户 ID，NULL 表示未绑定
+     */
+    @Schema(description = "归属场地管理员用户 ID")
+    private Long ownerUserId;
 }

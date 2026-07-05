@@ -24,4 +24,7 @@ public class VenueQueryRespDTO {
 
     @Schema(description = "场馆总容纳人数")
     private Integer capacity;
+
+    @Schema(description = "归属场地管理员用户 ID")
+    private Long ownerUserId;
 }

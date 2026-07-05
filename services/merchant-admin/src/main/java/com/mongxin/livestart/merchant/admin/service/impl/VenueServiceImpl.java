@@ -3,6 +3,7 @@ package com.mongxin.livestart.merchant.admin.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.util.StrUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -15,6 +16,7 @@ import com.mongxin.livestart.merchant.admin.dto.resp.VenuePageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.VenueQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.VenueService;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
  * 场馆服务实现层
@@ -51,7 +53,18 @@ public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implemen
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateVenue(VenueSaveReqDTO requestParam) {
+        if (requestParam.getId() == null) {
+            throw new ServiceException("场馆 ID 不能为空");
+        }
+        if (requestParam.getOwnerUserId() != null) {
+            LambdaUpdateWrapper<VenueDO> clearWrapper = Wrappers.lambdaUpdate(VenueDO.class)
+                    .eq(VenueDO::getOwnerUserId, requestParam.getOwnerUserId())
+                    .ne(VenueDO::getId, requestParam.getId())
+                    .set(VenueDO::getOwnerUserId, null);
+            baseMapper.update(null, clearWrapper);
+        }
         VenueDO venueDO = BeanUtil.toBean(requestParam, VenueDO.class);
         updateById(venueDO);
     }
