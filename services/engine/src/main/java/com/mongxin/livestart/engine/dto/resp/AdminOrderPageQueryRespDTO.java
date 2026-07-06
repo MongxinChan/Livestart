@@ -28,11 +28,17 @@ public class AdminOrderPageQueryRespDTO {
     @Schema(description = "演出名称")
     private String eventTitle;
 
+    @Schema(description = "场馆ID")
+    private Long venueId;
+
+    @Schema(description = "场馆名称")
+    private String venueName;
+
     @Schema(description = "票种ID")
     private Long skuId;
 
     @Schema(description = "票种名称")
-    private String skuName;
+    private String skuTitle;
 
     @Schema(description = "购票数量")
     private Integer ticketCount;

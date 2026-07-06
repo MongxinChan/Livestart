@@ -13,4 +13,5 @@ public class MerchantVenueRespDTO {
     private String city;
     private String address;
     private Integer capacity;
+    private Long ownerUserId;
 }

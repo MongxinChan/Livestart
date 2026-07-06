@@ -25,6 +25,9 @@ public class TicketOrderPageQueryRespDTO {
     @Schema(description = "票种名称")
     private String skuTitle;
 
+    @Schema(description = "票档单价")
+    private BigDecimal price;
+
     @Schema(description = "购买数量")
     private Integer count;
 

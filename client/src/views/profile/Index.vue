@@ -163,6 +163,11 @@ async function handleFileChange(event: Event) {
       method: 'POST',
       body: data,
     })
+    apiState.currentUser = {
+      ...apiState.currentUser,
+      avatar: form.avatar,
+    }
+    persistSession()
     message.success('头像上传成功')
   } catch (err: any) {
     message.error(err.message || '头像上传失败')
@@ -207,7 +212,7 @@ async function saveProfile() {
       }),
     })
 
-    const latest = await request<any>(`/api/live-start/admin/v1/user/${phone}`)
+    const latest = await request<any>('/api/live-start/admin/v1/user/me')
     apiState.currentUser = {
       ...apiState.currentUser,
       ...latest,

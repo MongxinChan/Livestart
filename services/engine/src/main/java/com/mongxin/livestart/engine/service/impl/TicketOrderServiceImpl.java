@@ -43,6 +43,7 @@ import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
 import com.mongxin.livestart.engine.remote.dto.AdminUserSimpleRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
+import com.mongxin.livestart.engine.remote.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
@@ -84,6 +85,8 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private static final String SECRET_SALT = "LiveStart_Engine_PathToken_Salt_Key";
     private static final int USER_TYPE_VENUE_ADMIN = 3;
     private static final int USER_TYPE_SUPER_ADMIN = 4;
+    private static final int EVENT_SCOPE_PAGE_SIZE = 200;
+    private static final int EVENT_SCOPE_MAX_PAGE = 100;
 
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
@@ -414,9 +417,25 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 .eq(requestParam.getStatus() != null, OrderDO::getStatus, requestParam.getStatus())
                 .orderByDesc(OrderDO::getCreateTime);
         IPage<OrderDO> page = orderMapper.selectPage(new Page<>(requestParam.getCurrent(), requestParam.getSize()), queryWrapper);
+        Map<Long, MerchantTicketSkuDetailRespDTO> skuCache = new HashMap<>();
+        Map<Long, MerchantEventRespDTO> eventCache = new HashMap<>();
         return page.convert(order -> {
+            List<OrderItemDO> items = orderItemMapper.selectList(Wrappers.lambdaQuery(OrderItemDO.class)
+                    .eq(OrderItemDO::getOrderNo, order.getOrderNo())
+                    .eq(OrderItemDO::getUserId, order.getUserId()));
+            OrderItemDO firstItem = CollUtil.getFirst(items);
+            Long skuId = firstItem != null ? firstItem.getSkuId() : null;
+            Long eventId = firstItem != null ? firstItem.getEventId() : null;
+            MerchantTicketSkuDetailRespDTO sku = loadTicketSkuDetail(skuId, skuCache);
+            MerchantEventRespDTO event = loadEventDetail(eventId, eventCache);
+
             TicketOrderPageQueryRespDTO dto = new TicketOrderPageQueryRespDTO();
             dto.setOrderNo(order.getOrderNo());
+            dto.setEventId(eventId);
+            dto.setEventTitle(event != null ? event.getTitle() : "");
+            dto.setSkuTitle(sku != null ? sku.getTitle() : "");
+            dto.setPrice(sku != null ? sku.getSellingPrice() : BigDecimal.ZERO);
+            dto.setCount(items.size());
             dto.setTotalAmount(order.getTotalAmount());
             dto.setStatus(order.getStatus());
             dto.setStatusDesc(OrderStatusEnum.fromCode(order.getStatus()).getDesc());
@@ -431,21 +450,102 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         if (userType == null || (userType != USER_TYPE_SUPER_ADMIN && userType != USER_TYPE_VENUE_ADMIN)) {
             throw new ClientException("当前用户无后台订单查看权限");
         }
-        if (userType == USER_TYPE_VENUE_ADMIN) {
-            throw new ClientException("当前版本暂不支持场馆管理员查看订单，请使用超级管理员账号查看");
-        }
 
         long current = normalizeCurrent(requestParam.getCurrent());
         long size = normalizeSize(requestParam.getSize());
         Integer statusCode = requestParam.getStatus() == null ? null : toOrderStatusCode(requestParam.getStatus());
-        LambdaQueryWrapper<OrderDO> queryWrapper = Wrappers.lambdaQuery(OrderDO.class)
-                .eq(statusCode != null, OrderDO::getStatus, statusCode)
-                .orderByDesc(OrderDO::getCreateTime);
-        IPage<OrderDO> orderPage = orderMapper.selectPage(new Page<>(current, size), queryWrapper);
+        List<Long> visibleEventIds = resolveAdminVisibleEventIds(userType, requestParam);
+        if (visibleEventIds != null && CollUtil.isEmpty(visibleEventIds)) {
+            return emptyAdminOrderPage(current, size);
+        }
+
+        IPage<OrderDO> orderPage = orderMapper.pageQueryAdminOrders(new Page<>(current, size), statusCode, visibleEventIds);
         List<AdminOrderPageQueryRespDTO> records = buildAdminOrderRecords(orderPage.getRecords());
         fillUsernames(records);
         Page<AdminOrderPageQueryRespDTO> page = new Page<>(current, size, orderPage.getTotal());
         page.setRecords(records);
+        return page;
+    }
+
+    private List<Long> resolveAdminVisibleEventIds(Integer userType, AdminOrderPageQueryReqDTO requestParam) {
+        Long requestEventId = requestParam.getEventId();
+        Long requestVenueId = requestParam.getVenueId();
+        if (userType == USER_TYPE_SUPER_ADMIN) {
+            return resolveSuperAdminEventFilter(requestEventId, requestVenueId);
+        }
+        return resolveVenueAdminEventFilter(requestEventId, requestVenueId);
+    }
+
+    private List<Long> resolveSuperAdminEventFilter(Long requestEventId, Long requestVenueId) {
+        if (requestEventId == null && requestVenueId == null) {
+            return null;
+        }
+        if (requestEventId != null && requestVenueId == null) {
+            return List.of(requestEventId);
+        }
+        if (requestEventId != null) {
+            MerchantEventRespDTO event = loadEventDetail(requestEventId, new HashMap<>());
+            return event != null && requestVenueId.equals(event.getVenueId()) ? List.of(requestEventId) : List.of();
+        }
+        return listAllMerchantEvents().stream()
+                .filter(event -> requestVenueId.equals(event.getVenueId()))
+                .map(MerchantEventRespDTO::getId)
+                .toList();
+    }
+
+    private List<Long> resolveVenueAdminEventFilter(Long requestEventId, Long requestVenueId) {
+        Long currentUserId = parseCurrentUserId();
+        Map<Long, MerchantVenueRespDTO> venueCache = new HashMap<>();
+        List<Long> manageableEventIds = listAllMerchantEvents().stream()
+                .filter(event -> event != null && event.getId() != null && event.getVenueId() != null)
+                .filter(event -> requestEventId == null || requestEventId.equals(event.getId()))
+                .filter(event -> requestVenueId == null || requestVenueId.equals(event.getVenueId()))
+                .filter(event -> isVenueManagedByCurrentUser(event.getVenueId(), currentUserId, venueCache))
+                .map(MerchantEventRespDTO::getId)
+                .toList();
+        return CollUtil.isEmpty(manageableEventIds) ? List.of() : manageableEventIds;
+    }
+
+    private Long parseCurrentUserId() {
+        String userId = UserContext.getUserId();
+        if (StrUtil.isBlank(userId)) {
+            throw new ClientException("用户未登录");
+        }
+        try {
+            return Long.parseLong(userId);
+        } catch (NumberFormatException ex) {
+            throw new ClientException("当前用户身份无效");
+        }
+    }
+
+    private boolean isVenueManagedByCurrentUser(Long venueId, Long currentUserId, Map<Long, MerchantVenueRespDTO> venueCache) {
+        MerchantVenueRespDTO venue = loadVenueDetail(venueId, venueCache);
+        return venue != null && currentUserId.equals(venue.getOwnerUserId());
+    }
+
+    private List<MerchantEventRespDTO> listAllMerchantEvents() {
+        List<MerchantEventRespDTO> events = new ArrayList<>();
+        for (int current = 1; current <= EVENT_SCOPE_MAX_PAGE; current++) {
+            Result<Page<MerchantEventRespDTO>> result = merchantAdminRemoteService.pageQueryEvents(current, EVENT_SCOPE_PAGE_SIZE);
+            if (result == null || result.isFail() || result.getData() == null) {
+                log.warn("[后台订单分页] 查询演出范围失败, current={}, result={}", current, result);
+                throw new ServiceException("查询演出管理范围失败，请稍后重试");
+            }
+            Page<MerchantEventRespDTO> page = result.getData();
+            if (CollUtil.isEmpty(page.getRecords())) {
+                break;
+            }
+            events.addAll(page.getRecords());
+            if (events.size() >= page.getTotal() || page.getCurrent() >= page.getPages()) {
+                break;
+            }
+        }
+        return events;
+    }
+
+    private Page<AdminOrderPageQueryRespDTO> emptyAdminOrderPage(long current, long size) {
+        Page<AdminOrderPageQueryRespDTO> page = new Page<>(current, size, 0);
+        page.setRecords(List.of());
         return page;
     }
 
@@ -532,7 +632,13 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         if (!SqlHelper.retBool(affected)) {
             log.warn("[库存回补] 数据库库存回补未命中记录，skuId={}, count={}", skuId, count);
         }
-        SOLD_OUT_MAP.remove(skuId);
+        releaseSoldOutMark(skuId);
+    }
+
+    public static void releaseSoldOutMark(Long skuId) {
+        if (skuId != null) {
+            SOLD_OUT_MAP.remove(skuId);
+        }
     }
 
     private DefaultRedisScript<Long> loadLongRedisScript(String classpath) {
@@ -718,16 +824,18 @@ public class TicketOrderServiceImpl implements TicketOrderService {
 
         Map<Long, MerchantTicketSkuDetailRespDTO> skuCache = new HashMap<>();
         Map<Long, MerchantEventRespDTO> eventCache = new HashMap<>();
+        Map<Long, MerchantVenueRespDTO> venueCache = new HashMap<>();
         List<AdminOrderPageQueryRespDTO> records = new ArrayList<>(orders.size());
         for (OrderDO order : orders) {
-            records.add(buildAdminOrderRecord(order, skuCache, eventCache));
+            records.add(buildAdminOrderRecord(order, skuCache, eventCache, venueCache));
         }
         return records;
     }
 
     private AdminOrderPageQueryRespDTO buildAdminOrderRecord(OrderDO order,
                                                              Map<Long, MerchantTicketSkuDetailRespDTO> skuCache,
-                                                             Map<Long, MerchantEventRespDTO> eventCache) {
+                                                             Map<Long, MerchantEventRespDTO> eventCache,
+                                                             Map<Long, MerchantVenueRespDTO> venueCache) {
         List<OrderItemDO> items = orderItemMapper.selectList(Wrappers.lambdaQuery(OrderItemDO.class)
                 .eq(OrderItemDO::getOrderNo, order.getOrderNo())
                 .eq(OrderItemDO::getUserId, order.getUserId()));
@@ -740,14 +848,18 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         Long eventId = firstItem != null ? firstItem.getEventId() : null;
         MerchantTicketSkuDetailRespDTO skuDetail = loadTicketSkuDetail(skuId, skuCache);
         MerchantEventRespDTO eventDetail = loadEventDetail(eventId, eventCache);
+        Long venueId = eventDetail != null ? eventDetail.getVenueId() : null;
+        MerchantVenueRespDTO venueDetail = loadVenueDetail(venueId, venueCache);
 
         AdminOrderPageQueryRespDTO dto = new AdminOrderPageQueryRespDTO();
         dto.setOrderNo(order.getOrderNo());
         dto.setUserId(order.getUserId());
         dto.setEventId(eventId);
         dto.setEventTitle(eventDetail != null ? eventDetail.getTitle() : "");
+        dto.setVenueId(venueId);
+        dto.setVenueName(venueDetail != null ? venueDetail.getName() : "");
         dto.setSkuId(skuId);
-        dto.setSkuName(skuDetail != null ? skuDetail.getTitle() : "");
+        dto.setSkuTitle(skuDetail != null ? skuDetail.getTitle() : "");
         dto.setTicketCount(items.size());
         dto.setTotalAmount(order.getTotalAmount());
         dto.setStatus(order.getStatus());
@@ -799,6 +911,29 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                     result != null ? result.getMessage() : "remote result is null");
         }
         eventCache.put(eventId, detail);
+        return detail;
+    }
+
+    private MerchantVenueRespDTO loadVenueDetail(Long venueId,
+                                                 Map<Long, MerchantVenueRespDTO> venueCache) {
+        if (venueId == null) {
+            return null;
+        }
+        if (venueCache.containsKey(venueId)) {
+            return venueCache.get(venueId);
+        }
+
+        Result<MerchantVenueRespDTO> result = merchantAdminRemoteService.getVenue(venueId);
+        MerchantVenueRespDTO detail = null;
+        if (result != null && result.isSuccess()) {
+            detail = result.getData();
+        } else {
+            log.warn("[后台订单分页] 查询场馆信息失败，venueId={}, code={}, message={}",
+                    venueId,
+                    result != null ? result.getCode() : "null",
+                    result != null ? result.getMessage() : "remote result is null");
+        }
+        venueCache.put(venueId, detail);
         return detail;
     }
 

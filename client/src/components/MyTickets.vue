@@ -30,7 +30,8 @@
             style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(var(--ls-accent-rgb), 0.08)"
           >
             <span style="font-size: 12px; color: var(--ls-text-secondary)">
-              流水单号: <span style="font-family: monospace; font-weight: 500">{{ order.orderNo }}</span>
+              流水单号:
+              <span style="font-family: monospace; font-weight: 500">{{ order.orderNo }}</span>
             </span>
             <a-tag :color="orderStatusColor(order.status)">{{ order.statusDesc }}</a-tag>
           </div>
@@ -41,12 +42,12 @@
                 ELECTRONIC TICKET / 电子入场凭证
               </a-tag>
               <h4 style="font-size: 0.9rem; font-weight: 700; margin-bottom: 6px; line-height: 1.4">
-                {{ order.title }}
+                {{ order.eventTitle }}
               </h4>
               <div
                 style="font-size: 12px; color: var(--ls-text-secondary); display: flex; flex-direction: column; gap: 3px"
               >
-                <span>票档：<b>{{ order.skuName }} (¥{{ order.price }} × {{ order.count }}张)</b></span>
+                <span>票档：<b>{{ order.skuTitle }} (¥{{ order.price }} × {{ order.count }}张)</b></span>
                 <span>下单：{{ order.createTime }}</span>
               </div>
               <div style="margin-top: 12px; font-size: 11px; color: var(--ls-text-secondary); opacity: 0.85">
@@ -128,9 +129,9 @@
           :bordered="false"
           style="margin-bottom: 20px; border-radius: 12px; background: rgba(0,0,0,0.06)"
         >
-          <h5 style="font-weight: 700; margin-bottom: 4px">{{ payingOrder.title }}</h5>
+          <h5 style="font-weight: 700; margin-bottom: 4px">{{ payingOrder.eventTitle }}</h5>
           <p style="font-size: 12px; color: var(--ls-text-secondary); margin-bottom: 8px">
-            {{ payingOrder.skuName }} × {{ payingOrder.count }}张
+            {{ payingOrder.skuTitle }} × {{ payingOrder.count }}张
           </p>
           <div style="font-size: 1.6rem; font-weight: 900; text-align: center; font-family: 'Outfit'">
             ¥ {{ payingOrder.totalAmount }}

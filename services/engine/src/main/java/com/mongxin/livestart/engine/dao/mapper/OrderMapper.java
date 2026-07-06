@@ -1,12 +1,15 @@
 package com.mongxin.livestart.engine.dao.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mongxin.livestart.engine.dao.entity.OrderDO;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 订单 Mapper
@@ -33,4 +36,30 @@ public interface OrderMapper extends BaseMapper<OrderDO> {
     int updatePayTime(@Param("id") Long id,
                       @Param("userId") Long userId,
                       @Param("payTime") Date payTime);
+
+    @Select({
+            "<script>",
+            "SELECT o.* FROM t_order o",
+            "<if test='eventIds != null and eventIds.size() > 0'>",
+            "JOIN t_order_item oi",
+            "  ON oi.order_no = o.order_no",
+            " AND oi.user_id = o.user_id",
+            " AND oi.event_id IN",
+            " <foreach collection='eventIds' item='eventId' open='(' separator=',' close=')'>",
+            "   #{eventId}",
+            " </foreach>",
+            "</if>",
+            "WHERE 1 = 1",
+            "<if test='status != null'>",
+            "  AND o.status = #{status}",
+            "</if>",
+            "<if test='eventIds != null and eventIds.size() > 0'>",
+            "GROUP BY o.id, o.order_no, o.user_id, o.total_amount, o.status, o.pay_time, o.create_time",
+            "</if>",
+            "ORDER BY o.create_time DESC",
+            "</script>"
+    })
+    Page<OrderDO> pageQueryAdminOrders(Page<OrderDO> page,
+                                       @Param("status") Integer status,
+                                       @Param("eventIds") List<Long> eventIds);
 }

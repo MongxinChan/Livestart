@@ -1,11 +1,19 @@
 import { onMounted, reactive, ref } from 'vue'
 import { orderApi } from '@/api/order'
+import type { OrderItem } from '@/types'
 import { orderStatusColors, orderStatusLabels, orderTableColumns } from './columns'
 
 export function useOrderList() {
   const loading = ref(false)
-  const list = ref<any[]>([])
-  const pagination = reactive({ current: 1, pageSize: 10, total: 0 })
+  const list = ref<OrderItem[]>([])
+  const pagination = reactive({
+    current: 1,
+    pageSize: 10,
+    total: 0,
+    showSizeChanger: true,
+    pageSizeOptions: ['10', '20', '50', '100'],
+    showTotal: (total: number) => `共 ${total} 条`,
+  })
   const ALL_STATUS = -1
   const statusFilter = ref<number>(ALL_STATUS)
 
@@ -26,6 +34,7 @@ export function useOrderList() {
 
   function onTableChange(pag: any) {
     pagination.current = pag.current
+    pagination.pageSize = pag.pageSize
     void fetchList()
   }
 

@@ -89,9 +89,9 @@ export let mockHotSearches: HotSearch[] = [
 export const mockOrders: Order[] = [
   {
     orderNo: '171725890012345678',
-    title: '「万能青年旅店」2026 巡回音乐会',
+    eventTitle: '「万能青年旅店」2026 巡回音乐会',
     skuId: 1012,
-    skuName: '普通票(全价)',
+    skuTitle: '普通票(全价)',
     price: 380,
     count: 2,
     totalAmount: 760,
@@ -103,9 +103,9 @@ export const mockOrders: Order[] = [
   },
   {
     orderNo: '171725800088888888',
-    title: '「重塑雕像的权利」RE-TREAD OVERTURE 特别专场',
+    eventTitle: '「重塑雕像的权利」RE-TREAD OVERTURE 特别专场',
     skuId: 1031,
-    skuName: '全价票',
+    skuTitle: '全价票',
     price: 320,
     count: 1,
     totalAmount: 320,

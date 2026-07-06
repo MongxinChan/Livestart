@@ -15,4 +15,10 @@ public class AdminOrderPageQueryReqDTO extends Page<Object> {
 
     @Schema(description = "订单状态筛选：1-待支付 2-已出票 3-已取消 4-已退票，不传表示全部")
     private Integer status;
+
+    @Schema(description = "演出 ID 筛选")
+    private Long eventId;
+
+    @Schema(description = "场馆 ID 筛选")
+    private Long venueId;
 }

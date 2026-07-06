@@ -79,25 +79,10 @@ async function handleAuthSubmit() {
       return
     }
 
-    const hasPhone = await request<boolean>(`/api/live-start/admin/v1/has-phone/${authForm.phone}`)
-
-    let data: { token: string }
-
-    if (hasPhone) {
-      data = await request<{ token: string }>(`/api/live-start/admin/v1/user`, {
-        method: 'POST',
-        body: JSON.stringify({
-          phone: authForm.phone,
-          password: 'LiveStart123',
-          code: authForm.code,
-        }),
-      })
-    } else {
-      data = await request<{ token: string }>(
-        `/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`,
-        { method: 'POST' }
-      )
-    }
+    const data = await request<{ token: string }>(
+      `/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`,
+      { method: 'POST' }
+    )
 
     apiState.token = data.token
     apiState.phone = authForm.phone
