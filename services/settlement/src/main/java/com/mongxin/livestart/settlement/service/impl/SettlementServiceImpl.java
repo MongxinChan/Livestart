@@ -50,6 +50,7 @@ public class SettlementServiceImpl implements SettlementService {
     private static final int SETTLEMENT_STATUS_PENDING = 0;
     private static final int SETTLEMENT_STATUS_SETTLED = 1;
     private static final int SETTLEMENT_STATUS_EXCEPTION = 2;
+    private static final int MAX_ERROR_MESSAGE_LENGTH = 1000;
 
     private final SettlementMapper settlementMapper;
     private final JdbcTemplate jdbcTemplate;
@@ -70,9 +71,6 @@ public class SettlementServiceImpl implements SettlementService {
 
         StringBuilder fromSql = new StringBuilder("""
                 FROM t_settlement s
-                LEFT JOIN t_event e ON s.event_id = e.id
-                LEFT JOIN t_event_performer ep ON e.id = ep.event_id
-                LEFT JOIN t_performer p ON ep.performer_id = p.id
                 WHERE 1 = 1
                 """);
         List<Object> args = new ArrayList<>();
@@ -89,7 +87,19 @@ public class SettlementServiceImpl implements SettlementService {
         }
         if (StrUtil.isNotBlank(keyword)) {
             String likeKeyword = "%" + keyword.trim() + "%";
-            fromSql.append(" AND (CAST(s.event_id AS CHAR) LIKE ? OR s.event_title LIKE ? OR p.name LIKE ?)");
+            fromSql.append("""
+                     AND (
+                         CAST(s.event_id AS CHAR) LIKE ?
+                         OR s.event_title LIKE ?
+                         OR EXISTS (
+                             SELECT 1
+                             FROM t_event_performer ep
+                             JOIN t_performer p ON ep.performer_id = p.id
+                             WHERE ep.event_id = s.event_id
+                               AND p.name LIKE ?
+                         )
+                     )
+                    """);
             args.add(likeKeyword);
             args.add(likeKeyword);
             args.add(likeKeyword);
@@ -120,10 +130,13 @@ public class SettlementServiceImpl implements SettlementService {
                        s.error_message,
                        s.create_time,
                        s.update_time,
-                       COALESCE(MAX(p.name), '') AS performer_name
+                       COALESCE((
+                           SELECT MAX(p.name)
+                           FROM t_event_performer ep
+                           JOIN t_performer p ON ep.performer_id = p.id
+                           WHERE ep.event_id = s.event_id
+                       ), '') AS performer_name
                 """ + fromSql + """
-                GROUP BY s.id, s.event_id, s.event_title, s.total_tickets, s.total_sales_amount,
-                         s.commission_rate, s.commission_amount, s.settlement_amount, s.status, s.error_message, s.create_time, s.update_time
                 """ + orderBy + " LIMIT ? OFFSET ?";
         List<SettlementRespDTO> records = jdbcTemplate.query(querySql, (rs, rowNum) -> {
             SettlementRespDTO dto = new SettlementRespDTO();
@@ -161,7 +174,6 @@ public class SettlementServiceImpl implements SettlementService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void triggerSettlement(Long eventId) {
         ensureVisibleEvent(eventId);
         String eventTitle = queryEventTitle(eventId);
@@ -206,7 +218,6 @@ public class SettlementServiceImpl implements SettlementService {
     }
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public void triggerVisibleSettlements() {
         Set<Long> visibleEventIds = resolveVisibleEventIds();
         if (visibleEventIds == null) {
@@ -414,7 +425,9 @@ public class SettlementServiceImpl implements SettlementService {
         if (StrUtil.isBlank(message)) {
             return "结算执行失败，请联系管理员排查";
         }
-        return StrUtil.maxLength(message, 500);
+        return message.length() <= MAX_ERROR_MESSAGE_LENGTH
+                ? message
+                : message.substring(0, MAX_ERROR_MESSAGE_LENGTH);
     }
 
     private Set<Long> resolveVisibleEventIds() {
@@ -595,7 +608,7 @@ public class SettlementServiceImpl implements SettlementService {
                 SELECT oi.sku_id, COUNT(*) AS ticket_count
                 FROM `%s`.t_order_item_%d oi
                 JOIN `%s`.t_order_%d o ON oi.order_no = o.order_no
-                WHERE %s AND (o.status = 1 OR o.status = 2)
+                WHERE %s AND o.status = 1
                 GROUP BY oi.sku_id
                 """, database, shardIndex, database, shardIndex, inSql);
 

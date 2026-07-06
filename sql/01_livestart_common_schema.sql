@@ -202,6 +202,7 @@ CREATE TABLE `t_settlement` (
   `commission_amount` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '扣除佣金金额',
   `settlement_amount` decimal(12,2) NOT NULL DEFAULT '0.00' COMMENT '商家应结金额',
   `status` tinyint NOT NULL DEFAULT '0' COMMENT '结算状态 0:未结算 1:已结算 2:结算异常',
+  `error_message` text COLLATE utf8mb4_unicode_ci DEFAULT NULL COMMENT '结算异常信息',
   `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
