@@ -15,10 +15,14 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.math.BigDecimal;
 import java.sql.ResultSet;
+import java.sql.Timestamp;
+import java.util.Date;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -129,5 +133,64 @@ class SettlementServiceImplTest {
         assertFalse(sql.contains("GROUP BY"));
         assertTrue(sql.contains("s.error_message"));
         assertTrue(sql.contains("EXISTS"));
+    }
+
+    @Test
+    void shouldRejectVenueAdminPagingInvisibleEvent() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        SettlementServiceImpl service = new SettlementServiceImpl(mock(SettlementMapper.class), jdbcTemplate);
+        UserContext.setUser(new UserInfoDTO("7", "venue-admin", null, null, 3));
+
+        when(jdbcTemplate.queryForList(
+                org.mockito.ArgumentMatchers.eq("SELECT id FROM t_venue WHERE owner_user_id = ?"),
+                org.mockito.ArgumentMatchers.eq(Long.class),
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(List.of(10L));
+        when(jdbcTemplate.queryForList(
+                org.mockito.ArgumentMatchers.startsWith("SELECT id FROM t_event WHERE venue_id IN"),
+                org.mockito.ArgumentMatchers.eq(Long.class),
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(List.of(100L));
+
+        assertThrows(ServiceException.class,
+                () -> service.pageSettlements(200L, null, null, null, 1, 10));
+    }
+
+    @Test
+    void shouldRejectInvisibleNotificationReadKey() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        SettlementServiceImpl service = new SettlementServiceImpl(mock(SettlementMapper.class), jdbcTemplate);
+        UserContext.setUser(new UserInfoDTO("1", "admin", null, null, 4));
+
+        when(jdbcTemplate.queryForObject(anyString(), org.mockito.ArgumentMatchers.eq(Long.class), any()))
+                .thenReturn(1L);
+        when(jdbcTemplate.query(anyString(), any(RowMapper.class), any()))
+                .thenAnswer(invocation -> {
+                    @SuppressWarnings("unchecked")
+                    RowMapper<com.mongxin.livestart.settlement.dto.resp.SettlementRespDTO> rowMapper = invocation.getArgument(1);
+                    ResultSet rs = mock(ResultSet.class);
+                    when(rs.getLong("id")).thenReturn(1L);
+                    when(rs.getLong("event_id")).thenReturn(100L);
+                    when(rs.getString("event_title")).thenReturn("event");
+                    when(rs.getString("performer_name")).thenReturn("artist");
+                    when(rs.getInt("total_tickets")).thenReturn(1);
+                    when(rs.getBigDecimal("total_sales_amount")).thenReturn(new BigDecimal("100.00"));
+                    when(rs.getBigDecimal("commission_rate")).thenReturn(new BigDecimal("0.0500"));
+                    when(rs.getBigDecimal("commission_amount")).thenReturn(new BigDecimal("5.00"));
+                    when(rs.getBigDecimal("settlement_amount")).thenReturn(new BigDecimal("95.00"));
+                    when(rs.getInt("status")).thenReturn(1);
+                    when(rs.getString("error_message")).thenReturn(null);
+                    when(rs.getTimestamp("create_time")).thenReturn(new Timestamp(System.currentTimeMillis()));
+                    when(rs.getTimestamp("update_time")).thenReturn(new Timestamp(new Date().getTime()));
+                    return List.of(rowMapper.mapRow(rs, 0));
+                });
+        when(jdbcTemplate.queryForList(
+                org.mockito.ArgumentMatchers.eq("SELECT notification_key FROM t_settlement_notification_read WHERE user_id = ?"),
+                org.mockito.ArgumentMatchers.eq(String.class),
+                org.mockito.ArgumentMatchers.any()
+        )).thenReturn(Collections.emptyList());
+
+        assertThrows(ServiceException.class,
+                () -> service.markNotificationRead("updated:999:1"));
     }
 }

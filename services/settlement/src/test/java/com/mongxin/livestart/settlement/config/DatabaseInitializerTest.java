@@ -23,6 +23,7 @@ class DatabaseInitializerTest {
     @Test
     void shouldCreateSettlementTableWithTextErrorMessageForFreshDatabase() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        mockVisibilityScopeDependenciesReady(jdbcTemplate);
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement'"))
                 .thenReturn(Collections.emptyList());
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement_notification_read'"))
@@ -51,6 +52,7 @@ class DatabaseInitializerTest {
     @Test
     void shouldAddTextErrorMessageWhenColumnMissingInExistingTable() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        mockVisibilityScopeDependenciesReady(jdbcTemplate);
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement'"))
                 .thenReturn(List.of(Collections.singletonMap("Tables_in_live_start", "t_settlement")));
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement_notification_read'"))
@@ -71,6 +73,7 @@ class DatabaseInitializerTest {
     @Test
     void shouldUpgradeLegacyVarcharErrorMessageToText() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        mockVisibilityScopeDependenciesReady(jdbcTemplate);
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement'"))
                 .thenReturn(List.of(Collections.singletonMap("Tables_in_live_start", "t_settlement")));
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement_notification_read'"))
@@ -92,6 +95,7 @@ class DatabaseInitializerTest {
     @Test
     void shouldKeepExistingTextCompatibleErrorMessageColumn() {
         JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        mockVisibilityScopeDependenciesReady(jdbcTemplate);
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement'"))
                 .thenReturn(List.of(Collections.singletonMap("Tables_in_live_start", "t_settlement")));
         when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement_notification_read'"))
@@ -108,5 +112,34 @@ class DatabaseInitializerTest {
         new DatabaseInitializer(jdbcTemplate).run();
 
         verify(jdbcTemplate, never()).execute("ALTER TABLE t_settlement MODIFY COLUMN error_message text DEFAULT NULL COMMENT '结算异常信息'");
+    }
+    @Test
+    void shouldCreateVisibilityScopeIndexesWhenMissing() {
+        JdbcTemplate jdbcTemplate = mock(JdbcTemplate.class);
+        when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement'"))
+                .thenReturn(List.of(Collections.singletonMap("Tables_in_live_start", "t_settlement")));
+        when(jdbcTemplate.queryForList("SHOW TABLES LIKE 't_settlement_notification_read'"))
+                .thenReturn(List.of(Collections.singletonMap("Tables_in_live_start", "t_settlement_notification_read")));
+        when(jdbcTemplate.queryForObject(anyString(), org.mockito.ArgumentMatchers.eq(Integer.class), any()))
+                .thenReturn(1, 0, 1, 0, 0);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            ResultSetExtractor<String> extractor = invocation.getArgument(1);
+            ResultSet resultSet = mock(ResultSet.class);
+            when(resultSet.next()).thenReturn(true);
+            when(resultSet.getString("DATA_TYPE")).thenReturn("text");
+            return extractor.extractData(resultSet);
+        }).when(jdbcTemplate).query(anyString(), any(ResultSetExtractor.class));
+
+        new DatabaseInitializer(jdbcTemplate).run();
+
+        verify(jdbcTemplate).execute("ALTER TABLE `t_venue` ADD INDEX `idx_owner_user_id` (`owner_user_id`)");
+        verify(jdbcTemplate).execute("ALTER TABLE `t_event` ADD INDEX `idx_venue_id` (`venue_id`)");
+        verify(jdbcTemplate).execute("ALTER TABLE `t_settlement` ADD INDEX `idx_settlement_event_id` (`event_id`)");
+    }
+
+    private void mockVisibilityScopeDependenciesReady(JdbcTemplate jdbcTemplate) {
+        when(jdbcTemplate.queryForObject(anyString(), org.mockito.ArgumentMatchers.eq(Integer.class), any()))
+                .thenReturn(1);
     }
 }

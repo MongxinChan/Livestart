@@ -64,9 +64,14 @@ public class SettlementServiceImpl implements SettlementService {
             Integer pageNum,
             Integer pageSize
     ) {
+        int safePageNum = normalizePageNum(pageNum);
+        int safePageSize = normalizePageSize(pageSize);
+        if (eventId != null) {
+            ensureVisibleEvent(eventId);
+        }
         Set<Long> visibleEventIds = resolveVisibleEventIds();
         if (visibleEventIds != null && visibleEventIds.isEmpty()) {
-            return new Page<>(pageNum, pageSize, 0L);
+            return new Page<>(safePageNum, safePageSize, 0L);
         }
 
         StringBuilder fromSql = new StringBuilder("""
@@ -112,9 +117,9 @@ public class SettlementServiceImpl implements SettlementService {
                 args.toArray()
         );
 
-        int offset = Math.max(pageNum - 1, 0) * pageSize;
+        int offset = (safePageNum - 1) * safePageSize;
         List<Object> queryArgs = new ArrayList<>(args);
-        queryArgs.add(pageSize);
+        queryArgs.add(safePageSize);
         queryArgs.add(offset);
 
         String querySql = """
@@ -156,9 +161,9 @@ public class SettlementServiceImpl implements SettlementService {
             return dto;
         }, queryArgs.toArray());
 
-        IPage<SettlementRespDTO> resultPage = new Page<>(pageNum, pageSize);
+        IPage<SettlementRespDTO> resultPage = new Page<>(safePageNum, safePageSize);
         resultPage.setTotal(total == null ? 0L : total);
-        resultPage.setPages(pageSize <= 0 ? 0 : (long) Math.ceil((total == null ? 0D : total.doubleValue()) / pageSize));
+        resultPage.setPages((long) Math.ceil((total == null ? 0D : total.doubleValue()) / safePageSize));
         resultPage.setRecords(records);
         return resultPage;
     }
@@ -233,6 +238,9 @@ public class SettlementServiceImpl implements SettlementService {
 
     @Override
     public SettlementStatsRespDTO getIncomeStats(Long eventId) {
+        if (eventId != null) {
+            ensureVisibleEvent(eventId);
+        }
         Set<Long> visibleEventIds = resolveVisibleEventIds();
         if (visibleEventIds != null && visibleEventIds.isEmpty()) {
             return emptyStats();
@@ -306,11 +314,13 @@ public class SettlementServiceImpl implements SettlementService {
         if (StrUtil.isBlank(notificationKey)) {
             throw new ServiceException("通知标识不能为空");
         }
+        String trimmedNotificationKey = notificationKey.trim();
+        ensureVisibleNotification(trimmedNotificationKey);
         jdbcTemplate.update("""
                 INSERT INTO t_settlement_notification_read (user_id, notification_key, read_time)
                 VALUES (?, ?, ?)
                 ON DUPLICATE KEY UPDATE read_time = VALUES(read_time)
-                """, userId, notificationKey, new Timestamp(System.currentTimeMillis()));
+                """, userId, trimmedNotificationKey, new Timestamp(System.currentTimeMillis()));
     }
 
     private List<SettlementNotificationRespDTO> buildNotifications(SettlementRespDTO item) {
@@ -380,6 +390,14 @@ public class SettlementServiceImpl implements SettlementService {
         return type + ":" + settlementId + ":" + (updateTime == null ? 0L : updateTime.getTime());
     }
 
+    private void ensureVisibleNotification(String notificationKey) {
+        boolean visible = listNotifications().stream()
+                .anyMatch(item -> notificationKey.equals(item.getNotificationKey()));
+        if (!visible) {
+            throw new ServiceException("当前账号无权标记该结算通知");
+        }
+    }
+
     private boolean isRecentlyUpdated(Date updateTime) {
         if (updateTime == null) {
             return false;
@@ -443,10 +461,11 @@ public class SettlementServiceImpl implements SettlementService {
             return Collections.emptySet();
         }
 
+        Long currentUserId = parseCurrentUserId(userId);
         List<Long> venueIds = jdbcTemplate.queryForList(
                 "SELECT id FROM t_venue WHERE owner_user_id = ?",
                 Long.class,
-                Long.valueOf(userId)
+                currentUserId
         );
         if (CollUtil.isEmpty(venueIds)) {
             return Collections.emptySet();
@@ -464,7 +483,15 @@ public class SettlementServiceImpl implements SettlementService {
         if (StrUtil.isBlank(userId)) {
             throw new ServiceException("当前用户未登录");
         }
-        return Long.valueOf(userId);
+        return parseCurrentUserId(userId);
+    }
+
+    private Long parseCurrentUserId(String userId) {
+        try {
+            return Long.valueOf(userId);
+        } catch (NumberFormatException ex) {
+            throw new ServiceException("当前用户身份不合法");
+        }
     }
 
     private Set<Long> queryAllEventIds() {
@@ -488,13 +515,39 @@ public class SettlementServiceImpl implements SettlementService {
     }
 
     private void ensureVisibleEvent(Long eventId) {
+        if (eventId == null) {
+            throw new ServiceException("演出ID不能为空");
+        }
         Set<Long> visibleEventIds = resolveVisibleEventIds();
         if (visibleEventIds == null) {
+            ensureEventExists(eventId);
             return;
         }
         if (!visibleEventIds.contains(eventId)) {
             throw new ServiceException("当前账号无权查看该演出结算");
         }
+    }
+
+    private void ensureEventExists(Long eventId) {
+        Integer count = jdbcTemplate.queryForObject(
+                "SELECT COUNT(1) FROM t_event WHERE id = ?",
+                Integer.class,
+                eventId
+        );
+        if (count == null || count == 0) {
+            throw new ServiceException("演出项目不存在");
+        }
+    }
+
+    private int normalizePageNum(Integer pageNum) {
+        return pageNum == null || pageNum < 1 ? 1 : pageNum;
+    }
+
+    private int normalizePageSize(Integer pageSize) {
+        if (pageSize == null || pageSize < 1) {
+            return 10;
+        }
+        return Math.min(pageSize, 100);
     }
 
     private SettlementStatsRespDTO emptyStats() {

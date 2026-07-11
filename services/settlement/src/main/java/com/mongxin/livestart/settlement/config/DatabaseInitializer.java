@@ -20,6 +20,7 @@ public class DatabaseInitializer implements CommandLineRunner {
             ensureSettlementTable();
             ensureSettlementTableColumns();
             ensureNotificationReadTable();
+            ensureVisibilityScopeDependencies();
         } catch (Exception ex) {
             log.error("[Settlement] Failed to initialize settlement database schema", ex);
         }
@@ -103,5 +104,45 @@ public class DatabaseInitializer implements CommandLineRunner {
                 """;
         jdbcTemplate.execute(createTableSql);
         log.info("[Settlement] t_settlement_notification_read created.");
+    }
+
+    private void ensureVisibilityScopeDependencies() {
+        if (hasRequiredColumn("t_venue", "owner_user_id")) {
+            ensureIndex("t_venue", "idx_owner_user_id", "owner_user_id");
+        }
+        if (hasRequiredColumn("t_event", "venue_id")) {
+            ensureIndex("t_event", "idx_venue_id", "venue_id");
+        }
+        ensureIndex("t_settlement", "idx_settlement_event_id", "event_id");
+    }
+
+    private boolean hasRequiredColumn(String tableName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1)
+                FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND COLUMN_NAME = ?
+                """, Integer.class, tableName, columnName);
+        if (count == null || count == 0) {
+            log.error("[Settlement] Missing required visibility column {}.{}; venue-admin settlement scope may fail.", tableName, columnName);
+            return false;
+        }
+        return true;
+    }
+
+    private void ensureIndex(String tableName, String indexName, String columnName) {
+        Integer count = jdbcTemplate.queryForObject("""
+                SELECT COUNT(1)
+                FROM information_schema.STATISTICS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = ?
+                  AND INDEX_NAME = ?
+                """, Integer.class, tableName, indexName);
+        if (count != null && count > 0) {
+            return;
+        }
+        jdbcTemplate.execute("ALTER TABLE `" + tableName + "` ADD INDEX `" + indexName + "` (`" + columnName + "`)");
+        log.info("[Settlement] Added {}.{} for venue-admin visibility scope.", tableName, indexName);
     }
 }
