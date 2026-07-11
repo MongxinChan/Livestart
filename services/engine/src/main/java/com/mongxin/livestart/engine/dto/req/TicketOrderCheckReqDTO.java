@@ -11,6 +11,9 @@ import lombok.Data;
 @Schema(description = "订单核销请求")
 public class TicketOrderCheckReqDTO {
 
+    /**
+     * 订单流水号
+     */
     @NotBlank(message = "订单流水号不能为空")
     @Schema(description = "订单流水号", requiredMode = Schema.RequiredMode.REQUIRED)
     private String orderNo;

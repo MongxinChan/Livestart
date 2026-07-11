@@ -13,6 +13,9 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "票种分页查询参数")
 public class TicketSkuPageQueryReqDTO extends Page {
 
+    /**
+     * 按演出ID筛选
+     */
     @Schema(description = "按演出ID筛选")
     private Long eventId;
 }

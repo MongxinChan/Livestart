@@ -4,6 +4,9 @@ import lombok.Builder;
 import lombok.Data;
 import java.math.BigDecimal;
 
+/**
+ * 全局财务结算统计数据响应 DTO
+ */
 @Data
 @Builder
 public class SettlementStatsRespDTO {

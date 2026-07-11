@@ -11,10 +11,16 @@ import lombok.Data;
 @Schema(description = "门票秒杀抢票请求")
 public class TicketGrabReqDTO {
 
+    /**
+     * 抢购门票票档 SkuID
+     */
     @Schema(description = "抢购门票票档 SkuID", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotNull(message = "秒杀门票 SkuID 不能为空")
     private Long ticketSkuId;
 
+    /**
+     * 分销来源艺人专属宣发推广码 (静默追踪绑定)
+     */
     @Schema(description = "分销来源艺人专属宣发推广码 (静默追踪绑定)", requiredMode = Schema.RequiredMode.NOT_REQUIRED)
     private String artistPromoCode;
 }

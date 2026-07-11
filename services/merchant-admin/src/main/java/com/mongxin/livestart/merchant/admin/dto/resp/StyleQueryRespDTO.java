@@ -13,18 +13,33 @@ import java.util.Date;
 @Schema(description = "风格详情查询返回实体")
 public class StyleQueryRespDTO {
 
+    /**
+     * 风格ID
+     */
     @Schema(description = "风格ID")
     private Long id;
 
+    /**
+     * 风格名称
+     */
     @Schema(description = "风格名称")
     private String name;
 
+    /**
+     * 风格代码
+     */
     @Schema(description = "风格代码")
     private String code;
 
+    /**
+     * 风格描述
+     */
     @Schema(description = "风格描述")
     private String description;
 
+    /**
+     * 创建时间
+     */
     @Schema(description = "创建时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createTime;

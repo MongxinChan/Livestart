@@ -13,6 +13,9 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "艺人分页查询参数")
 public class PerformerPageQueryReqDTO extends Page {
 
+    /**
+     * 按名称模糊搜索
+     */
     @Schema(description = "按名称模糊搜索")
     private String name;
 }

@@ -14,9 +14,15 @@ import lombok.NoArgsConstructor;
 @Schema(description = "热搜关键词")
 public class HotSearchRespDTO {
 
+    /**
+     * 关键词
+     */
     @Schema(description = "关键词")
     private String keyword;
 
+    /**
+     * 热度分值（Redis ZSet score）
+     */
     @Schema(description = "热度分值（Redis ZSet score）")
     private Double score;
 }

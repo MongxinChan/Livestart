@@ -14,6 +14,9 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "门票票档分页查询参数")
 public class TicketSkuPageQueryReqDTO extends Page<TicketSkuDO> {
 
+    /**
+     * 演出ID
+     */
     @Schema(description = "演出ID")
     private Long eventId;
 }

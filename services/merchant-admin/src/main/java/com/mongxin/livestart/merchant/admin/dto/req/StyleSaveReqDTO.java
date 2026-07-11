@@ -10,15 +10,27 @@ import lombok.Data;
 @Schema(description = "风格新增/修改参数")
 public class StyleSaveReqDTO {
 
+    /**
+     * 风格ID（修改时必传）
+     */
     @Schema(description = "风格ID（修改时必传）")
     private Long id;
 
+    /**
+     * 风格名称
+     */
     @Schema(description = "风格名称", example = "摇滚", required = true)
     private String name;
 
+    /**
+     * 风格代码
+     */
     @Schema(description = "风格代码", example = "ROCK", required = true)
     private String code;
 
+    /**
+     * 风格描述
+     */
     @Schema(description = "风格描述", example = "以强烈的节奏和电吉他为主的音乐流派")
     private String description;
 }

@@ -13,38 +13,71 @@ import java.util.Date;
 @Schema(description = "艺人详情查询返回实体")
 public class PerformerQueryRespDTO {
 
+    /**
+     * 艺人ID
+     */
     @Schema(description = "艺人ID")
     private Long id;
 
+    /**
+     * 艺人/乐队名称
+     */
     @Schema(description = "艺人/乐队名称")
     private String name;
 
+    /**
+     * 关联风格ID
+     */
     @Schema(description = "关联风格ID")
     private Long styleId;
 
+    /**
+     * 艺人头像/Logo URL
+     */
     @Schema(description = "艺人头像/Logo URL")
     private String avatar;
 
+    /**
+     * 介绍
+     */
     @Schema(description = "介绍")
     private String bio;
 
+    /**
+     * 状态 1:正常 0:停演
+     */
     @Schema(description = "状态 1:正常 0:停演")
     private Integer status;
 
+    /**
+     * 创建时间
+     */
     @Schema(description = "创建时间")
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "GMT+8")
     private Date createTime;
 
     // ----- 前端兼容字段 -----
+    /**
+     * 头像图片 URL（前端表单渲染映射）
+     */
     @Schema(description = "头像图片 URL（前端表单渲染映射）")
     private String avatarUrl;
 
+    /**
+     * 描述介绍（前端表单渲染映射）
+     */
     @Schema(description = "描述介绍（前端表单渲染映射）")
     private String description;
 
+    /**
+     * 音乐风格流派名称（前端表单渲染映射）
+     */
     @Schema(description = "音乐风格流派名称（前端表单渲染映射）")
     private String genre;
 
+    /**
+     * 多选关联的风格ID集合
+     */
     @Schema(description = "多选关联的风格ID集合")
     private java.util.List<Long> styleIds;
 }

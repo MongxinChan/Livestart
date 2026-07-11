@@ -13,6 +13,9 @@ import lombok.EqualsAndHashCode;
 @Schema(description = "风格分页查询参数")
 public class StylePageQueryReqDTO extends Page {
 
+    /**
+     * 按风格名称模糊搜索
+     */
     @Schema(description = "按风格名称模糊搜索")
     private String name;
 }

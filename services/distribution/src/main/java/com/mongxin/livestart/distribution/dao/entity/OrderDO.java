@@ -20,9 +20,15 @@ import java.math.BigDecimal;
 @TableName("t_order")
 public class OrderDO {
 
+    /**
+     * 订单ID
+     */
     @TableId(type = IdType.INPUT)
     private Long id;
 
+    /**
+     * 订单流水号
+     */
     private String orderNo;
 
     /**
@@ -35,5 +41,8 @@ public class OrderDO {
      */
     private BigDecimal totalAmount;
 
+    /**
+     * 订单状态 0:待支付 1:已支付 2:已取消 3:已退票
+     */
     private Integer status;
 }

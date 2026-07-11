@@ -11,6 +11,9 @@ import lombok.NoArgsConstructor;
 import java.math.BigDecimal;
 import java.util.Date;
 
+/**
+ * 演出结算账单持久层实体，对应表：t_settlement
+ */
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,21 +21,45 @@ import java.util.Date;
 @TableName("t_settlement")
 public class SettlementDO {
 
+    /**
+     * 结算记录ID
+     */
     @TableId(type = IdType.AUTO)
     private Long id;
 
+    /**
+     * 演出活动ID
+     */
     private Long eventId;
 
+    /**
+     * 演出名称
+     */
     private String eventTitle;
 
+    /**
+     * 本场演出总出票数
+     */
     private Integer totalTickets;
 
+    /**
+     * 总销售票房金额
+     */
     private BigDecimal totalSalesAmount;
 
+    /**
+     * 佣金比例 (例如 0.10 代表 10%)
+     */
     private BigDecimal commissionRate;
 
+    /**
+     * 佣金抽成金额
+     */
     private BigDecimal commissionAmount;
 
+    /**
+     * 主办方应结净额 (总销售额 - 佣金)
+     */
     private BigDecimal settlementAmount;
 
     /**
@@ -45,7 +72,13 @@ public class SettlementDO {
      */
     private String errorMessage;
 
+    /**
+     * 创建时间
+     */
     private Date createTime;
 
+    /**
+     * 修改时间
+     */
     private Date updateTime;
 }

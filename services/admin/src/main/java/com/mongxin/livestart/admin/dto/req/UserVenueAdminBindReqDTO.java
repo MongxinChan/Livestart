@@ -3,12 +3,21 @@ package com.mongxin.livestart.admin.dto.req;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+/**
+ * 场地管理员绑定请求参数
+ */
 @Data
 public class UserVenueAdminBindReqDTO {
 
-    @NotNull(message = "\u7528\u6237ID\u4e0d\u80fd\u4e3a\u7a7a")
+    /**
+     * 用户ID
+     */
+    @NotNull(message = "用户ID不能为空")
     private Long userId;
 
-    @NotNull(message = "\u573a\u9986ID\u4e0d\u80fd\u4e3a\u7a7a")
+    /**
+     * 场馆ID
+     */
+    @NotNull(message = "场馆ID不能为空")
     private Long venueId;
 }

@@ -13,36 +13,69 @@ import java.math.BigDecimal;
 @Schema(description = "merchant-admin 票种详情响应")
 public class MerchantTicketSkuDetailRespDTO {
 
+    /**
+     * 票种ID
+     */
     @Schema(description = "票种ID")
     private Long id;
 
+    /**
+     * 关联演出ID
+     */
     @Schema(description = "关联演出ID")
     private Long eventId;
 
+    /**
+     * 票种名称
+     */
     @Schema(description = "票种名称")
     private String title;
 
+    /**
+     * 票面原价
+     */
     @Schema(description = "票面原价")
     private BigDecimal originalPrice;
 
+    /**
+     * 实际售卖价
+     */
     @Schema(description = "实际售卖价")
     private BigDecimal sellingPrice;
 
+    /**
+     * 总库存
+     */
     @Schema(description = "总库存")
     private Integer totalStock;
 
+    /**
+     * 一开释放库存
+     */
     @Schema(description = "一开释放库存")
     private Integer stage1Stock;
 
+    /**
+     * 二开待释放库存
+     */
     @Schema(description = "二开待释放库存")
     private Integer stage2Stock;
 
+    /**
+     * 当前剩余可售库存
+     */
     @Schema(description = "当前剩余可售库存")
     private Integer remainingStock;
 
+    /**
+     * 单个用户的限购张数
+     */
     @Schema(description = "单个用户的限购张数")
     private Integer limitNum;
 
+    /**
+     * 乐观锁版本号
+     */
     @Schema(description = "乐观锁版本号")
     private Integer version;
 }

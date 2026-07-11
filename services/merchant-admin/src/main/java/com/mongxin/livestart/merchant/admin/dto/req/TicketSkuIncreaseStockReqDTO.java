@@ -10,9 +10,15 @@ import lombok.Data;
 @Schema(description = "票种增发库存参数")
 public class TicketSkuIncreaseStockReqDTO {
 
+    /**
+     * 票种ID
+     */
     @Schema(description = "票种ID", required = true)
     private Long skuId;
 
+    /**
+     * 增发数量
+     */
     @Schema(description = "增发数量", example = "100", required = true)
     private Integer count;
 }

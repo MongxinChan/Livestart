@@ -9,6 +9,10 @@ import lombok.Data;
 
 import java.util.Date;
 
+/**
+ * 用户个人资料持久层实体
+ * 对应表：t_user_profile
+ */
 @Data
 @TableName("t_user_profile")
 public class UserProfileDO {
