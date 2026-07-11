@@ -1,6 +1,7 @@
 import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { venueApi } from '@/api/venue'
+import { useExcelImport } from '@/composables/useExcelImport'
 import { chinaCities } from '@/utils/chinaCities'
 import type { VenueItem } from '@/types'
 import { venueTableColumns } from './columns'
@@ -97,6 +98,8 @@ export function useVenueList() {
     void fetchList()
   })
 
+  const { beforeUpload } = useExcelImport(venueApi.importExcel, fetchList)
+
   return {
     columns: venueTableColumns,
     loading,
@@ -110,6 +113,7 @@ export function useVenueList() {
     selectedCity,
     chinaCities,
     openForm,
+    beforeUpload,
     onSubmit,
     onDelete,
   }

@@ -6,8 +6,10 @@ import com.mongxin.livestart.merchant.admin.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuIncreaseStockReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuQueryRespDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -22,6 +24,8 @@ public interface TicketSkuService extends IService<TicketSkuDO> {
      * @param requestParam 创建参数
      */
     void createTicketSku(TicketSkuSaveReqDTO requestParam);
+
+    ImportResultRespDTO importTicketSkus(MultipartFile file);
 
     /**
      * 按演出ID查询该演出下所有票种

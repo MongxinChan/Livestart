@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.mongxin.livestart.merchant.admin.dao.entity.VenueDO;
 import com.mongxin.livestart.merchant.admin.dto.req.VenuePageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.VenueSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.VenuePageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.VenueQueryRespDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 场馆业务逻辑层
@@ -19,6 +21,8 @@ public interface VenueService extends IService<VenueDO> {
      * @param requestParam 创建参数
      */
     void createVenue(VenueSaveReqDTO requestParam);
+
+    ImportResultRespDTO importVenues(MultipartFile file);
 
     /**
      * 分页查询场馆（支持按城市筛选）

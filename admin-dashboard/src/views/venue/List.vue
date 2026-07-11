@@ -2,6 +2,12 @@
   <div>
     <a-page-header title="场馆管理" sub-title="管理演出场馆信息" :ghost="false" style="margin-bottom: 24px">
       <template #extra>
+        <a-upload :show-upload-list="false" accept=".xlsx,.xls" :before-upload="beforeUpload">
+          <a-button>
+            <template #icon><UploadOutlined /></template>
+            Excel 导入
+          </a-button>
+        </a-upload>
         <a-button type="primary" @click="openForm()">
           <template #icon><PlusOutlined /></template>
           新增场馆
@@ -71,7 +77,7 @@
 </template>
 
 <script setup lang="ts">
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { useVenueList } from './useVenueList'
 
 const {
@@ -87,6 +93,7 @@ const {
   selectedCity,
   chinaCities,
   openForm,
+  beforeUpload,
   onSubmit,
   onDelete,
 } = useVenueList()

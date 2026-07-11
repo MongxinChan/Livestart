@@ -20,12 +20,14 @@ import com.mongxin.livestart.merchant.admin.dao.mapper.EventMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.EventStyleRelationMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.StyleMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.TicketSkuMapper;
+import com.mongxin.livestart.merchant.admin.dto.req.EventImportExcelDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventSaveReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventUpdateReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.SaleStageReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.EventPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.EventQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.SaleStageRespDTO;
 import com.mongxin.livestart.merchant.admin.remote.DistributionRemoteService;
 import com.mongxin.livestart.merchant.admin.remote.dto.DistributionEventPublishReqDTO;
@@ -35,6 +37,7 @@ import com.mongxin.livestart.merchant.admin.remote.dto.DistributionTicketSkuPara
 import com.mongxin.livestart.merchant.admin.service.EventConfigService;
 import com.mongxin.livestart.merchant.admin.service.EventService;
 import com.mongxin.livestart.merchant.admin.service.basics.chain.MerchantAdminChainContext;
+import com.mongxin.livestart.merchant.admin.toolkit.EasyExcelImportUtil;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.RequiredArgsConstructor;
@@ -44,6 +47,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import jakarta.annotation.PostConstruct;
 import java.sql.ResultSet;
@@ -141,6 +145,60 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         warmUpEventCache(eventDO, defaultConfig);
         LogRecordContext.putVariable("bizNo", eventDO.getId());
+    }
+
+    @Override
+    public ImportResultRespDTO importEvents(MultipartFile file) {
+        List<EventImportExcelDTO> rows = EasyExcelImportUtil.readFirstSheet(file, EventImportExcelDTO.class);
+        ImportResultRespDTO result = new ImportResultRespDTO();
+        if (rows.isEmpty()) {
+            result.addFail(1, "Excel 没有可导入的数据行，请保留表头并从第 2 行开始填写");
+            return result;
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            int rowIndex = i + 2;
+            try {
+                EventImportExcelDTO row = rows.get(i);
+                validateEventImportRow(row);
+                EventSaveReqDTO requestParam = new EventSaveReqDTO();
+                requestParam.setTitle(row.getTitle().trim());
+                requestParam.setEventType(row.getEventType());
+                requestParam.setVenueId(row.getVenueId());
+                requestParam.setPerformerId(row.getPerformerId());
+                requestParam.setStartTime(row.getStartTime());
+                requestParam.setPosterUrl(row.getPosterUrl() == null ? null : row.getPosterUrl().trim());
+                requestParam.setTicketStage(row.getTicketStage() == null ? 1 : row.getTicketStage());
+                createEvent(requestParam);
+                result.addSuccess();
+            } catch (Exception ex) {
+                result.addFail(rowIndex, ex.getMessage());
+            }
+        }
+        return result;
+    }
+
+    private void validateEventImportRow(EventImportExcelDTO row) {
+        if (row == null) {
+            throw new ClientException("空行不能导入");
+        }
+        if (row.getTitle() == null || row.getTitle().isBlank()) {
+            throw new ClientException("title 不能为空");
+        }
+        if (row.getEventType() == null) {
+            throw new ClientException("eventType 不能为空");
+        }
+        if (row.getEventType() != 0 && row.getEventType() != 1) {
+            throw new ClientException("eventType 只能填写 0 或 1");
+        }
+        if (row.getVenueId() == null) {
+            throw new ClientException("venueId 不能为空");
+        }
+        if (row.getStartTime() == null) {
+            throw new ClientException("startTime 不能为空，格式为 yyyy-MM-dd HH:mm:ss");
+        }
+        if (row.getTicketStage() != null && row.getTicketStage() != 1 && row.getTicketStage() != 2) {
+            throw new ClientException("ticketStage 只能填写 1 或 2");
+        }
     }
 
     @Override

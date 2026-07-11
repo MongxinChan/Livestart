@@ -2,6 +2,12 @@
   <div>
     <a-page-header title="演出管理" sub-title="创建、编辑、上下架演出项目" :ghost="false" style="margin-bottom: 24px">
       <template #extra>
+        <a-upload :show-upload-list="false" accept=".xlsx,.xls" :before-upload="beforeUpload">
+          <a-button>
+            <template #icon><UploadOutlined /></template>
+            Excel 导入
+          </a-button>
+        </a-upload>
         <a-button type="primary" @click="openForm()">
           <template #icon><PlusOutlined /></template>
           创建演出
@@ -254,7 +260,7 @@
 </template>
 
 <script setup lang="ts">
-import { DownOutlined, PlusOutlined } from '@ant-design/icons-vue'
+import { DownOutlined, PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { eventTableColumns } from './columns'
 import { eventStatusColors, eventStatusLabels, useEventList } from './useEventList'
 
@@ -282,6 +288,7 @@ const {
   configWaitingAllowed,
   onTableChange,
   openForm,
+  beforeUpload,
   onSubmit,
   onConfigSubmit,
   onAction,

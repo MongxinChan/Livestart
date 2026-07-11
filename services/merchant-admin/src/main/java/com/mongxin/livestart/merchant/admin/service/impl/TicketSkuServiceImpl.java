@@ -12,20 +12,25 @@ import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.merchant.admin.common.constant.MerchantAdminRedisConstant;
 import com.mongxin.livestart.merchant.admin.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.TicketSkuMapper;
+import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuImportExcelDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuIncreaseStockReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.TicketSkuService;
 import com.mongxin.livestart.merchant.admin.service.basics.chain.MerchantAdminChainContext;
+import com.mongxin.livestart.merchant.admin.toolkit.EasyExcelImportUtil;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -88,6 +93,85 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
 
         // 将运行时生成的票种ID放入日志上下文
         LogRecordContext.putVariable("bizNo", ticketSkuDO.getId());
+    }
+
+    @Override
+    @LogRecord(
+            success = "Excel 批量导入票档：总数 {{#importTotal}}，成功 {{#importSuccess}}，失败 {{#importFail}}",
+            type = "TicketSku",
+            bizNo = "BATCH_IMPORT",
+            extra = "{{#importResult.toString()}}"
+    )
+    public ImportResultRespDTO importTicketSkus(MultipartFile file) {
+        List<TicketSkuImportExcelDTO> rows = EasyExcelImportUtil.readFirstSheet(file, TicketSkuImportExcelDTO.class);
+        ImportResultRespDTO result = new ImportResultRespDTO();
+        if (rows.isEmpty()) {
+            result.addFail(1, "Excel 没有可导入的数据行，请保留表头并从第 2 行开始填写");
+            fillImportLogVariables(result);
+            return result;
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            int rowIndex = i + 2;
+            try {
+                TicketSkuImportExcelDTO row = rows.get(i);
+                validateTicketSkuImportRow(row);
+                TicketSkuSaveReqDTO requestParam = new TicketSkuSaveReqDTO();
+                requestParam.setEventId(row.getEventId());
+                requestParam.setTitle(row.getTitle().trim());
+                requestParam.setOriginalPrice(row.getOriginalPrice());
+                requestParam.setSellingPrice(row.getSellingPrice());
+                requestParam.setTotalStock(row.getTotalStock());
+                requestParam.setStage1Stock(row.getStage1Stock());
+                requestParam.setStage2Stock(row.getStage2Stock());
+                requestParam.setLimitNum(row.getLimitNum());
+                createTicketSku(requestParam);
+                result.addSuccess();
+            } catch (Exception ex) {
+                result.addFail(rowIndex, ex.getMessage());
+            }
+        }
+        fillImportLogVariables(result);
+        return result;
+    }
+
+    private void validateTicketSkuImportRow(TicketSkuImportExcelDTO row) {
+        if (row == null) {
+            throw new ClientException("空行不能导入");
+        }
+        if (row.getEventId() == null) {
+            throw new ClientException("eventId 不能为空");
+        }
+        if (row.getTitle() == null || row.getTitle().isBlank()) {
+            throw new ClientException("title 不能为空");
+        }
+        if (row.getSellingPrice() == null) {
+            throw new ClientException("sellingPrice 不能为空");
+        }
+        if (row.getSellingPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ClientException("sellingPrice 不能为负数");
+        }
+        if (row.getOriginalPrice() != null && row.getOriginalPrice().compareTo(BigDecimal.ZERO) < 0) {
+            throw new ClientException("originalPrice 不能为负数");
+        }
+        if (row.getTotalStock() == null || row.getTotalStock() <= 0) {
+            throw new ClientException("totalStock 必须为正整数");
+        }
+        if (row.getStage1Stock() != null && row.getStage1Stock() < 0) {
+            throw new ClientException("stage1Stock 不能为负数");
+        }
+        if (row.getStage2Stock() != null && row.getStage2Stock() < 0) {
+            throw new ClientException("stage2Stock 不能为负数");
+        }
+        if (row.getLimitNum() != null && row.getLimitNum() <= 0) {
+            throw new ClientException("limitNum 必须为正整数");
+        }
+    }
+
+    private void fillImportLogVariables(ImportResultRespDTO result) {
+        LogRecordContext.putVariable("importTotal", result.getTotal());
+        LogRecordContext.putVariable("importSuccess", result.getSuccess());
+        LogRecordContext.putVariable("importFail", result.getFail());
+        LogRecordContext.putVariable("importResult", result);
     }
 
     @Override

@@ -1,5 +1,5 @@
 import http from './http'
-import type { EventItem, EventSaveReq, EventUpdateReq, PageResult } from '@/types'
+import type { EventItem, EventSaveReq, EventUpdateReq, ImportResult, PageResult } from '@/types'
 
 export const eventApi = {
   page: (params?: { current?: number; size?: number }) =>
@@ -10,6 +10,14 @@ export const eventApi = {
 
   create: (data: EventSaveReq) =>
     http.post<any, void>('/api/live-start/merchant-admin/event/create', data),
+
+  importExcel: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return http.post<any, ImportResult>('/api/live-start/merchant-admin/event/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 
   update: (data: EventUpdateReq) =>
     http.put<any, void>('/api/live-start/merchant-admin/event/update', data),

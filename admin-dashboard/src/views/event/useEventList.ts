@@ -5,6 +5,7 @@ import { eventApi } from '@/api/event'
 import { performerApi } from '@/api/performer'
 import { styleApi } from '@/api/style'
 import { venueApi } from '@/api/venue'
+import { useExcelImport } from '@/composables/useExcelImport'
 import { eventConfigApi, type EventConfigItem } from '@/api/eventConfig'
 import type { EventItem, SaleStageItem, VenueItem } from '@/types'
 
@@ -400,6 +401,8 @@ export function useEventList() {
     void fetchVenueOptions()
   })
 
+  const { beforeUpload } = useExcelImport(eventApi.importExcel, fetchList)
+
   return {
     loading,
     list,
@@ -426,6 +429,7 @@ export function useEventList() {
     fetchList,
     onTableChange,
     openForm,
+    beforeUpload,
     onSubmit,
     openConfig,
     onConfigSubmit,

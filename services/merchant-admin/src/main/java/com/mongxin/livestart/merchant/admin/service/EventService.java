@@ -8,6 +8,8 @@ import com.mongxin.livestart.merchant.admin.dto.req.EventSaveReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventUpdateReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.EventPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.EventQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 演出业务逻辑层
@@ -20,6 +22,8 @@ public interface EventService extends IService<EventDO> {
      * @param requestParam 创建参数
      */
     void createEvent(EventSaveReqDTO requestParam);
+
+    ImportResultRespDTO importEvents(MultipartFile file);
 
     /**
      * 分页查询演出列表（支持按状态筛选）

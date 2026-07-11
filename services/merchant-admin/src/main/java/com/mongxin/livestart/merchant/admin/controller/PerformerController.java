@@ -5,6 +5,7 @@ import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.PerformerService;
@@ -12,6 +13,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 艺人/乐队管理控制层
@@ -29,6 +31,12 @@ public class PerformerController {
     public Result<Void> createPerformer(@RequestBody PerformerSaveReqDTO requestParam) {
         performerService.createPerformer(requestParam);
         return Results.success();
+    }
+
+    @Operation(summary = "Excel 批量导入艺人/乐队")
+    @PostMapping("/import")
+    public Result<ImportResultRespDTO> importPerformers(@RequestPart("file") MultipartFile file) {
+        return Results.success(performerService.importPerformers(file));
     }
 
     @Operation(summary = "分页查询艺人列表")

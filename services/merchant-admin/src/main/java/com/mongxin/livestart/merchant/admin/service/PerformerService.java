@@ -5,8 +5,10 @@ import com.baomidou.mybatisplus.extension.service.IService;
 import com.mongxin.livestart.merchant.admin.dao.entity.PerformerDO;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerQueryRespDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 艺人/乐队业务逻辑层
@@ -17,6 +19,8 @@ public interface PerformerService extends IService<PerformerDO> {
      * 创建艺人/乐队（名称防重）
      */
     void createPerformer(PerformerSaveReqDTO requestParam);
+
+    ImportResultRespDTO importPerformers(MultipartFile file);
 
     /**
      * 分页查询艺人（支持按名称模糊搜索）

@@ -201,6 +201,18 @@ export interface PageResult<T> {
   pages: number
 }
 
+export interface ImportErrorItem {
+  rowIndex: number
+  message: string
+}
+
+export interface ImportResult {
+  total: number
+  success: number
+  fail: number
+  errors: ImportErrorItem[]
+}
+
 export interface ApiResult<T = any> {
   code: string
   message: string

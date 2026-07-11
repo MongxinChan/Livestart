@@ -1,5 +1,5 @@
 import http from './http'
-import type { VenueItem, VenueSaveReq, PageResult } from '@/types'
+import type { ImportResult, VenueItem, VenueSaveReq, PageResult } from '@/types'
 
 export const venueApi = {
   page: (params?: { current?: number; size?: number }) =>
@@ -7,6 +7,14 @@ export const venueApi = {
 
   create: (data: VenueSaveReq) =>
     http.post<any, void>('/api/live-start/merchant-admin/venue/create', data),
+
+  importExcel: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return http.post<any, ImportResult>('/api/live-start/merchant-admin/venue/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 
   update: (data: VenueItem) =>
     http.put<any, void>('/api/live-start/merchant-admin/venue/update', data),

@@ -9,11 +9,13 @@ import com.mongxin.livestart.merchant.admin.dto.req.EventSaveReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventUpdateReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.EventPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.EventQueryRespDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.service.EventService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 演出管理控制层
@@ -32,6 +34,12 @@ public class EventController {
     public Result<Void> createEvent(@RequestBody EventSaveReqDTO requestParam) {
         eventService.createEvent(requestParam);
         return Results.success();
+    }
+
+    @Operation(summary = "Excel 批量导入演出")
+    @PostMapping("/import")
+    public Result<ImportResultRespDTO> importEvents(@RequestPart("file") MultipartFile file) {
+        return Results.success(eventService.importEvents(file));
     }
 
     @Operation(summary = "分页查询演出列表")

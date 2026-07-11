@@ -2,6 +2,12 @@
   <div>
     <a-page-header title="艺人管理" sub-title="管理演出艺人和乐队信息" :ghost="false" style="margin-bottom: 24px">
       <template #extra>
+        <a-upload :show-upload-list="false" accept=".xlsx,.xls" :before-upload="beforeUpload">
+          <a-button>
+            <template #icon><UploadOutlined /></template>
+            Excel 导入
+          </a-button>
+        </a-upload>
         <a-button type="primary" @click="openForm()">
           <template #icon><PlusOutlined /></template>
           新增艺人
@@ -77,7 +83,7 @@
 </template>
 
 <script setup lang="ts">
-import { PlusOutlined } from '@ant-design/icons-vue'
+import { PlusOutlined, UploadOutlined } from '@ant-design/icons-vue'
 import { usePerformerList } from './usePerformerList'
 
 const statusOptions = [
@@ -97,6 +103,7 @@ const {
   formData,
   styleOptions,
   openForm,
+  beforeUpload,
   onSubmit,
   onDelete,
 } = usePerformerList()

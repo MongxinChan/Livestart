@@ -54,6 +54,13 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
+        <!-- EasyExcel -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>easyexcel</artifactId>
+            <version>${easyexcel.version}</version>
+        </dependency>
+
         <!-- 接口文档 Knife4j (OpenAPI3 + Jakarta) -->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>

@@ -6,6 +6,7 @@ import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
 import com.mongxin.livestart.merchant.admin.dto.req.VenuePageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.VenueSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.VenuePageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.VenueQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.VenueService;
@@ -13,6 +14,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 场馆管理控制层
@@ -30,6 +32,12 @@ public class VenueController {
     public Result<Void> createVenue(@RequestBody VenueSaveReqDTO requestParam) {
         venueService.createVenue(requestParam);
         return Results.success();
+    }
+
+    @Operation(summary = "Excel 批量导入场所")
+    @PostMapping("/import")
+    public Result<ImportResultRespDTO> importVenues(@RequestPart("file") MultipartFile file) {
+        return Results.success(venueService.importVenues(file));
     }
 
     @Operation(summary = "分页查询场馆列表")

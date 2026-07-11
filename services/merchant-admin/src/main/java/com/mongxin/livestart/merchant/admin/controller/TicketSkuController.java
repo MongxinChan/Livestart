@@ -7,6 +7,7 @@ import com.mongxin.livestart.framework.web.Results;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuIncreaseStockReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.TicketSkuService;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -34,6 +36,12 @@ public class TicketSkuController {
     public Result<Void> createTicketSku(@RequestBody TicketSkuSaveReqDTO requestParam) {
         ticketSkuService.createTicketSku(requestParam);
         return Results.success();
+    }
+
+    @Operation(summary = "Excel 批量导入票档")
+    @PostMapping("/import")
+    public Result<ImportResultRespDTO> importTicketSkus(@RequestPart("file") MultipartFile file) {
+        return Results.success(ticketSkuService.importTicketSkus(file));
     }
 
     @Operation(summary = "按演出ID查询票种列表")

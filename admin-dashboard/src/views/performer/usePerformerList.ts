@@ -2,6 +2,7 @@ import { onMounted, reactive, ref } from 'vue'
 import { message } from 'ant-design-vue'
 import { performerApi } from '@/api/performer'
 import { styleApi } from '@/api/style'
+import { useExcelImport } from '@/composables/useExcelImport'
 import type { PerformerItem, PerformerSaveReq } from '@/types'
 import { performerTableColumns } from './columns'
 
@@ -124,6 +125,8 @@ export function usePerformerList() {
     void fetchStyleOptions()
   })
 
+  const { beforeUpload } = useExcelImport(performerApi.importExcel, fetchList)
+
   return {
     columns: performerTableColumns,
     loading,
@@ -136,6 +139,7 @@ export function usePerformerList() {
     formData,
     styleOptions,
     openForm,
+    beforeUpload,
     onSubmit,
     onDelete,
   }

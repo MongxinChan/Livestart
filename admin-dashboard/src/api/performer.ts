@@ -1,5 +1,5 @@
 import http from './http'
-import type { PerformerItem, PerformerSaveReq, PageResult } from '@/types'
+import type { ImportResult, PerformerItem, PerformerSaveReq, PageResult } from '@/types'
 
 export const performerApi = {
   page: (params?: { current?: number; size?: number }) =>
@@ -7,6 +7,14 @@ export const performerApi = {
 
   create: (data: PerformerSaveReq) =>
     http.post<any, void>('/api/live-start/merchant-admin/performer/create', data),
+
+  importExcel: (file: File) => {
+    const formData = new FormData()
+    formData.append('file', file)
+    return http.post<any, ImportResult>('/api/live-start/merchant-admin/performer/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
 
   update: (data: PerformerItem) =>
     http.put<any, void>('/api/live-start/merchant-admin/performer/update', data),

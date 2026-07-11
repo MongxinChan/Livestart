@@ -14,13 +14,17 @@ import com.mongxin.livestart.merchant.admin.dao.entity.PerformerStyleRelationDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.PerformerMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.StyleMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.PerformerStyleRelationMapper;
+import com.mongxin.livestart.merchant.admin.dto.req.PerformerImportExcelDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.PerformerSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.PerformerService;
+import com.mongxin.livestart.merchant.admin.toolkit.EasyExcelImportUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -79,6 +83,46 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
                     .performerId(performerDO.getId())
                     .styleId(performerDO.getStyleId())
                     .build());
+        }
+    }
+
+    @Override
+    public ImportResultRespDTO importPerformers(MultipartFile file) {
+        List<PerformerImportExcelDTO> rows = EasyExcelImportUtil.readFirstSheet(file, PerformerImportExcelDTO.class);
+        ImportResultRespDTO result = new ImportResultRespDTO();
+        if (rows.isEmpty()) {
+            result.addFail(1, "Excel 没有可导入的数据行，请保留表头并从第 2 行开始填写");
+            return result;
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            int rowIndex = i + 2;
+            try {
+                PerformerImportExcelDTO row = rows.get(i);
+                validatePerformerImportRow(row);
+                PerformerSaveReqDTO requestParam = new PerformerSaveReqDTO();
+                requestParam.setName(row.getName().trim());
+                requestParam.setStyleId(row.getStyleId());
+                requestParam.setAvatar(StrUtil.trim(row.getAvatar()));
+                requestParam.setBio(StrUtil.trim(row.getBio()));
+                requestParam.setStatus(row.getStatus() == null ? 1 : row.getStatus());
+                createPerformer(requestParam);
+                result.addSuccess();
+            } catch (Exception ex) {
+                result.addFail(rowIndex, ex.getMessage());
+            }
+        }
+        return result;
+    }
+
+    private void validatePerformerImportRow(PerformerImportExcelDTO row) {
+        if (row == null) {
+            throw new ServiceException("空行不能导入");
+        }
+        if (StrUtil.isBlank(row.getName())) {
+            throw new ServiceException("name 不能为空");
+        }
+        if (row.getStatus() != null && row.getStatus() != 0 && row.getStatus() != 1) {
+            throw new ServiceException("status 只能填写 0 或 1");
         }
     }
 

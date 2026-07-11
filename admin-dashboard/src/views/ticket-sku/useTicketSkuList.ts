@@ -2,6 +2,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { ticketSkuApi } from '@/api/ticketSku'
 import { eventApi } from '@/api/event'
+import { useExcelImport } from '@/composables/useExcelImport'
 import type { EventItem, TicketSkuItem } from '@/types'
 import { ticketSkuTableColumns } from './columns'
 
@@ -218,6 +219,8 @@ export function useTicketSkuList() {
     void fetchList()
   })
 
+  const { beforeUpload } = useExcelImport(ticketSkuApi.importExcel, fetchList)
+
   return {
     columns: ticketSkuTableColumns,
     loading,
@@ -241,6 +244,7 @@ export function useTicketSkuList() {
     increaseStockTarget,
     increaseStockCount,
     openForm,
+    beforeUpload,
     openIncreaseStock,
     onSubmit,
     onSubmitIncreaseStock,

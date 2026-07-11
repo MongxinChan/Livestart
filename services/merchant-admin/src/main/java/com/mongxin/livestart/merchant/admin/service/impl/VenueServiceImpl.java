@@ -10,13 +10,19 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.merchant.admin.dao.entity.VenueDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.VenueMapper;
+import com.mongxin.livestart.merchant.admin.dto.req.VenueImportExcelDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.VenuePageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.VenueSaveReqDTO;
+import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.VenuePageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.VenueQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.VenueService;
+import com.mongxin.livestart.merchant.admin.toolkit.EasyExcelImportUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.List;
 
 /**
  * 场馆服务实现层
@@ -34,6 +40,49 @@ public class VenueServiceImpl extends ServiceImpl<VenueMapper, VenueDO> implemen
         }
         VenueDO venueDO = BeanUtil.toBean(requestParam, VenueDO.class);
         save(venueDO);
+    }
+
+    @Override
+    public ImportResultRespDTO importVenues(MultipartFile file) {
+        List<VenueImportExcelDTO> rows = EasyExcelImportUtil.readFirstSheet(file, VenueImportExcelDTO.class);
+        ImportResultRespDTO result = new ImportResultRespDTO();
+        if (rows.isEmpty()) {
+            result.addFail(1, "Excel 没有可导入的数据行，请保留表头并从第 2 行开始填写");
+            return result;
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            int rowIndex = i + 2;
+            try {
+                VenueImportExcelDTO row = rows.get(i);
+                validateVenueImportRow(row);
+                VenueSaveReqDTO requestParam = new VenueSaveReqDTO();
+                requestParam.setName(row.getName().trim());
+                requestParam.setCity(row.getCity().trim());
+                requestParam.setAddress(StrUtil.trim(row.getAddress()));
+                requestParam.setCapacity(row.getCapacity());
+                requestParam.setOwnerUserId(row.getOwnerUserId());
+                createVenue(requestParam);
+                result.addSuccess();
+            } catch (Exception ex) {
+                result.addFail(rowIndex, ex.getMessage());
+            }
+        }
+        return result;
+    }
+
+    private void validateVenueImportRow(VenueImportExcelDTO row) {
+        if (row == null) {
+            throw new ServiceException("空行不能导入");
+        }
+        if (StrUtil.isBlank(row.getName())) {
+            throw new ServiceException("name 不能为空");
+        }
+        if (StrUtil.isBlank(row.getCity())) {
+            throw new ServiceException("city 不能为空");
+        }
+        if (row.getCapacity() != null && row.getCapacity() < 0) {
+            throw new ServiceException("capacity 不能为负数");
+        }
     }
 
     @Override
