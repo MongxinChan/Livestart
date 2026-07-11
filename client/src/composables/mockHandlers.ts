@@ -25,6 +25,11 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
+      if (url.includes('/api/live-start/admin/v1/user/me') && (!options.method || options.method === 'GET')) {
+        resolve(apiState.currentUser)
+        return
+      }
+
       if (url.includes('/api/live-start/admin/v1/user/') && (!options.method || options.method === 'GET')) {
         resolve(apiState.currentUser)
         return

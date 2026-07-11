@@ -144,10 +144,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Override
     public void update(UserUpdateReqDTO requestParam) {
         String currentPhone = UserContext.getPhone();
-        String targetPhone = StrUtil.blankToDefault(currentPhone, requestParam.getPhone());
-        if (StrUtil.isBlank(targetPhone)) {
+        if (StrUtil.isBlank(currentPhone)) {
             throw new ClientException("当前用户未登录，请重新登录");
         }
+        if (StrUtil.isNotBlank(requestParam.getPhone()) && !currentPhone.equals(requestParam.getPhone().trim())) {
+            throw new ClientException("只能修改当前登录用户的资料");
+        }
+        String targetPhone = currentPhone;
 
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
                 .eq(UserDO::getPhone, targetPhone)

@@ -14,6 +14,7 @@ export interface CurrentUser {
   mail?: string
   signature?: string
   gender?: number
+  birthday?: string
 }
 
 function isPhoneValid(phone?: string): boolean {

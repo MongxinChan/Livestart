@@ -87,7 +87,12 @@ async function handleAuthSubmit() {
     apiState.token = data.token
     apiState.phone = authForm.phone
 
-    const userRes = await request<any>(`/api/live-start/admin/v1/user/${authForm.phone}`)
+    let userRes: any
+    try {
+      userRes = await request<any>('/api/live-start/admin/v1/user/me')
+    } catch {
+      userRes = await request<any>(`/api/live-start/admin/v1/user/${authForm.phone}`)
+    }
     apiState.userId = String(userRes.id)
     apiState.currentUser = {
       ...userRes,

@@ -76,6 +76,11 @@
                 <a-segmented v-model:value="form.gender" :options="genderOptions" block />
               </a-form-item>
             </a-col>
+            <a-col :xs="24" :md="12">
+              <a-form-item label="生日">
+                <a-input v-model:value="form.birthday" type="date" />
+              </a-form-item>
+            </a-col>
           </a-row>
 
           <a-form-item label="个性签名">
@@ -122,6 +127,7 @@ const form = reactive({
   mail: '',
   signature: '',
   gender: 0,
+  birthday: '',
 })
 
 const displayInitial = computed(() => (form.realName || form.username || 'U').substring(0, 1))
@@ -134,6 +140,17 @@ function hydrateForm() {
   form.mail = user?.mail || ''
   form.signature = user?.signature || ''
   form.gender = user?.gender ?? 0
+  form.birthday = normalizeBirthday(user?.birthday)
+}
+
+function normalizeBirthday(value?: string | number | Date) {
+  if (!value) {
+    return ''
+  }
+  if (typeof value === 'string') {
+    return value.substring(0, 10)
+  }
+  return new Date(value).toISOString().substring(0, 10)
 }
 
 function chooseFile() {
@@ -209,6 +226,7 @@ async function saveProfile() {
         mail: form.mail.trim(),
         signature: form.signature.trim(),
         gender: form.gender,
+        birthday: form.birthday || null,
       }),
     })
 
