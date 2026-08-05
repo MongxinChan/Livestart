@@ -5,16 +5,16 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 /**
- * 订单核销请求
+ * 电子票核验请求。
  */
 @Data
-@Schema(description = "订单核销请求")
+@Schema(description = "电子票核验请求")
 public class TicketOrderCheckReqDTO {
 
     /**
-     * 订单流水号
+     * 电子票核销码（电脑端输入票码，模拟扫码）
      */
-    @NotBlank(message = "订单流水号不能为空")
-    @Schema(description = "订单流水号", requiredMode = Schema.RequiredMode.REQUIRED)
-    private String orderNo;
+    @NotBlank(message = "电子票码不能为空")
+    @Schema(description = "电子票核销码", requiredMode = Schema.RequiredMode.REQUIRED)
+    private String checkCode;
 }

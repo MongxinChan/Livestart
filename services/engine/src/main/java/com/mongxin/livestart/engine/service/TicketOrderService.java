@@ -10,6 +10,7 @@ import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
 import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyRespDTO;
 
 import java.math.BigDecimal;
 
@@ -98,4 +99,9 @@ public interface TicketOrderService {
      * @return 订单详情
      */
     TicketOrderDetailRespDTO getOrderDetail(String orderNo);
+
+    /**
+     * 后台验票人员根据电子票核销码核验入场。
+     */
+    TicketVerifyRespDTO verifyTicket(String checkCode);
 }

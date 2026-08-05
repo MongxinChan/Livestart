@@ -34,6 +34,7 @@ import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
 import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyRespDTO;
 import com.mongxin.livestart.engine.mq.event.OrderPaySuccessEvent;
 import com.mongxin.livestart.engine.mq.event.TicketOrderCreateEvent;
 import com.mongxin.livestart.engine.mq.producer.OrderPaySuccessProducer;
@@ -440,6 +441,8 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             dto.setStatus(order.getStatus());
             dto.setStatusDesc(OrderStatusEnum.fromCode(order.getStatus()).getDesc());
             dto.setCreateTime(order.getCreateTime());
+            dto.setCheckCode(firstItem != null ? firstItem.getCheckCode() : null);
+            dto.setIsChecked(firstItem != null ? firstItem.getIsChecked() : 0);
             return dto;
         });
     }
@@ -549,6 +552,47 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         return page;
     }
 
+    @Override
+    public TicketVerifyRespDTO verifyTicket(String checkCode) {
+        Integer userType = UserContext.getUserType();
+        if (userType == null || (userType != USER_TYPE_SUPER_ADMIN && userType != USER_TYPE_VENUE_ADMIN)) {
+            throw new ClientException("当前用户无验票权限");
+        }
+        String normalizedCode = StrUtil.trim(checkCode);
+        if (StrUtil.isBlank(normalizedCode)) {
+            throw new ClientException("电子票码不能为空");
+        }
+
+        OrderItemDO item = orderItemMapper.selectOne(Wrappers.lambdaQuery(OrderItemDO.class)
+                .eq(OrderItemDO::getCheckCode, normalizedCode));
+        if (item == null) {
+            throw new ClientException("无效电子票码");
+        }
+
+        OrderDO order = getOrderByOrderNo(item.getOrderNo());
+        if (order == null || !OrderStatusEnum.PAID.equals(OrderStatusEnum.fromCode(order.getStatus()))) {
+            throw new ClientException("该电子票尚未支付或订单已失效");
+        }
+
+        int affected = orderItemMapper.update(null, Wrappers.lambdaUpdate(OrderItemDO.class)
+                .eq(OrderItemDO::getCheckCode, normalizedCode)
+                .eq(OrderItemDO::getIsChecked, 0)
+                .set(OrderItemDO::getIsChecked, 1));
+        if (!SqlHelper.retBool(affected)) {
+            throw new ClientException("该电子票已核验");
+        }
+
+        TicketVerifyRespDTO result = new TicketVerifyRespDTO();
+        result.setOrderNo(item.getOrderNo());
+        result.setCheckCode(item.getCheckCode());
+        result.setEventId(item.getEventId());
+        result.setSkuId(item.getSkuId());
+        result.setVisitorId(item.getVisitorId());
+        result.setStatus("已入场");
+        result.setCheckedAt(new Date());
+        log.info("[现场验票] 核验成功，orderNo={}, checkCode={}", item.getOrderNo(), normalizedCode);
+        return result;
+    }
     @Override
     public TicketOrderDetailRespDTO getOrderDetail(String orderNo) {
         String userId = requireUserId();

@@ -62,7 +62,7 @@
                 <span
                   style="font-size: 11px; font-family: monospace; font-weight: 600; color: var(--ant-color-success)"
                 >
-                  {{ order.checkCode.substring(0, 11) }}
+                  {{ order.checkCode }}
                 </span>
               </template>
               <template v-else-if="order.status === 1">
@@ -105,10 +105,6 @@
 
             <template v-if="order.status === 1 && order.checkCode && !order.isChecked">
               <a-button size="small" danger @click="refundOrder(order.orderNo)">退票申请</a-button>
-              <a-button size="small" type="primary" @click="performCheckCode(order)">
-                <template #icon><CheckCircleOutlined /></template>
-                模拟入场核销
-              </a-button>
             </template>
           </div>
         </a-card>
@@ -187,7 +183,6 @@ import {
   QrcodeOutlined,
   StopOutlined,
   WalletOutlined,
-  CheckCircleOutlined,
   WechatOutlined,
   AlipayCircleOutlined,
   LoadingOutlined,
@@ -208,6 +203,5 @@ const {
   confirmMockPay,
   cancelOrder,
   refundOrder,
-  performCheckCode,
 } = useMyTickets()
 </script>

@@ -6,6 +6,7 @@ import com.mongxin.livestart.framework.idempotent.NoDuplicateSubmit;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.mongxin.livestart.engine.dto.req.AdminOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO;
+import com.mongxin.livestart.engine.dto.req.TicketOrderCheckReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCreateReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPayCallbackReqDTO;
@@ -13,6 +14,7 @@ import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
 import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyRespDTO;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
@@ -182,5 +184,14 @@ public class TicketOrderController {
     @GetMapping("/detail/{orderNo}")
     public Result<TicketOrderDetailRespDTO> getOrderDetail(@PathVariable String orderNo) {
         return Results.success(ticketOrderService.getOrderDetail(orderNo));
+    }
+
+    /**
+     * 现场验票（电脑端输入票码，模拟扫码）。
+     */
+    @Operation(summary = "现场验票", description = "后台验票人员输入电子票核销码并完成入场核验")
+    @PostMapping("/verify")
+    public Result<TicketVerifyRespDTO> verifyTicket(@Valid @RequestBody TicketOrderCheckReqDTO requestParam) {
+        return Results.success(ticketOrderService.verifyTicket(requestParam.getCheckCode()));
     }
 }

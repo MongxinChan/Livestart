@@ -72,4 +72,15 @@ public class TicketOrderPageQueryRespDTO {
      */
     @Schema(description = "下单时间")
     private Date createTime;
+    /**
+     * 首张电子票核销码，用于用户出示和现场验票。
+     */
+    @Schema(description = "首张电子票核销码")
+    private String checkCode;
+
+    /**
+     * 首张电子票入场状态：0-未入场 1-已入场。
+     */
+    @Schema(description = "首张电子票入场状态：0-未入场 1-已入场")
+    private Integer isChecked;
 }

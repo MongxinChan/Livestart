@@ -20,7 +20,8 @@
  *   2. 02_livestart_sharded_schema.sql
  *   3. 03_tables_xxl_job.sql
  *   4. 04_feature_and_job_upgrade.sql (This script)
- *   5. 05_test_seed_data.sql
+ *   5. 09_distribution_tables_upgrade.sql
+ *   6. 05_test_seed_data.sql
  */
 
 DELIMITER //

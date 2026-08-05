@@ -34,6 +34,7 @@
           <template #title>运营管理</template>
           <a-menu-item v-if="isSuper" key="/user">用户管理</a-menu-item>
           <a-menu-item key="/order">订单管理</a-menu-item>
+          <a-menu-item key="/verify">现场验票</a-menu-item>
         </a-sub-menu>
 
         <a-menu-item key="/settlement">

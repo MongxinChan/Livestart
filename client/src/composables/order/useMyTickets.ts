@@ -108,26 +108,6 @@ export function useMyTickets() {
     })
   }
 
-  function performCheckCode(order: Order) {
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const osc = audioCtx.createOscillator()
-      const gain = audioCtx.createGain()
-      osc.connect(gain)
-      gain.connect(audioCtx.destination)
-      osc.type = 'triangle'
-      osc.frequency.setValueAtTime(120, audioCtx.currentTime)
-      gain.gain.setValueAtTime(0.12, audioCtx.currentTime)
-      gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15)
-      osc.start()
-      setTimeout(() => osc.stop(), 150)
-    } catch (_) {
-      // 忽略音频错误
-    }
-
-    order.isChecked = 1
-    message.success('核销成功，该电子票已失效')
-  }
 
   onMounted(() => {
     void fetchOrders()
@@ -144,6 +124,5 @@ export function useMyTickets() {
     confirmMockPay,
     cancelOrder,
     refundOrder,
-    performCheckCode,
   }
 }

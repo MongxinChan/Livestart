@@ -66,6 +66,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '用户管理', requiresAuth: true, allowRoles: SUPER_ONLY },
       },
       {
+        path: 'verify',
+        name: 'TicketVerify',
+        component: () => import('@/views/verify/Index.vue'),
+        meta: { title: '现场验票', requiresAuth: true, allowRoles: ADMIN_AND_VENUE },
+      },
+      {
         path: 'order',
         name: 'OrderList',
         component: () => import('@/views/order/List.vue'),

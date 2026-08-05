@@ -4,4 +4,6 @@ import type { PageResult } from '@/types'
 export const orderApi = {
   page: (params?: { status?: number; eventId?: number; venueId?: number; current?: number; size?: number }) =>
     http.get<any, PageResult<any>>('/api/live-start/engine/order/admin/page', { params }),
+  verify: (checkCode: string) =>
+    http.post<any, any>('/api/live-start/engine/order/verify', { checkCode }),
 }
