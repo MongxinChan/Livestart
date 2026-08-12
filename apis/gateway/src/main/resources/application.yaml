@@ -58,6 +58,14 @@ spring:
           filters:
             - RewritePath=/api/live-start/engine/(?<segment>.*), /api/engine/${segment}
 
+        # 支付服务（支付宝支付、回调、退款）
+        - id: livestart-pay
+          uri: http://localhost:8009
+          predicates:
+            - Path=/api/live-start/pay/**
+          filters:
+            - RewritePath=/api/live-start/pay/(?<segment>.*), /api/pay/${segment}
+
         # ----------------------------------------------------------------
         # 分发/推广服务 (distribution)
         # 端口: 8005 | 包含：优惠券/邀请码/分销提成

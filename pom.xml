@@ -17,6 +17,7 @@
         <module>services/merchant-admin</module>
         <module>services/search</module>
         <module>services/settlement</module>
+        <module>services/pay-service</module>
     </modules>
 
     <properties>

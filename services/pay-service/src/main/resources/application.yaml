@@ -1,0 +1,39 @@
+server:
+  port: 8009
+
+spring:
+  application:
+    name: Livestart-pay-service
+  datasource:
+    url: ${PAY_DB_URL:jdbc:mysql://127.0.0.1:3306/live_start_pay?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${PAY_DB_USERNAME:root}
+    password: ${PAY_DB_PASSWORD:123456}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+rocketmq:
+  name-server: ${ROCKETMQ_NAME_SERVER:127.0.0.1:9876}
+  producer:
+    group: Livestart_pay-service_common-message-execute_pg
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 3
+
+feign:
+  engine:
+    url: ${LIVESTART_ENGINE_URL:http://127.0.0.1:8004}
+
+livestart:
+  pay:
+    internal-token: ${LIVESTART_INTERNAL_TOKEN:change-me}
+    alipay:
+      app-id: ${ALIPAY_APP_ID:9021000164662769}
+      private-key: ${ALIPAY_PRIVATE_KEY:xxx}
+      public-key: ${ALIPAY_PUBLIC_KEY:xxx}
+      gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi.alipaydev.com/gateway.do}
+      notify-url: ${ALIPAY_NOTIFY_URL:http://127.0.0.1:8888/api/live-start/pay/pay/callback/alipay}
+      return-url: ${ALIPAY_RETURN_URL:http://localhost:3000}
+      charset: UTF-8
+      sign-type: RSA2
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
