@@ -5,7 +5,6 @@ import com.mongxin.livestart.engine.dto.req.AdminOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCreateReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPageQueryReqDTO;
-import com.mongxin.livestart.engine.dto.req.TicketOrderPayCallbackReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
 import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
@@ -35,13 +34,6 @@ public interface TicketOrderService {
      * @return 订单流水号
      */
     String createOrder(TicketOrderCreateReqDTO requestParam, String pathToken);
-
-    /**
-     * 支付回调（出票）
-     *
-     * @param requestParam 支付回调参数
-     */
-    void payCallback(TicketOrderPayCallbackReqDTO requestParam);
 
     /**
      * 发起支付宝沙箱支付

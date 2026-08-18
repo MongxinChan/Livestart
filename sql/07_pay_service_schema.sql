@@ -21,3 +21,20 @@ CREATE TABLE IF NOT EXISTS `t_pay` (
   UNIQUE KEY `uk_order_no` (`order_no`),
   UNIQUE KEY `uk_trade_no` (`trade_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LiveStart支付单';
+
+CREATE TABLE IF NOT EXISTS `t_refund` (
+  `id` bigint NOT NULL,
+  `refund_no` varchar(64) NOT NULL,
+  `order_no` varchar(64) NOT NULL,
+  `pay_sn` varchar(64) NOT NULL,
+  `trade_no` varchar(128) NOT NULL,
+  `refund_trade_no` varchar(128) DEFAULT NULL,
+  `refund_amount` decimal(10,2) NOT NULL,
+  `reason` varchar(256) DEFAULT NULL,
+  `status` tinyint NOT NULL DEFAULT 0,
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_refund_no` (`refund_no`),
+  UNIQUE KEY `uk_refund_order_no` (`order_no`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LiveStart退款单';

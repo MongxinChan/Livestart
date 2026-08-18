@@ -5,10 +5,6 @@ import cn.hutool.core.lang.Singleton;
 import cn.hutool.core.lang.UUID;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.SecureUtil;
-import com.alibaba.fastjson2.JSONObject;
-import com.alipay.api.AlipayClient;
-import com.alipay.api.DefaultAlipayClient;
-import com.alipay.api.request.AlipayTradePagePayRequest;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -18,7 +14,6 @@ import com.mongxin.livestart.engine.common.biz.user.UserContext;
 import com.mongxin.livestart.engine.common.constant.EngineRedisConstant;
 import com.mongxin.livestart.engine.common.enums.OrderStatusEnum;
 import com.mongxin.livestart.engine.common.enums.StockDecrementErrorEnum;
-import com.mongxin.livestart.engine.config.AlipayConfig;
 import com.mongxin.livestart.engine.dao.entity.OrderDO;
 import com.mongxin.livestart.engine.dao.entity.OrderItemDO;
 import com.mongxin.livestart.engine.dao.entity.TicketSkuDO;
@@ -29,7 +24,6 @@ import com.mongxin.livestart.engine.dto.req.AdminOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCreateReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderPageQueryReqDTO;
-import com.mongxin.livestart.engine.dto.req.TicketOrderPayCallbackReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderRefundReqDTO;
 import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
@@ -41,6 +35,9 @@ import com.mongxin.livestart.engine.mq.producer.OrderPaySuccessProducer;
 import com.mongxin.livestart.engine.mq.producer.TicketOrderCreateProducer;
 import com.mongxin.livestart.engine.remote.AdminRemoteService;
 import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
+import com.mongxin.livestart.engine.remote.PayRemoteService;
+import com.mongxin.livestart.engine.remote.dto.PayCreateRequestDTO;
+import com.mongxin.livestart.engine.remote.dto.RefundCreateRequestDTO;
 import com.mongxin.livestart.engine.remote.dto.AdminUserSimpleRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
@@ -94,11 +91,11 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private final TicketSkuMapper ticketSkuMapper;
     private final AdminRemoteService adminRemoteService;
     private final MerchantAdminRemoteService merchantAdminRemoteService;
+    private final PayRemoteService payRemoteService;
     private final StringRedisTemplate stringRedisTemplate;
     private final TransactionTemplate transactionTemplate;
     private final OrderPaySuccessProducer orderPaySuccessProducer;
     private final TicketOrderCreateProducer ticketOrderCreateProducer;
-    private final AlipayConfig alipayConfig;
 
     @Value("${livestart.engine.local-order-mode:false}")
     private boolean localOrderMode;
@@ -233,47 +230,14 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     }
 
     @Override
-    public void payCallback(TicketOrderPayCallbackReqDTO requestParam) {
-        paySuccess(requestParam.getOrderNo(), requestParam.getTradeNo(), requestParam.getPayAmount());
-    }
-
-    @Override
     public String payWithAlipay(String orderNo) {
         String userId = requireUserId();
-        OrderDO order = getOrderByNo(orderNo, Long.parseLong(userId));
-        if (order == null) {
-            throw new ClientException("订单不存在");
+        var result = payRemoteService.create(
+                new PayCreateRequestDTO(orderNo, "LiveStart 演出门票 - " + orderNo), userId);
+        if (result == null || result.isFail() || result.getData() == null) {
+            throw new ServiceException(result == null ? "支付服务不可用" : result.getMessage());
         }
-        if (!OrderStatusEnum.PENDING_PAYMENT.equals(OrderStatusEnum.fromCode(order.getStatus()))) {
-            throw new ClientException("订单状态异常，无法发起支付");
-        }
-
-        try {
-            AlipayClient client = new DefaultAlipayClient(
-                    alipayConfig.getGatewayUrl(),
-                    alipayConfig.getAppId(),
-                    alipayConfig.getPrivateKey(),
-                    "json",
-                    alipayConfig.getCharset(),
-                    alipayConfig.getPublicKey(),
-                    alipayConfig.getSignType()
-            );
-
-            AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
-            request.setNotifyUrl(alipayConfig.getNotifyUrl());
-            request.setReturnUrl(alipayConfig.getReturnUrl());
-
-            JSONObject biz = new JSONObject();
-            biz.put("out_trade_no", order.getOrderNo());
-            biz.put("total_amount", order.getTotalAmount().toString());
-            biz.put("subject", "LiveStart 票务订单 - " + order.getOrderNo());
-            biz.put("product_code", "FAST_INSTANT_TRADE_PAY");
-            request.setBizContent(biz.toString());
-            return client.pageExecute(request).getBody();
-        } catch (Exception ex) {
-            log.error("[支付宝支付] 发起支付异常，orderNo={}", orderNo, ex);
-            throw new ServiceException("支付宝支付接口调用失败：" + ex.getMessage());
-        }
+        return result.getData().getBody();
     }
 
     @Override
@@ -387,6 +351,14 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         }
         if (order.getStatus() != OrderStatusEnum.PAID.getCode()) {
             throw new ClientException("仅已支付订单可以申请退票");
+        }
+
+        var refundResult = payRemoteService.refund(
+                new RefundCreateRequestDTO(requestParam.getOrderNo(), requestParam.getReason()), userId);
+        if (refundResult == null || refundResult.isFail() || refundResult.getData() == null
+                || !Integer.valueOf(1).equals(refundResult.getData().getStatus())) {
+            throw new ServiceException(refundResult == null ? "支付服务不可用"
+                    : (refundResult.getMessage() == null ? "退款失败" : refundResult.getMessage()));
         }
 
         int affected = orderMapper.updateOrderStatus(
