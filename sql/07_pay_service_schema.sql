@@ -38,3 +38,19 @@ CREATE TABLE IF NOT EXISTS `t_refund` (
   UNIQUE KEY `uk_refund_no` (`refund_no`),
   UNIQUE KEY `uk_refund_order_no` (`order_no`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='LiveStart退款单';
+
+CREATE TABLE IF NOT EXISTS `t_pay_outbox` (
+  `id` bigint NOT NULL,
+  `event_id` varchar(64) NOT NULL,
+  `aggregate_id` varchar(64) NOT NULL,
+  `event_type` varchar(64) NOT NULL,
+  `payload` text NOT NULL,
+  `status` tinyint NOT NULL DEFAULT 0,
+  `retry_count` int NOT NULL DEFAULT 0,
+  `next_retry_time` datetime DEFAULT NULL,
+  `create_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uk_pay_outbox_event_id` (`event_id`),
+  KEY `idx_pay_outbox_pending` (`status`, `next_retry_time`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='支付事件Outbox';

@@ -1,0 +1,51 @@
+dataSources:
+  ds_0:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: ${PAY_DB_0_URL:jdbc:mysql://127.0.0.1:3306/live_start_pay_0?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${PAY_DB_USERNAME:root}
+    password: ${PAY_DB_PASSWORD:123456}
+  ds_1:
+    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
+    driverClassName: com.mysql.cj.jdbc.Driver
+    jdbcUrl: ${PAY_DB_1_URL:jdbc:mysql://127.0.0.1:3306/live_start_pay_1?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
+    username: ${PAY_DB_USERNAME:root}
+    password: ${PAY_DB_PASSWORD:123456}
+
+rules:
+  - !SHARDING
+    tables:
+      t_pay:
+        actualDataNodes: ds_${0..1}.t_pay_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: order_no
+            shardingAlgorithmName: pay_route
+        tableStrategy:
+          standard:
+            shardingColumn: order_no
+            shardingAlgorithmName: pay_route
+      t_refund:
+        actualDataNodes: ds_${0..1}.t_refund_${0..15}
+        databaseStrategy:
+          standard:
+            shardingColumn: order_no
+            shardingAlgorithmName: pay_route
+      t_pay_outbox:
+        actualDataNodes: ds_0.t_pay_outbox
+        tableStrategy:
+          standard:
+            shardingColumn: order_no
+            shardingAlgorithmName: pay_route
+    shardingAlgorithms:
+      pay_route:
+        type: CLASS_BASED
+        props:
+          strategy: STANDARD
+          algorithmClassName: com.mongxin.livestart.pay.dao.algorithm.PayShardingAlgorithm
+    keyGenerators:
+      snowflake:
+        type: SNOWFLAKE
+
+props:
+  sql-show: false

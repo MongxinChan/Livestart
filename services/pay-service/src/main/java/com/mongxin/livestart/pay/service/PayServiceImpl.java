@@ -1,5 +1,6 @@
 package com.mongxin.livestart.pay.service;
 
+import com.alibaba.fastjson2.JSON;
 import com.alipay.api.AlipayClient;
 import com.alipay.api.DefaultAlipayClient;
 import com.alipay.api.request.AlipayTradePagePayRequest;
@@ -12,6 +13,8 @@ import com.mongxin.livestart.pay.config.AlipayProperties;
 import com.mongxin.livestart.pay.config.PayServiceProperties;
 import com.mongxin.livestart.pay.dao.entity.PayDO;
 import com.mongxin.livestart.pay.dao.mapper.PayMapper;
+import com.mongxin.livestart.pay.dao.entity.PayOutboxDO;
+import com.mongxin.livestart.pay.dao.mapper.PayOutboxMapper;
 import com.mongxin.livestart.pay.dto.PayCreateRequest;
 import com.mongxin.livestart.pay.dto.PayCreateResponse;
 import com.mongxin.livestart.pay.mq.PayResultEvent;
@@ -34,7 +37,7 @@ import java.util.UUID;
 public class PayServiceImpl implements PayService {
     private final PayMapper payMapper;
     private final OrderRemoteService orderRemoteService;
-    private final PayResultProducer payResultProducer;
+    private final PayOutboxMapper payOutboxMapper;
     private final AlipayProperties alipayProperties;
     private final PayServiceProperties payServiceProperties;
 
@@ -112,6 +115,9 @@ public class PayServiceImpl implements PayService {
         }
         String orderNo = params.get("out_trade_no");
         String tradeNo = params.get("trade_no");
+        if (orderNo == null || orderNo.isBlank() || tradeNo == null || tradeNo.isBlank()) {
+            throw new ClientException("支付宝回调缺少订单或交易流水号");
+        }
         BigDecimal amount = new BigDecimal(params.get("total_amount"));
         PayDO pay = payMapper.selectOne(Wrappers.lambdaQuery(PayDO.class).eq(PayDO::getOrderNo, orderNo));
         if (pay == null || pay.getTotalAmount().compareTo(amount) != 0) {
@@ -122,14 +128,27 @@ public class PayServiceImpl implements PayService {
             return;
         }
         if (pay.getStatus() == PayStatus.TRADE_SUCCESS) {
+            if (!tradeNo.equals(pay.getTradeNo())) {
+                throw new ClientException("支付单交易流水号不匹配");
+            }
             return;
         }
         int affected = payMapper.markSuccessIfPending(orderNo, PayStatus.TRADE_SUCCESS,
                 PayStatus.WAIT_BUYER_PAY, tradeNo, amount, new Date());
         if (affected == 1) {
-            payResultProducer.send(PayResultEvent.builder().eventId(UUID.randomUUID().toString())
+            PayResultEvent event = PayResultEvent.builder().eventId(UUID.randomUUID().toString())
                     .paySn(pay.getPaySn()).orderNo(orderNo).userId(pay.getUserId()).tradeNo(tradeNo)
-                    .payAmount(amount).paidAt(new Date()).build());
+                    .payAmount(amount).paidAt(new Date()).build();
+            PayOutboxDO outbox = new PayOutboxDO();
+            outbox.setEventId(event.getEventId());
+            outbox.setAggregateId(orderNo);
+            outbox.setEventType("PAY_SUCCESS");
+            outbox.setPayload(JSON.toJSONString(event));
+            outbox.setStatus(0);
+            outbox.setRetryCount(0);
+            outbox.setCreateTime(new Date());
+            outbox.setUpdateTime(new Date());
+            payOutboxMapper.insert(outbox);
         }
     }
 }

@@ -2,12 +2,16 @@ package com.mongxin.livestart.pay.mq;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
 @Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class PayResultEvent {
     private String eventId;
     private String paySn;
