@@ -38,7 +38,7 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
             "/api/live-start/admin/v1/has-phone/**",
             "/api/live-start/admin/v1/actual/**",
             "/api/live-start/admin/v1/user/check-login",
-            "/api/live-start/pay/pay/callback/**",
+            "/api/live-start/pay/callback/**",
             "/api/pay/callback/**",
             "/api/live-start/engine/event/**",
             "/api/live-start/search/**"

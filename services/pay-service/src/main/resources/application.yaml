@@ -29,7 +29,7 @@ livestart:
       private-key: ${ALIPAY_PRIVATE_KEY:xxx}
       public-key: ${ALIPAY_PUBLIC_KEY:xxx}
       gateway-url: ${ALIPAY_GATEWAY_URL:https://openapi.alipaydev.com/gateway.do}
-      notify-url: ${ALIPAY_NOTIFY_URL:http://127.0.0.1:8888/api/live-start/pay/pay/callback/alipay}
+      notify-url: ${ALIPAY_NOTIFY_URL:http://127.0.0.1:8888/api/live-start/pay/callback/alipay}
       return-url: ${ALIPAY_RETURN_URL:http://localhost:3000}
       charset: UTF-8
       sign-type: RSA2
