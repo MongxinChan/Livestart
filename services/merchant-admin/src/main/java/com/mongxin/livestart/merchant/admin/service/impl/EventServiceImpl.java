@@ -21,6 +21,7 @@ import com.mongxin.livestart.merchant.admin.dao.mapper.EventStyleRelationMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.StyleMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.TicketSkuMapper;
 import com.mongxin.livestart.merchant.admin.dto.req.EventImportExcelDTO;
+import com.mongxin.livestart.merchant.admin.dto.req.EventConfigUpdateReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventPageQueryReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventSaveReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.req.EventUpdateReqDTO;
@@ -132,16 +133,18 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         saveStyleRelations(eventDO.getId(), requestParam.getStyleIds());
         saveSaleStages(eventDO.getId(), requestParam.getSaleStages(), requestParam.getTicketStage());
 
-        EventConfigDO defaultConfig = new EventConfigDO();
-        defaultConfig.setEventId(eventDO.getId());
-        defaultConfig.setSelectionMode(0);
-        defaultConfig.setIsVerifyRequired(0);
-        defaultConfig.setMaxTicketsPerUser(4);
-        defaultConfig.setRefundPolicyType(1);
-        defaultConfig.setTier1FreeRefundHours(48);
-        defaultConfig.setIsWaitingAllowed(0);
-        defaultConfig.setIsTransferable(0);
-        eventConfigService.save(defaultConfig);
+        EventConfigUpdateReqDTO defaultConfigRequest = new EventConfigUpdateReqDTO();
+        defaultConfigRequest.setEventId(eventDO.getId());
+        defaultConfigRequest.setSelectionMode(0);
+        defaultConfigRequest.setIsVerifyRequired(0);
+        defaultConfigRequest.setMaxTicketsPerUser(4);
+        defaultConfigRequest.setRefundPolicyType(1);
+        defaultConfigRequest.setTier1FreeRefundHours(48);
+        defaultConfigRequest.setIsWaitingAllowed(0);
+        defaultConfigRequest.setIsTransferable(0);
+        eventConfigService.saveOrUpdateConfig(defaultConfigRequest);
+
+        EventConfigDO defaultConfig = BeanUtil.toBean(defaultConfigRequest, EventConfigDO.class);
 
         warmUpEventCache(eventDO, defaultConfig);
         LogRecordContext.putVariable("bizNo", eventDO.getId());

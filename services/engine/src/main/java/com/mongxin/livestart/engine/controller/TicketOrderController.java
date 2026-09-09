@@ -88,6 +88,7 @@ public class TicketOrderController {
      * 退票申请
      */
     @Operation(summary = "退票申请", description = "用户对已支付订单发起退票，按演出退票策略处理")
+    @NoDuplicateSubmit(message = "退票申请正在处理中，请勿重复提交")
     @PostMapping("/refund")
     public Result<Void> refundOrder(@Valid @RequestBody TicketOrderRefundReqDTO requestParam) {
         ticketOrderService.refundOrder(requestParam);

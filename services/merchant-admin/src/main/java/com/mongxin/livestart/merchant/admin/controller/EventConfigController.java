@@ -7,6 +7,7 @@ import com.mongxin.livestart.merchant.admin.dto.resp.EventConfigQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.EventConfigService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,7 +32,7 @@ public class EventConfigController {
 
     @Operation(summary = "更新演出配置")
     @PutMapping("/update")
-    public Result<Void> updateEventConfig(@RequestBody EventConfigUpdateReqDTO requestParam) {
+    public Result<Void> updateEventConfig(@Valid @RequestBody EventConfigUpdateReqDTO requestParam) {
         eventConfigService.saveOrUpdateConfig(requestParam);
         return Results.success();
     }

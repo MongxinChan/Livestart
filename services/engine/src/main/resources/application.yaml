@@ -61,6 +61,10 @@ rocketmq:
 livestart:
   engine:
     internal-token: ${LIVESTART_INTERNAL_TOKEN:change-me}
+    refund-policy:
+      default-tier1-deadline-hours: ${LIVESTART_REFUND_TIER1_HOURS:48}
+      default-tier2-deadline-hours: ${LIVESTART_REFUND_TIER2_HOURS:24}
+      default-tier2-refund-fee-rate: ${LIVESTART_REFUND_TIER2_FEE_RATE:0.20}
     order-close-delay-minutes: 15
     local-order-mode: ${LIVESTART_ENGINE_LOCAL_ORDER_MODE:false}
     auto-warm-stock-on-miss: true

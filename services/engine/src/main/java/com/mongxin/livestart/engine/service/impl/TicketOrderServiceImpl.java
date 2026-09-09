@@ -20,6 +20,7 @@ import com.mongxin.livestart.engine.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.engine.dao.mapper.OrderItemMapper;
 import com.mongxin.livestart.engine.dao.mapper.OrderMapper;
 import com.mongxin.livestart.engine.dao.mapper.TicketSkuMapper;
+import com.mongxin.livestart.engine.dao.mapper.RefundPolicyMapper;
 import com.mongxin.livestart.engine.dto.req.AdminOrderPageQueryReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO;
 import com.mongxin.livestart.engine.dto.req.TicketOrderCreateReqDTO;
@@ -43,6 +44,7 @@ import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.engine.service.TicketOrderService;
+import com.mongxin.livestart.engine.service.RefundPolicyEvaluator;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.exception.ServiceException;
@@ -61,6 +63,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -89,9 +92,11 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private final OrderMapper orderMapper;
     private final OrderItemMapper orderItemMapper;
     private final TicketSkuMapper ticketSkuMapper;
+    private final RefundPolicyMapper refundPolicyMapper;
     private final AdminRemoteService adminRemoteService;
     private final MerchantAdminRemoteService merchantAdminRemoteService;
     private final PayRemoteService payRemoteService;
+    private final RefundPolicyEvaluator refundPolicyEvaluator;
     private final StringRedisTemplate stringRedisTemplate;
     private final TransactionTemplate transactionTemplate;
     private final OrderPaySuccessProducer orderPaySuccessProducer;
@@ -105,6 +110,9 @@ public class TicketOrderServiceImpl implements TicketOrderService {
 
     @Value("${livestart.engine.mq.enabled:true}")
     private boolean mqEnabled;
+
+    @Value("${livestart.engine.internal-token:change-me}")
+    private String internalToken;
 
     @Override
     public String generatePathToken(Long skuId) {
@@ -344,6 +352,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
 
     @Override
     public void refundOrder(TicketOrderRefundReqDTO requestParam) {
+        Instant requestedAt = Instant.now();
         String userId = requireUserId();
         OrderDO order = getOrderByNo(requestParam.getOrderNo(), Long.parseLong(userId));
         if (order == null) {
@@ -353,8 +362,23 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             throw new ClientException("仅已支付订单可以申请退票");
         }
 
+        List<OrderItemDO> items = orderItemMapper.selectList(Wrappers.lambdaQuery(OrderItemDO.class)
+                .eq(OrderItemDO::getOrderNo, requestParam.getOrderNo())
+                .eq(OrderItemDO::getUserId, order.getUserId()));
+        OrderItemDO firstItem = CollUtil.getFirst(items);
+        if (firstItem == null || firstItem.getEventId() == null) {
+            throw new ClientException("订单缺少演出信息，无法计算退票规则");
+        }
+        RefundPolicyEvaluator.RefundDecision decision = refundPolicyEvaluator.evaluate(
+                refundPolicyMapper.selectByEventId(firstItem.getEventId()),
+                order.getTotalAmount(), requestedAt);
+        if (!decision.allowed()) {
+            throw new ClientException(decision.rejectionReason());
+        }
+
         var refundResult = payRemoteService.refund(
-                new RefundCreateRequestDTO(requestParam.getOrderNo(), requestParam.getReason()), userId);
+                new RefundCreateRequestDTO(requestParam.getOrderNo(), requestParam.getReason(), decision.refundAmount()),
+                userId, internalToken);
         if (refundResult == null || refundResult.isFail() || refundResult.getData() == null
                 || !Integer.valueOf(1).equals(refundResult.getData().getStatus())) {
             throw new ServiceException(refundResult == null ? "支付服务不可用"
@@ -371,15 +395,14 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             throw new ServiceException("退票申请失败，请重试");
         }
 
-        List<OrderItemDO> items = orderItemMapper.selectList(Wrappers.lambdaQuery(OrderItemDO.class)
-                .eq(OrderItemDO::getOrderNo, requestParam.getOrderNo())
-                .eq(OrderItemDO::getUserId, order.getUserId()));
         if (CollUtil.isNotEmpty(items)) {
             restoreStockIfNeeded(items.get(0).getSkuId(), items.size(),
                     order.getUserId(), items.get(0).getEventId());
         }
 
-        log.info("[退票] 退票成功，orderNo={}", requestParam.getOrderNo());
+        log.info("[退票] 退票成功，orderNo={}, tier={}, refundAmount={}, requestedAt={}, minutesBeforeStart={}",
+                requestParam.getOrderNo(), decision.tier(), decision.refundAmount(), requestedAt,
+                decision.minutesBeforeStart());
     }
 
     @Override
