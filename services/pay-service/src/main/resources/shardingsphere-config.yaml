@@ -31,12 +31,12 @@ rules:
           standard:
             shardingColumn: order_no
             shardingAlgorithmName: pay_route
-      t_pay_outbox:
-        actualDataNodes: ds_0.t_pay_outbox
         tableStrategy:
           standard:
             shardingColumn: order_no
             shardingAlgorithmName: pay_route
+      t_pay_outbox:
+        actualDataNodes: ds_0.t_pay_outbox
     shardingAlgorithms:
       pay_route:
         type: CLASS_BASED

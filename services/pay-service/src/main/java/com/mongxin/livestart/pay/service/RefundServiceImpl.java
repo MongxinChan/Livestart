@@ -19,10 +19,11 @@ import com.mongxin.livestart.pay.dto.RefundCreateResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
+import java.math.RoundingMode;
 import java.util.Date;
 import java.util.UUID;
+import java.math.BigDecimal;
 
 @Slf4j
 @Service
@@ -34,7 +35,6 @@ public class RefundServiceImpl implements RefundService {
     private final AlipayProperties alipayProperties;
 
     @Override
-    @Transactional(rollbackFor = Exception.class)
     public RefundCreateResponse create(RefundCreateRequest request, Long userId) {
         PayDO pay = payMapper.selectOne(Wrappers.lambdaQuery(PayDO.class)
                 .eq(PayDO::getOrderNo, request.getOrderNo())
@@ -45,8 +45,11 @@ public class RefundServiceImpl implements RefundService {
         RefundDO existing = refundMapper.selectOne(Wrappers.lambdaQuery(RefundDO.class)
                 .eq(RefundDO::getOrderNo, request.getOrderNo()));
         if (existing != null) {
-            return RefundCreateResponse.builder().refundNo(existing.getRefundNo())
-                    .orderNo(existing.getOrderNo()).status(existing.getStatus()).build();
+            validateSameRefund(existing, request.getRefundAmount());
+            if (existing.getStatus() == REFUND_SUCCESS) {
+                return buildResponse(existing);
+            }
+            return executeRefund(existing, pay);
         }
 
         RefundDO refund = new RefundDO();
@@ -54,7 +57,12 @@ public class RefundServiceImpl implements RefundService {
         refund.setOrderNo(pay.getOrderNo());
         refund.setPaySn(pay.getPaySn());
         refund.setTradeNo(pay.getTradeNo());
-        refund.setRefundAmount(pay.getTotalAmount());
+        BigDecimal paidAmount = pay.getPayAmount() == null ? pay.getTotalAmount() : pay.getPayAmount();
+        BigDecimal refundAmount = request.getRefundAmount().setScale(2, RoundingMode.UNNECESSARY);
+        if (refundAmount.signum() <= 0 || refundAmount.compareTo(paidAmount) > 0) {
+            throw new ClientException("退款金额不合法");
+        }
+        refund.setRefundAmount(refundAmount);
         refund.setReason(request.getReason());
         refund.setStatus(0);
         refund.setCreateTime(new Date());
@@ -63,6 +71,10 @@ public class RefundServiceImpl implements RefundService {
             throw new ServiceException("退款单创建失败");
         }
 
+        return executeRefund(refund, pay);
+    }
+
+    private RefundCreateResponse executeRefund(RefundDO refund, PayDO pay) {
         try {
             AlipayClient client = new DefaultAlipayClient(
                     alipayProperties.getGatewayUrl(), alipayProperties.getAppId(),
@@ -71,7 +83,7 @@ public class RefundServiceImpl implements RefundService {
             AlipayTradeRefundModel model = new AlipayTradeRefundModel();
             model.setTradeNo(pay.getTradeNo());
             model.setOutTradeNo(pay.getOrderNo());
-            model.setRefundAmount(pay.getTotalAmount().toPlainString());
+            model.setRefundAmount(refund.getRefundAmount().toPlainString());
             model.setOutRequestNo(refund.getRefundNo());
             AlipayTradeRefundRequest refundRequest = new AlipayTradeRefundRequest();
             refundRequest.setBizModel(model);
@@ -82,14 +94,33 @@ public class RefundServiceImpl implements RefundService {
             refund.setStatus(REFUND_SUCCESS);
             refund.setRefundTradeNo(response.getTradeNo());
             refund.setUpdateTime(new Date());
-            refundMapper.updateById(refund);
-            return RefundCreateResponse.builder().refundNo(refund.getRefundNo())
-                    .orderNo(refund.getOrderNo()).status(refund.getStatus()).build();
+            int affected = refundMapper.markSuccessIfPending(refund.getOrderNo(), refund.getRefundNo(),
+                    REFUND_SUCCESS, 0, refund.getRefundTradeNo(), refund.getUpdateTime());
+            if (affected != 1) {
+                RefundDO latest = refundMapper.selectOne(Wrappers.lambdaQuery(RefundDO.class)
+                        .eq(RefundDO::getOrderNo, refund.getOrderNo()));
+                if (latest == null || latest.getStatus() != REFUND_SUCCESS) {
+                    throw new ServiceException("退款结果保存失败");
+                }
+                return buildResponse(latest);
+            }
+            return buildResponse(refund);
         } catch (ServiceException e) {
             throw e;
         } catch (Exception e) {
-            log.error("[退款] 支付宝退款调用失败，orderNo={}", request.getOrderNo(), e);
+            log.error("[退款] 支付宝退款调用失败，orderNo={}", refund.getOrderNo(), e);
             throw new ServiceException("支付宝退款接口调用失败");
         }
+    }
+
+    private void validateSameRefund(RefundDO existing, BigDecimal requestedAmount) {
+        if (requestedAmount == null || existing.getRefundAmount().compareTo(requestedAmount) != 0) {
+            throw new ClientException("该订单已存在不同金额的退款申请");
+        }
+    }
+
+    private RefundCreateResponse buildResponse(RefundDO refund) {
+        return RefundCreateResponse.builder().refundNo(refund.getRefundNo())
+                .orderNo(refund.getOrderNo()).status(refund.getStatus()).build();
     }
 }

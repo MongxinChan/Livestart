@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashMap;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +48,9 @@ public class PayServiceImpl implements PayService {
         PayDO existing = payMapper.selectOne(Wrappers.lambdaQuery(PayDO.class)
                 .eq(PayDO::getOrderNo, request.getOrderNo()));
         if (existing != null) {
+            if (!userId.equals(existing.getUserId())) {
+                throw new ClientException("订单不存在或无权支付");
+            }
             if (existing.getStatus() == PayStatus.TRADE_SUCCESS) {
                 return PayCreateResponse.builder().paySn(existing.getPaySn()).orderNo(existing.getOrderNo())
                         .status(existing.getStatus()).build();
@@ -87,10 +91,12 @@ public class PayServiceImpl implements PayService {
             AlipayTradePagePayRequest request = new AlipayTradePagePayRequest();
             request.setNotifyUrl(alipayProperties.getNotifyUrl());
             request.setReturnUrl(alipayProperties.getReturnUrl());
-            request.setBizContent("{\"out_trade_no\":\"" + pay.getOrderNo()
-                    + "\",\"total_amount\":\"" + pay.getTotalAmount().toPlainString()
-                    + "\",\"subject\":\"" + pay.getSubject()
-                    + "\",\"product_code\":\"FAST_INSTANT_TRADE_PAY\"}");
+            Map<String, String> bizContent = new HashMap<>();
+            bizContent.put("out_trade_no", pay.getOrderNo());
+            bizContent.put("total_amount", pay.getTotalAmount().toPlainString());
+            bizContent.put("subject", pay.getSubject());
+            bizContent.put("product_code", "FAST_INSTANT_TRADE_PAY");
+            request.setBizContent(JSON.toJSONString(bizContent));
             return PayCreateResponse.builder().paySn(pay.getPaySn()).orderNo(pay.getOrderNo())
                     .body(client.pageExecute(request).getBody()).status(pay.getStatus()).build();
         } catch (Exception e) {
