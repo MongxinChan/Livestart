@@ -16,6 +16,7 @@ import com.mongxin.livestart.engine.common.enums.OrderStatusEnum;
 import com.mongxin.livestart.engine.common.enums.StockDecrementErrorEnum;
 import com.mongxin.livestart.engine.dao.entity.OrderDO;
 import com.mongxin.livestart.engine.dao.entity.OrderItemDO;
+import com.mongxin.livestart.engine.dao.entity.StockRestoreTaskDO;
 import com.mongxin.livestart.engine.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.engine.dao.mapper.OrderItemMapper;
 import com.mongxin.livestart.engine.dao.mapper.OrderMapper;
@@ -45,6 +46,7 @@ import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
 import com.mongxin.livestart.engine.remote.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.engine.service.RefundPolicyEvaluator;
+import com.mongxin.livestart.engine.service.StockRestoreService;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.exception.ServiceException;
@@ -97,6 +99,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private final MerchantAdminRemoteService merchantAdminRemoteService;
     private final PayRemoteService payRemoteService;
     private final RefundPolicyEvaluator refundPolicyEvaluator;
+    private final StockRestoreService stockRestoreService;
     private final StringRedisTemplate stringRedisTemplate;
     private final TransactionTemplate transactionTemplate;
     private final OrderPaySuccessProducer orderPaySuccessProducer;
@@ -369,12 +372,19 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         if (firstItem == null || firstItem.getEventId() == null) {
             throw new ClientException("订单缺少演出信息，无法计算退票规则");
         }
+        if (firstItem.getSkuId() == null || items.size() <= 0) {
+            throw new ClientException("订单缺少票档信息，无法创建库存补偿任务");
+        }
         RefundPolicyEvaluator.RefundDecision decision = refundPolicyEvaluator.evaluate(
                 refundPolicyMapper.selectByEventId(firstItem.getEventId()),
                 order.getTotalAmount(), requestedAt);
         if (!decision.allowed()) {
             throw new ClientException(decision.rejectionReason());
         }
+
+        StockRestoreTaskDO restoreTask = stockRestoreService.prepareRefund(
+                requestParam.getOrderNo(), order.getUserId(), firstItem.getEventId(),
+                firstItem.getSkuId(), items.size());
 
         var refundResult = payRemoteService.refund(
                 new RefundCreateRequestDTO(requestParam.getOrderNo(), requestParam.getReason(), decision.refundAmount()),
@@ -383,6 +393,10 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 || !Integer.valueOf(1).equals(refundResult.getData().getStatus())) {
             throw new ServiceException(refundResult == null ? "支付服务不可用"
                     : (refundResult.getMessage() == null ? "退款失败" : refundResult.getMessage()));
+        }
+
+        if (!stockRestoreService.confirmRefund(restoreTask)) {
+            throw new ServiceException("退款成功但库存补偿任务确认失败，请稍后重试");
         }
 
         int affected = orderMapper.updateOrderStatus(
@@ -395,10 +409,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             throw new ServiceException("退票申请失败，请重试");
         }
 
-        if (CollUtil.isNotEmpty(items)) {
-            restoreStockIfNeeded(items.get(0).getSkuId(), items.size(),
-                    order.getUserId(), items.get(0).getEventId());
-        }
+        stockRestoreService.process(restoreTask);
 
         log.info("[退票] 退票成功，orderNo={}, tier={}, refundAmount={}, requestedAt={}, minutesBeforeStart={}",
                 requestParam.getOrderNo(), decision.tier(), decision.refundAmount(), requestedAt,
