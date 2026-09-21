@@ -55,20 +55,22 @@ public class StockRestoreService {
             return existing;
         }
 
-        StockRestoreTaskDO task = new StockRestoreTaskDO();
-        task.setBizType(REFUND_BIZ_TYPE);
-        task.setOrderNo(orderNo);
-        task.setUserId(userId);
-        task.setEventId(eventId);
-        task.setSkuId(skuId);
-        task.setRestoreCount(restoreCount);
-        task.setRefundConfirmed(0);
-        task.setDbRestored(0);
-        task.setRedisRestored(0);
-        task.setStatus(0);
-        task.setRetryCount(0);
-        task.setCreateTime(new Date());
-        task.setUpdateTime(new Date());
+        Date now = new Date();
+        StockRestoreTaskDO task = StockRestoreTaskDO.builder()
+                .bizType(REFUND_BIZ_TYPE)
+                .orderNo(orderNo)
+                .userId(userId)
+                .eventId(eventId)
+                .skuId(skuId)
+                .restoreCount(restoreCount)
+                .refundConfirmed(0)
+                .dbRestored(0)
+                .redisRestored(0)
+                .status(0)
+                .retryCount(0)
+                .createTime(now)
+                .updateTime(now)
+                .build();
         try {
             taskMapper.insert(task);
             return task;
