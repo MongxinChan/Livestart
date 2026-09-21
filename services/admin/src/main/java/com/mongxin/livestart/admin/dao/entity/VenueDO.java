@@ -11,6 +11,9 @@ import lombok.Data;
 @TableName("t_venue")
 public class VenueDO {
 
+    /**
+     * 主键
+     */
     @TableId
     private Long id;
 

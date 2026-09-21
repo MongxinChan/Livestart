@@ -1,6 +1,5 @@
 package com.mongxin.livestart.admin.dao.entity;
 
-
 import com.baomidou.mybatisplus.annotation.FieldFill;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
@@ -16,6 +15,7 @@ import java.util.Date;
 @Data
 @TableName("t_user_profile")
 public class UserProfileDO {
+
     /**
      * 关联用户ID (对应 t_user.id)
      * 注意：此处不使用自动生成，由业务层在注册时手动设置

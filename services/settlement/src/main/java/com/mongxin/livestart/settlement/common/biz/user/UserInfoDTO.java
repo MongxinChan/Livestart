@@ -12,9 +12,28 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class UserInfoDTO {
 
+    /**
+     * 用户ID
+     */
     private String userId;
+
+    /**
+     * 用户名
+     */
     private String username;
+
+    /**
+     * 手机号
+     */
     private String phone;
+
+    /**
+     * 真实姓名
+     */
     private String realName;
+
+    /**
+     * 用户类型
+     */
     private Integer userType;
 }

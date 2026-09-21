@@ -23,6 +23,9 @@ import java.util.Date;
 @TableName("t_ticket_task")
 public class TicketTaskDO {
 
+    /**
+     * 主键
+     */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 

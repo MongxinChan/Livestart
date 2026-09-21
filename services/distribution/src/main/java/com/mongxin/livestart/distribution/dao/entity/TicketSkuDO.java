@@ -21,6 +21,9 @@ import java.math.BigDecimal;
 @TableName("t_ticket_sku")
 public class TicketSkuDO {
 
+    /**
+     * 主键
+     */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 

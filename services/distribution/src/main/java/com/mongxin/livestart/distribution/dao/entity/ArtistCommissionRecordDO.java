@@ -24,6 +24,9 @@ import java.util.Date;
 @TableName("t_artist_commission_record")
 public class ArtistCommissionRecordDO {
 
+    /**
+     * 主键
+     */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 

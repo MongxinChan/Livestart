@@ -72,6 +72,7 @@ public class TicketOrderPageQueryRespDTO {
      */
     @Schema(description = "下单时间")
     private Date createTime;
+
     /**
      * 首张电子票核销码，用于用户出示和现场验票。
      */

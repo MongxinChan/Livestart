@@ -57,6 +57,9 @@ public class TicketSkuDO {
      */
     private Integer stage2Stock;
 
+    /**
+     * 二开是否已释放库存
+     */
     private Integer stage2Released;
 
     /**

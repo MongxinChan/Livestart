@@ -23,6 +23,9 @@ import java.util.Date;
 @TableName("t_invite_relation")
 public class InviteRelationDO {
 
+    /**
+     * 主键
+     */
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
