@@ -4,6 +4,7 @@ import com.mongxin.livestart.engine.common.biz.user.UserContext;
 import com.mongxin.livestart.engine.common.biz.user.UserInfoDTO;
 import com.mongxin.livestart.engine.config.AlipayConfig;
 import com.mongxin.livestart.engine.dao.entity.OrderDO;
+import com.mongxin.livestart.engine.dao.entity.OrderItemDO;
 import com.mongxin.livestart.engine.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.engine.dao.mapper.OrderItemMapper;
 import com.mongxin.livestart.engine.dao.mapper.OrderMapper;
@@ -11,8 +12,11 @@ import com.mongxin.livestart.engine.dao.mapper.TicketSkuMapper;
 import com.mongxin.livestart.engine.mq.producer.OrderPaySuccessProducer;
 import com.mongxin.livestart.engine.mq.producer.TicketOrderCreateProducer;
 import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
+import com.mongxin.livestart.engine.remote.PayRemoteService;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
+import com.mongxin.livestart.engine.remote.dto.RefundCreateResponseDTO;
 import com.mongxin.livestart.engine.service.impl.TicketOrderServiceImpl;
+import com.mongxin.livestart.engine.service.StockRestoreService;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.result.Result;
 import org.apache.rocketmq.client.exception.MQClientException;
@@ -59,6 +63,10 @@ class TicketOrderServiceImplTest {
     private TicketSkuMapper ticketSkuMapper;
     @Mock
     private MerchantAdminRemoteService merchantAdminRemoteService;
+    @Mock
+    private PayRemoteService payRemoteService;
+    @Mock
+    private StockRestoreService stockRestoreService;
     @Mock
     private StringRedisTemplate stringRedisTemplate;
     @Mock
@@ -178,6 +186,46 @@ class TicketOrderServiceImplTest {
 
         verify(orderMapper).updateOrderStatus(4L, 4004L, 1, 0);
         verify(orderMapper).updatePayTime(eq(4L), eq(4004L), any());
+        verify(orderPaySuccessProducer, never()).sendMessage(any());
+    }
+
+    @Test
+    void shouldUseReliableCompensationWhenUserCancelsOrder() {
+        UserContext.setUser(UserInfoDTO.builder().userId("5006").build());
+        OrderDO order = OrderDO.builder()
+                .id(6L).userId(5006L).orderNo("O202406100006").status(0).build();
+        OrderItemDO item = OrderItemDO.builder()
+                .orderNo(order.getOrderNo()).userId(5006L).eventId(66L).skuId(666L).build();
+        com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO request =
+                new com.mongxin.livestart.engine.dto.req.TicketOrderCancelReqDTO();
+        request.setOrderNo(order.getOrderNo());
+
+        when(orderMapper.selectOne(any())).thenReturn(order);
+        when(orderItemMapper.selectList(any())).thenReturn(java.util.List.of(item));
+        when(stockRestoreService.closeTimeoutOrder(6L, 5006L, order.getOrderNo(), 66L, 666L, 1))
+                .thenReturn(true);
+
+        ticketOrderService.cancelOrder(request);
+
+        verify(stockRestoreService).closeTimeoutOrder(6L, 5006L, order.getOrderNo(), 66L, 666L, 1);
+        verify(orderMapper, never()).updateOrderStatus(anyLong(), anyLong(), anyInt(), anyInt());
+    }
+
+    @Test
+    void shouldRefundWhenPaymentArrivesAfterOrderWasCancelled() {
+        OrderDO order = OrderDO.builder()
+                .id(7L).userId(7007L).orderNo("O202406100007").status(2)
+                .totalAmount(new BigDecimal("88.00")).build();
+        RefundCreateResponseDTO refund = new RefundCreateResponseDTO();
+        refund.setStatus(1);
+        when(orderMapper.selectOne(any())).thenReturn(order);
+        when(payRemoteService.refund(any(), eq("7007"), any()))
+                .thenReturn(new Result<RefundCreateResponseDTO>().setCode(Result.SUCCESS_CODE).setData(refund));
+
+        ticketOrderService.paySuccess(order.getOrderNo(), "TRADE-7", new BigDecimal("88.00"));
+
+        verify(payRemoteService).refund(any(), eq("7007"), any());
+        verify(orderMapper, never()).updateOrderStatus(anyLong(), anyLong(), anyInt(), anyInt());
         verify(orderPaySuccessProducer, never()).sendMessage(any());
     }
 

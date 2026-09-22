@@ -22,6 +22,7 @@ import com.mongxin.livestart.pay.dto.RefundCreateResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.math.RoundingMode;
 import java.util.Date;
@@ -114,8 +115,23 @@ public class RefundServiceImpl implements RefundService {
         refund.setStatus(0);
         refund.setCreateTime(new Date());
         refund.setUpdateTime(new Date());
-        if (refundMapper.insert(refund) <= 0) {
-            throw new ServiceException("退款单创建失败");
+        try {
+            if (refundMapper.insert(refund) <= 0) {
+                throw new ServiceException("退款单创建失败");
+            }
+        } catch (DuplicateKeyException ex) {
+            // 并发重复退款请求复用已创建的退款单，保持接口幂等。
+            RefundDO concurrent = refundMapper.selectOne(Wrappers.lambdaQuery(RefundDO.class)
+                    .eq(RefundDO::getOrderNo, request.getOrderNo()));
+            if (concurrent == null) {
+                log.error("[退款] 并发退款单插入失败，且未找到已创建退款单，orderNo={}", request.getOrderNo(), ex);
+                throw new ServiceException("退款单创建失败");
+            }
+            validateSameRefund(concurrent, request.getRefundAmount());
+            if (concurrent.getStatus() == REFUND_SUCCESS) {
+                return buildResponse(concurrent);
+            }
+            return executeRefund(concurrent, pay);
         }
 
         return executeRefund(refund, pay);

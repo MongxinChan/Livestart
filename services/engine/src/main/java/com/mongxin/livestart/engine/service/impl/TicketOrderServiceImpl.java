@@ -276,6 +276,21 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             return;
         }
 
+        if (order.getStatus() == OrderStatusEnum.CANCELLED.getCode()) {
+            // 关单与支付宝回调可能并发。订单已取消时不能吞掉已到账支付，改为幂等全额退款。
+            BigDecimal refundAmount = payAmount != null ? payAmount : order.getTotalAmount();
+            var refundResult = payRemoteService.refund(
+                    new RefundCreateRequestDTO(orderNo, "订单已关单但支付成功，自动退款", refundAmount),
+                    String.valueOf(order.getUserId()), internalToken);
+            if (refundResult == null || refundResult.isFail() || refundResult.getData() == null
+                    || !Integer.valueOf(1).equals(refundResult.getData().getStatus())) {
+                log.error("[支付成功通知] 取消订单自动退款失败，orderNo={}, tradeNo={}", orderNo, tradeNo);
+                throw new ServiceException("订单已取消，自动退款处理中");
+            }
+            log.warn("[支付成功通知] 订单已取消，已自动发起全额退款，orderNo={}, tradeNo={}", orderNo, tradeNo);
+            return;
+        }
+
         if (order.getStatus() != OrderStatusEnum.PENDING_PAYMENT.getCode()) {
             log.warn("[支付成功通知] 当前订单状态不允许支付成功流转，orderNo={}, status={}",
                     orderNo, order.getStatus());
@@ -336,20 +351,17 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                 .eq(OrderItemDO::getOrderNo, requestParam.getOrderNo())
                 .eq(OrderItemDO::getUserId, order.getUserId()));
         int count = items.size();
-        Long skuId = CollUtil.isNotEmpty(items) ? items.get(0).getSkuId() : null;
-
-        int affected = orderMapper.updateOrderStatus(
-                order.getId(),
-                order.getUserId(),
-                OrderStatusEnum.CANCELLED.getCode(),
-                OrderStatusEnum.PENDING_PAYMENT.getCode()
-        );
-        if (!SqlHelper.retBool(affected)) {
-            throw new ServiceException("取消订单失败，请重试");
+        OrderItemDO firstItem = CollUtil.getFirst(items);
+        if (firstItem == null || firstItem.getEventId() == null || firstItem.getSkuId() == null) {
+            throw new ServiceException("订单明细不完整，暂不能取消订单");
         }
 
-        Long eventId = CollUtil.isNotEmpty(items) ? items.get(0).getEventId() : null;
-        restoreStockIfNeeded(skuId, count, order.getUserId(), eventId);
+        boolean cancelled = stockRestoreService.closeTimeoutOrder(
+                order.getId(), order.getUserId(), requestParam.getOrderNo(),
+                firstItem.getEventId(), firstItem.getSkuId(), count);
+        if (!cancelled) {
+            throw new ServiceException("订单状态已变更，取消失败");
+        }
         log.info("[取消订单] 订单已取消，orderNo={}", requestParam.getOrderNo());
     }
 
@@ -661,28 +673,6 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             log.error("[下单] Redis 库存与限购回滚失败，stockKey={}, userLimitKey={}, count={}",
                     stockKey, userLimitKey, count, redisEx);
         }
-    }
-
-    private void restoreStockIfNeeded(Long skuId, int count, Long userId, Long eventId) {
-        if (skuId == null || count <= 0) {
-            return;
-        }
-        String stockKey = String.format(EngineRedisConstant.TICKET_STOCK_KEY, skuId);
-        if (userId != null && eventId != null) {
-            String userLimitKey = String.format(EngineRedisConstant.USER_TICKET_LIMIT_KEY, userId, eventId);
-            rollbackPreDeductStock(stockKey, userLimitKey, count);
-        } else {
-            try {
-                stringRedisTemplate.opsForValue().increment(stockKey, count);
-            } catch (Exception e) {
-                log.error("[库存回补] Redis 库存回补失败，skuId={}", skuId, e);
-            }
-        }
-        int affected = ticketSkuMapper.returnStock(skuId, count);
-        if (!SqlHelper.retBool(affected)) {
-            log.warn("[库存回补] 数据库库存回补未命中记录，skuId={}, count={}", skuId, count);
-        }
-        releaseSoldOutMark(skuId);
     }
 
     public static void releaseSoldOutMark(Long skuId) {

@@ -39,16 +39,6 @@ public class UserController {
     }
 
     /**
-     * 根据手机号查询无脱敏用户信息
-     */
-    @GetMapping("/api/live-start/admin/v1/actual/{phone}")
-    public Result<UserRespDTO> getActualUserByPhone(
-            @PathVariable("phone") String phone) {
-        // TODO:由于现已统一为 UserRespDTO，若要实现真正脱敏，后续请结合 AOP 或新的字段来隔离
-        return Results.success(userService.getUserByPhone(phone));
-    }
-
-    /**
      * 查询手机号是否存在
      */
     @GetMapping("/api/live-start/admin/v1/has-phone/{phone}")
@@ -150,8 +140,16 @@ public class UserController {
      */
     @PostMapping("/api/live-start/admin/v1/user/send-code")
     public Result<Void> sendCode(@RequestParam("phone") String phone, HttpServletRequest request) {
-        userService.sendCode(phone, request.getRemoteAddr());
+        userService.sendCode(phone, resolveClientIp(request));
         return Results.success();
+    }
+
+    private String resolveClientIp(HttpServletRequest request) {
+        String forwardedFor = request.getHeader("X-Forwarded-For");
+        if (forwardedFor != null && !forwardedFor.isBlank()) {
+            return forwardedFor.split(",", 2)[0].trim();
+        }
+        return request.getRemoteAddr();
     }
 
     /**
