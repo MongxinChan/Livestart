@@ -7,6 +7,8 @@ import com.mongxin.livestart.engine.remote.dto.RefundCreateResponseDTO;
 import com.mongxin.livestart.framework.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 
@@ -24,4 +26,8 @@ public interface PayRemoteService {
     Result<RefundCreateResponseDTO> refund(@RequestBody RefundCreateRequestDTO request,
                                            @RequestHeader("userId") String userId,
                                            @RequestHeader("X-Internal-Token") String internalToken);
+
+    @GetMapping("/api/pay/refund/{orderNo}")
+    Result<RefundCreateResponseDTO> refundStatus(@PathVariable("orderNo") String orderNo,
+                                                 @RequestHeader("X-Internal-Token") String internalToken);
 }

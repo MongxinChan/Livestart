@@ -97,7 +97,7 @@ public interface UserService extends IService<UserDO> {
      *
      * @param phone 手机号
      */
-    void sendCode(String phone);
+    void sendCode(String phone, String clientIp);
 
     /**
      * 验证码快捷登录（若不存在则隐式自动注册）

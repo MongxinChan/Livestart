@@ -11,7 +11,7 @@ import lombok.NoArgsConstructor;
 import java.util.Date;
 
 /**
- * 退款后的库存回补任务。任务落在公共库，数据库库存和任务状态可以在同一事务内更新。
+ * 库存回补任务。任务落在公共库，数据库库存和任务状态可以在同一事务内更新。
  */
 @Data
 @Builder
@@ -27,7 +27,7 @@ public class StockRestoreTaskDO {
     private Long id;
 
     /**
-     * 业务类型，目前固定为 REFUND
+     * 业务类型：REFUND 或 TIMEOUT_CLOSE
      */
     private String bizType;
 

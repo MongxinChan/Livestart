@@ -9,7 +9,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.rocketmq.spring.annotation.RocketMQMessageListener;
 import org.apache.rocketmq.spring.core.RocketMQListener;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
+
+import java.util.concurrent.TimeUnit;
 
 /**
  * 支付成功（出票）消费者
@@ -26,6 +29,8 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class OrderPaySuccessConsumer implements RocketMQListener<String> {
 
+    private final StringRedisTemplate stringRedisTemplate;
+
     @Override
     public void onMessage(String message) {
         log.info("[消费者] 支付成功出票消息：{}", message);
@@ -34,7 +39,17 @@ public class OrderPaySuccessConsumer implements RocketMQListener<String> {
                 message, new TypeReference<MessageWrapper<OrderPaySuccessEvent>>() {});
         OrderPaySuccessEvent event = wrapper.getMessage();
 
-        // TODO: 后续扩展：发送短信/App推送、刷新用户订单缓存等
-        log.info("[消费者] 订单出票处理完成，orderNo={}，userId={}", event.getOrderNo(), event.getUserId());
+        String notifyKey = "engine:order:pay-success:notification:" + event.getOrderNo();
+        Boolean firstDelivery = stringRedisTemplate.opsForValue()
+                .setIfAbsent(notifyKey, "1", 30, TimeUnit.DAYS);
+        if (!Boolean.TRUE.equals(firstDelivery)) {
+            log.info("[消费者] 支付成功后置通知已处理，跳过重复消息，orderNo={}", event.getOrderNo());
+            return;
+        }
+
+        // 毕业设计阶段使用本地模拟通知，替换为真实短信/App 推送实现时无需改变消费幂等逻辑。
+        log.info("[模拟短信通知] 订单支付成功，orderNo={}，userId={}，tradeNo={}",
+                event.getOrderNo(), event.getUserId(), event.getTradeNo());
+        log.info("[消费者] 订单出票后置处理完成，orderNo={}，userId={}", event.getOrderNo(), event.getUserId());
     }
 }

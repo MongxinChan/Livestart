@@ -2,30 +2,21 @@ package com.mongxin.livestart.engine.job;
 
 import com.mongxin.livestart.engine.dao.entity.OrderItemDO;
 import com.mongxin.livestart.engine.dao.mapper.OrderItemMapper;
-import com.mongxin.livestart.engine.dao.mapper.OrderMapper;
-import com.mongxin.livestart.engine.dao.mapper.TicketSkuMapper;
-import com.mongxin.livestart.engine.service.impl.TicketOrderServiceImpl;
-import org.junit.jupiter.api.AfterEach;
+import com.mongxin.livestart.engine.service.StockRestoreService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.test.util.ReflectionTestUtils;
 
 import java.sql.ResultSet;
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -38,34 +29,21 @@ class OrderTimeoutCloseFallbackJobTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
     @Mock
-    private OrderMapper orderMapper;
-    @Mock
     private OrderItemMapper orderItemMapper;
     @Mock
-    private TicketSkuMapper ticketSkuMapper;
-    @Mock
-    private StringRedisTemplate stringRedisTemplate;
-
-    @AfterEach
-    void tearDown() {
-        soldOutMap().clear();
-    }
-
+    private StockRestoreService stockRestoreService;
     @Test
     void shouldCloseTimeoutOrderAndRollbackStockLikeOrderService() throws Exception {
         OrderTimeoutCloseFallbackJob job = new OrderTimeoutCloseFallbackJob(
                 jdbcTemplate,
-                orderMapper,
                 orderItemMapper,
-                ticketSkuMapper,
-                stringRedisTemplate
+                stockRestoreService
         );
         ReflectionTestUtils.setField(job, "fallbackEnabled", true);
         ReflectionTestUtils.setField(job, "orderCloseDelayMinutes", 15L);
         ReflectionTestUtils.setField(job, "batchSize", 100);
 
         Long skuId = 11L;
-        soldOutMap().put(skuId, true);
 
         AtomicInteger queryCount = new AtomicInteger();
         doAnswer(invocation -> {
@@ -99,27 +77,12 @@ class OrderTimeoutCloseFallbackJobTest {
                 .eventId(22L)
                 .skuId(skuId)
                 .build();
-        when(orderMapper.updateOrderStatus(1L, 1001L, 2, 0)).thenReturn(1);
         when(orderItemMapper.selectList(any())).thenReturn(List.of(firstItem, secondItem));
+        when(stockRestoreService.closeTimeoutOrder(1L, 1001L, "O202607060001", 22L, 11L, 2))
+                .thenReturn(true);
 
         job.closeTimeoutPendingOrders();
 
-        verify(orderMapper).updateOrderStatus(1L, 1001L, 2, 0);
-        verify(stringRedisTemplate).execute(
-                any(RedisScript.class),
-                eq(List.of("engine:stock:sku:11", "engine:limit:user:1001:event:22")),
-                eq("2"),
-                eq("2")
-        );
-        verify(ticketSkuMapper).returnStock(11L, 2);
-        assertFalse(soldOutMap().containsKey(skuId));
-    }
-
-    @SuppressWarnings("unchecked")
-    private ConcurrentHashMap<Long, Boolean> soldOutMap() {
-        return (ConcurrentHashMap<Long, Boolean>) ReflectionTestUtils.getField(
-                TicketOrderServiceImpl.class,
-                "SOLD_OUT_MAP"
-        );
+        verify(stockRestoreService).closeTimeoutOrder(1L, 1001L, "O202607060001", 22L, 11L, 2);
     }
 }

@@ -5,4 +5,8 @@ import com.mongxin.livestart.pay.dto.RefundCreateResponse;
 
 public interface RefundService {
     RefundCreateResponse create(RefundCreateRequest request, Long userId);
+
+    RefundCreateResponse query(String orderNo);
+
+    void reconcilePendingRefunds();
 }

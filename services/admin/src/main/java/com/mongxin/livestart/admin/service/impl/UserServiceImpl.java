@@ -35,6 +35,7 @@ import org.redisson.api.RBloomFilter;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -57,6 +58,18 @@ import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.USER_SA
 @RequiredArgsConstructor
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements UserService {
+
+    private static final String LOGIN_CODE_KEY_PREFIX = "login_code:";
+    private static final String LOGIN_CODE_SEND_PHONE_KEY_PREFIX = "login_code:send:phone:";
+    private static final String LOGIN_CODE_SEND_IP_KEY_PREFIX = "login_code:send:ip:";
+    private static final String LOGIN_CODE_ATTEMPT_KEY_PREFIX = "login_code:attempt:";
+    private static final int CODE_MAX_ATTEMPTS = 5;
+    private static final long CODE_EXPIRE_MINUTES = 5L;
+
+    @Value("${livestart.sms.mock-log-enabled:true}")
+    private boolean mockSmsLogEnabled;
+    @Value("${spring.profiles.active:}")
+    private String activeProfiles;
 
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
     private final RedissonClient redissonClient;
@@ -98,16 +111,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     @Transactional(rollbackFor = Exception.class)
     @Override
     public UserLoginRespDTO register(UserRegisterReqDTO requestParam) {
+        requestParam.setPhone(normalizePhone(requestParam.getPhone()));
         if (!availablePhone(requestParam.getPhone())) {
             throw new ClientException(UserErrorCodeEnum.PHONE_EXIST);
         }
 
         if (StrUtil.isNotBlank(requestParam.getCode())) {
-            String cacheCode = stringRedisTemplate.opsForValue().get("login_code:" + requestParam.getPhone());
-            if (cacheCode == null || !cacheCode.equals(requestParam.getCode())) {
-                throw new ClientException("验证码错误或已失效");
-            }
-            stringRedisTemplate.delete("login_code:" + requestParam.getPhone());
+            verifyLoginCode(requestParam.getPhone(), requestParam.getCode());
         }
 
         RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getPhone());
@@ -299,13 +309,69 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     }
 
     @Override
-    public void sendCode(String phone) {
-        if (StrUtil.isBlank(phone)) {
-            throw new ClientException("手机号不能为空");
+    public void sendCode(String phone, String clientIp) {
+        phone = normalizePhone(phone);
+        if (!phone.matches("^1[3-9]\\d{9}$")) {
+            throw new ClientException("请输入有效的手机号");
         }
+        if (StrUtil.isBlank(clientIp)) {
+            clientIp = "unknown";
+        }
+        enforceRateLimit(LOGIN_CODE_SEND_PHONE_KEY_PREFIX + phone, 1, 60, "该手机号操作频繁，请 60 秒后再试");
+        enforceRateLimit(LOGIN_CODE_SEND_IP_KEY_PREFIX + clientIp, 20, 60, "请求过于频繁，请稍后再试");
+
         String code = RandomUtil.randomNumbers(6);
-        stringRedisTemplate.opsForValue().set("login_code:" + phone, code, 5, TimeUnit.MINUTES);
-        log.info("【模拟短信通道】已向手机号 {} 发送登录验证码: {}", phone, code);
+        String codeKey = LOGIN_CODE_KEY_PREFIX + phone;
+        stringRedisTemplate.opsForValue().set(codeKey, code, CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
+        stringRedisTemplate.delete(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
+        if (mockSmsLogEnabled && !isProductionProfile()) {
+            log.info("【模拟短信通道】已向手机号 {} 发送登录验证码: {}", phone, code);
+        } else {
+            log.info("【短信通道】验证码已发送，phone={}", maskPhone(phone));
+        }
+    }
+
+    private String normalizePhone(String phone) {
+        return StrUtil.trimToEmpty(phone);
+    }
+
+    private void enforceRateLimit(String key, int maxCount, long expireSeconds, String message) {
+        Long count = stringRedisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1L) {
+            stringRedisTemplate.expire(key, expireSeconds, TimeUnit.SECONDS);
+        }
+        if (count != null && count > maxCount) {
+            throw new ClientException(message);
+        }
+    }
+
+    private void verifyLoginCode(String phone, String code) {
+        phone = normalizePhone(phone);
+        if (!phone.matches("^1[3-9]\\d{9}$") || code == null || !code.matches("^\\d{6}$")) {
+            throw new ClientException("手机号或验证码格式错误");
+        }
+        String codeKey = LOGIN_CODE_KEY_PREFIX + phone;
+        String cacheCode = stringRedisTemplate.opsForValue().get(codeKey);
+        if (cacheCode == null || !cacheCode.equals(code)) {
+            Long attempts = stringRedisTemplate.opsForValue().increment(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
+            stringRedisTemplate.expire(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone, CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
+            if (attempts != null && attempts >= CODE_MAX_ATTEMPTS) {
+                stringRedisTemplate.delete(codeKey);
+                stringRedisTemplate.delete(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
+            }
+            throw new ClientException("验证码错误或已失效");
+        }
+        stringRedisTemplate.delete(codeKey);
+        stringRedisTemplate.delete(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
+    }
+
+    private boolean isProductionProfile() {
+        return StrUtil.splitTrim(activeProfiles, ',').stream()
+                .anyMatch(profile -> "prod".equalsIgnoreCase(profile) || "production".equalsIgnoreCase(profile));
+    }
+
+    private String maskPhone(String phone) {
+        return phone.length() == 11 ? phone.substring(0, 3) + "****" + phone.substring(7) : "****";
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -314,12 +380,8 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (StrUtil.isBlank(phone) || StrUtil.isBlank(code)) {
             throw new ClientException("手机号和验证码不能为空");
         }
-        String cacheCode = stringRedisTemplate.opsForValue().get("login_code:" + phone);
-        if (cacheCode == null || !cacheCode.equals(code)) {
-            throw new ClientException("验证码错误或已失效");
-        }
-
-        stringRedisTemplate.delete("login_code:" + phone);
+        phone = normalizePhone(phone);
+        verifyLoginCode(phone, code);
 
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
                 .eq(UserDO::getPhone, phone)

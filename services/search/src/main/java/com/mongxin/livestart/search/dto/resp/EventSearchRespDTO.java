@@ -2,6 +2,7 @@ package com.mongxin.livestart.search.dto.resp;
 
 import lombok.Data;
 import java.util.Date;
+import java.math.BigDecimal;
 
 /**
  * 演出搜索结果 DTO
@@ -64,17 +65,20 @@ public class EventSearchRespDTO {
     private String date;
 
     /**
-     * 场馆名称（暂为兜底文案，待关联 venue 表）
+     * 场馆名称
      */
     private String venue;
 
+    /** 场馆所在城市 */
+    private String city;
+
     /**
-     * 艺人（暂留空，待关联 performer 表）
+     * 艺人
      */
     private String artist;
 
     /**
-     * 最低价格（暂留 0，待关联 sku 表）
+     * 最低价格
      */
-    private Integer minPrice;
+    private BigDecimal minPrice;
 }

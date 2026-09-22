@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -25,7 +26,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Tag(name = "购票引擎 - 演出信息")
@@ -41,10 +41,15 @@ public class EventController {
 
     @Operation(summary = "演出列表", description = "聚合 merchant-admin 的演出与票档信息，返回 C 端展示列表")
     @GetMapping("/list")
-    public Result<List<EventListRespDTO>> listEvents() {
-        log.info("[Engine] 拉取 C 端演出列表");
+    public Result<List<EventListRespDTO>> listEvents(
+            @RequestParam(value = "current", defaultValue = "1") int current,
+            @RequestParam(value = "size", defaultValue = "20") int size) {
+        int normalizedCurrent = Math.max(current, 1);
+        int normalizedSize = Math.min(Math.max(size, 1), 100);
+        log.info("[Engine] 拉取 C 端演出列表，current={}, size={}", normalizedCurrent, normalizedSize);
 
-        Result<Page<MerchantEventRespDTO>> eventResult = merchantAdminRemoteService.pageQueryEvents(1, 50);
+        Result<Page<MerchantEventRespDTO>> eventResult = merchantAdminRemoteService
+                .pageQueryEvents(normalizedCurrent, normalizedSize);
         if (eventResult.isFail() || eventResult.getData() == null) {
             log.warn("[Engine] 获取演出列表失败: {}", eventResult.getMessage());
             return Results.success(Collections.emptyList());
@@ -55,7 +60,6 @@ public class EventController {
             return Results.success(Collections.emptyList());
         }
 
-        Map<Long, List<MerchantTicketSkuRespDTO>> skuGroupByEvent = loadSkuGroup(null, 500);
         Map<Long, MerchantVenueRespDTO> venueCache = new HashMap<>();
 
         List<EventListRespDTO> resultList = new ArrayList<>();
@@ -63,7 +67,7 @@ public class EventController {
             if (!isVisibleEvent(event)) {
                 continue;
             }
-            resultList.add(buildEventDetail(event, skuGroupByEvent, venueCache));
+            resultList.add(buildEventDetail(event, loadSkuGroup(event.getId()), venueCache));
         }
 
         return Results.success(resultList);
@@ -85,19 +89,32 @@ public class EventController {
             return Results.success(null);
         }
 
-        Map<Long, List<MerchantTicketSkuRespDTO>> skuGroupByEvent = loadSkuGroup(id, 200);
+        Map<Long, List<MerchantTicketSkuRespDTO>> skuGroupByEvent = loadSkuGroup(id);
         Map<Long, MerchantVenueRespDTO> venueCache = new HashMap<>();
         return Results.success(buildEventDetail(event, skuGroupByEvent, venueCache));
     }
 
-    private Map<Long, List<MerchantTicketSkuRespDTO>> loadSkuGroup(Long eventId, int size) {
-        Result<Page<MerchantTicketSkuRespDTO>> skuResult = merchantAdminRemoteService.pageQueryTicketSkus(eventId, 1, size);
-        if (skuResult.isFail() || skuResult.getData() == null || skuResult.getData().getRecords() == null) {
-            return Collections.emptyMap();
+    private Map<Long, List<MerchantTicketSkuRespDTO>> loadSkuGroup(Long eventId) {
+        Map<Long, List<MerchantTicketSkuRespDTO>> result = new HashMap<>();
+        int current = 1;
+        final int pageSize = 100;
+        while (current <= 100) {
+            Result<Page<MerchantTicketSkuRespDTO>> skuResult = merchantAdminRemoteService
+                    .pageQueryTicketSkus(eventId, current, pageSize);
+            if (skuResult.isFail() || skuResult.getData() == null
+                    || skuResult.getData().getRecords() == null) {
+                break;
+            }
+            for (MerchantTicketSkuRespDTO sku : skuResult.getData().getRecords()) {
+                result.computeIfAbsent(sku.getEventId(), ignored -> new ArrayList<>()).add(sku);
+            }
+            long pages = skuResult.getData().getPages();
+            if (skuResult.getData().getRecords().isEmpty() || pages <= current) {
+                break;
+            }
+            current++;
         }
-
-        return skuResult.getData().getRecords().stream()
-                .collect(Collectors.groupingBy(MerchantTicketSkuRespDTO::getEventId));
+        return result;
     }
 
     private boolean isVisibleEvent(MerchantEventRespDTO event) {

@@ -4,7 +4,7 @@ USE `live_start`;
 
 CREATE TABLE IF NOT EXISTS `t_stock_restore_task` (
   `id` bigint NOT NULL,
-  `biz_type` varchar(32) NOT NULL COMMENT '业务类型，如 REFUND',
+  `biz_type` varchar(32) NOT NULL COMMENT '业务类型：REFUND 或 TIMEOUT_CLOSE',
   `order_no` varchar(64) NOT NULL COMMENT '业务订单号',
   `user_id` bigint NOT NULL,
   `event_id` bigint NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS `t_stock_restore_task` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_stock_restore_biz_order` (`biz_type`, `order_no`),
   KEY `idx_stock_restore_pending` (`status`, `next_retry_time`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退款库存回补任务';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='退款与超时关单库存回补任务';
 
 SET @stock_restore_refund_confirmed_exists := (
   SELECT COUNT(*) FROM information_schema.COLUMNS

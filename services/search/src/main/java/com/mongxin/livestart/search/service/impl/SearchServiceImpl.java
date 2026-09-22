@@ -48,8 +48,8 @@ public class SearchServiceImpl implements SearchService {
         recordHotSearch(req.getKeyword());
 
         // 分页计算
-        int pageNum = req.getPageNum() != null ? req.getPageNum() : 1;
-        int pageSize = req.getPageSize() != null ? req.getPageSize() : 10;
+        int pageNum = req.getPageNum() != null ? Math.max(req.getPageNum(), 1) : 1;
+        int pageSize = req.getPageSize() != null ? Math.min(Math.max(req.getPageSize(), 1), 100) : 10;
         int offset = (pageNum - 1) * pageSize;
 
         // 调用自定义 SQL 查询
@@ -204,12 +204,10 @@ public class SearchServiceImpl implements SearchService {
         dto.setCover(item.getPosterUrl());
         // 格式化演出时间
         dto.setDate(item.getStartTime() != null ? DATE_FORMAT.format(item.getStartTime()) : "");
-        // 场馆（暂用兜底，TODO: 关联 venue 表）
-        dto.setVenue("待确认场馆");
-        // 艺人（暂留空，TODO: 关联 performer 表）
-        dto.setArtist("");
-        // 最低价格（暂留 0，TODO: 关联 sku 表）
-        dto.setMinPrice(0);
+        dto.setVenue(StrUtil.blankToDefault(item.getVenueName(), "未知场馆"));
+        dto.setCity(StrUtil.blankToDefault(item.getVenueCity(), ""));
+        dto.setArtist(StrUtil.blankToDefault(item.getPerformerName(), ""));
+        dto.setMinPrice(item.getMinPrice() == null ? java.math.BigDecimal.ZERO : item.getMinPrice());
         return dto;
     }
 

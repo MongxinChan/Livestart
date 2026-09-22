@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
 import java.util.Date;
+import java.math.BigDecimal;
 
 /**
  * 演出活动搜索引擎文档实体，对应表：t_event
@@ -49,4 +50,14 @@ public class EventDO {
      * 演出状态 0:下架 1:预售 2:上架 3:售罄
      */
     private Integer status;
+
+    /** 关联场馆名称和城市，由搜索查询别名映射。 */
+    private String venueName;
+    private String venueCity;
+
+    /** 关联艺人名称，由搜索查询聚合。 */
+    private String performerName;
+
+    /** 票档最低售价，由搜索查询聚合。 */
+    private BigDecimal minPrice;
 }

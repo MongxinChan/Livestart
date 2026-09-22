@@ -3,8 +3,11 @@ package com.mongxin.livestart.pay.service;
 import com.alipay.api.AlipayClient;
 import com.alipay.api.DefaultAlipayClient;
 import com.alipay.api.domain.AlipayTradeRefundModel;
+import com.alipay.api.domain.AlipayTradeFastpayRefundQueryModel;
 import com.alipay.api.request.AlipayTradeRefundRequest;
+import com.alipay.api.request.AlipayTradeFastpayRefundQueryRequest;
 import com.alipay.api.response.AlipayTradeRefundResponse;
+import com.alipay.api.response.AlipayTradeFastpayRefundQueryResponse;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.exception.ServiceException;
@@ -24,15 +27,59 @@ import java.math.RoundingMode;
 import java.util.Date;
 import java.util.UUID;
 import java.math.BigDecimal;
+import java.util.List;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class RefundServiceImpl implements RefundService {
     private static final int REFUND_SUCCESS = 1;
+    private static final String ALIPAY_REFUND_SUCCESS = "REFUND_SUCCESS";
     private final PayMapper payMapper;
     private final RefundMapper refundMapper;
     private final AlipayProperties alipayProperties;
+
+    @Override
+    public RefundCreateResponse query(String orderNo) {
+        RefundDO refund = refundMapper.selectOne(Wrappers.lambdaQuery(RefundDO.class)
+                .eq(RefundDO::getOrderNo, orderNo));
+        return refund == null ? null : buildResponse(refund);
+    }
+
+    @Override
+    public void reconcilePendingRefunds() {
+        List<RefundDO> pending = refundMapper.selectPending();
+        for (RefundDO refund : pending) {
+            try {
+                reconcileOne(refund);
+            } catch (Exception ex) {
+                log.error("[退款对账] 查询支付宝退款结果失败，orderNo={}, refundNo={}",
+                        refund.getOrderNo(), refund.getRefundNo(), ex);
+            }
+        }
+    }
+
+    private void reconcileOne(RefundDO refund) throws Exception {
+        AlipayClient client = new DefaultAlipayClient(
+                alipayProperties.getGatewayUrl(), alipayProperties.getAppId(),
+                alipayProperties.getPrivateKey(), "json", alipayProperties.getCharset(),
+                alipayProperties.getPublicKey(), alipayProperties.getSignType());
+        AlipayTradeFastpayRefundQueryRequest request = new AlipayTradeFastpayRefundQueryRequest();
+        AlipayTradeFastpayRefundQueryModel model = new AlipayTradeFastpayRefundQueryModel();
+        model.setTradeNo(refund.getTradeNo());
+        model.setOutRequestNo(refund.getRefundNo());
+        request.setBizModel(model);
+        AlipayTradeFastpayRefundQueryResponse response = client.execute(request);
+        if (response != null && response.isSuccess()
+                && ALIPAY_REFUND_SUCCESS.equalsIgnoreCase(response.getRefundStatus())) {
+            int affected = refundMapper.markSuccessIfPending(refund.getOrderNo(), refund.getRefundNo(),
+                    REFUND_SUCCESS, 0, response.getTradeNo(), new Date());
+            if (affected == 1) {
+                log.info("[退款对账] 已修正退款成功状态，orderNo={}, refundNo={}",
+                        refund.getOrderNo(), refund.getRefundNo());
+            }
+        }
+    }
 
     @Override
     public RefundCreateResponse create(RefundCreateRequest request, Long userId) {

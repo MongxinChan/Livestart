@@ -10,6 +10,8 @@ import com.mongxin.livestart.framework.exception.ClientException;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -30,5 +32,14 @@ public class RefundController {
             throw new ClientException("内部调用认证失败");
         }
         return Results.success(refundService.create(request, userId));
+    }
+
+    @GetMapping("/{orderNo}")
+    public Result<RefundCreateResponse> query(@PathVariable String orderNo,
+                                               @RequestHeader("X-Internal-Token") String internalToken) {
+        if (!payServiceProperties.getInternalToken().equals(internalToken)) {
+            throw new ClientException("内部调用认证失败");
+        }
+        return Results.success(refundService.query(orderNo));
     }
 }

@@ -6,6 +6,7 @@ import com.mongxin.livestart.engine.dao.entity.StockRestoreTaskDO;
 import com.mongxin.livestart.engine.dao.mapper.OrderMapper;
 import com.mongxin.livestart.engine.dao.mapper.StockRestoreTaskMapper;
 import com.mongxin.livestart.engine.dao.mapper.TicketSkuMapper;
+import com.mongxin.livestart.engine.remote.PayRemoteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -26,6 +27,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -44,6 +46,8 @@ class StockRestoreServiceTest {
     @Mock
     private TransactionTemplate transactionTemplate;
     @Mock
+    private PayRemoteService payRemoteService;
+    @Mock
     private TransactionStatus transactionStatus;
 
     private StockRestoreService service;
@@ -51,7 +55,7 @@ class StockRestoreServiceTest {
     @BeforeEach
     void setUp() {
         service = new StockRestoreService(taskMapper, ticketSkuMapper, orderMapper,
-                stringRedisTemplate, transactionTemplate);
+                stringRedisTemplate, transactionTemplate, payRemoteService);
         ReflectionTestUtils.setField(service, "retryBaseDelayMs", 1_000L);
     }
 
@@ -124,6 +128,34 @@ class StockRestoreServiceTest {
         verify(taskMapper).scheduleRetry(eq(1L), any(), anyString());
         verify(stringRedisTemplate, never()).execute(any(RedisScript.class), anyList(), any());
         verify(taskMapper, never()).markCompleted(1L);
+    }
+
+    @Test
+    void shouldKeepTimeoutCloseTaskPendingWhenRedisRestoreFails() {
+        StockRestoreTaskDO task = task(2L, 0, 0);
+        task.setBizType("TIMEOUT_CLOSE");
+        when(orderMapper.selectOne(any())).thenReturn(OrderDO.builder()
+                .orderNo(task.getOrderNo()).userId(task.getUserId())
+                .status(OrderStatusEnum.CANCELLED.getCode()).build());
+        when(taskMapper.selectForUpdate(2L)).thenReturn(task);
+        when(taskMapper.selectById(2L)).thenReturn(task);
+        when(taskMapper.markDbRestored(2L)).thenReturn(1);
+        when(ticketSkuMapper.returnStock(9L, 2)).thenReturn(1);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<TransactionStatus> callback = invocation.getArgument(0);
+            callback.accept(transactionStatus);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+        doThrow(new IllegalStateException("redis unavailable"))
+                .when(stringRedisTemplate).execute(any(RedisScript.class), anyList(),
+                        eq("2"), eq("2"), anyString());
+
+        service.processTimeoutClose(task);
+
+        verify(taskMapper).markDbRestored(2L);
+        verify(taskMapper).scheduleRetry(eq(2L), any(), anyString());
+        verify(taskMapper, never()).markCompleted(2L);
     }
 
     private StockRestoreTaskDO task(Long id, int dbRestored, int redisRestored) {

@@ -15,6 +15,7 @@ import org.springframework.validation.annotation.Validated;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import jakarta.servlet.http.HttpServletRequest;
 import java.util.List;
 
 /**
@@ -148,8 +149,8 @@ public class UserController {
      * 发送登录/注册手机验证码
      */
     @PostMapping("/api/live-start/admin/v1/user/send-code")
-    public Result<Void> sendCode(@RequestParam("phone") String phone) {
-        userService.sendCode(phone);
+    public Result<Void> sendCode(@RequestParam("phone") String phone, HttpServletRequest request) {
+        userService.sendCode(phone, request.getRemoteAddr());
         return Results.success();
     }
 

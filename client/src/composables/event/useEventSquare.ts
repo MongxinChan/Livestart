@@ -191,7 +191,42 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   async function fetchEvents() {
     loading.value = true
     try {
-      events.value = await request<LiveEvent[]>('/api/live-start/engine/event/list')
+      const priceRange = priceRanges.find((item) => item.label === activePriceLabel.value)
+      const eventType = activeCategory.value === 'Livehouse'
+        ? 0
+        : activeCategory.value === '演唱会'
+          ? 1
+          : activeCategory.value === '音乐节'
+            ? 2
+            : null
+      const params = new URLSearchParams({ pageNum: '1', pageSize: '100' })
+      if (searchQuery.value.trim()) params.set('keyword', searchQuery.value.trim())
+      if (eventType !== null) params.set('eventType', String(eventType))
+      if (activeCity.value !== '全国') params.set('city', activeCity.value)
+      if (priceRange?.minPrice != null) params.set('minPrice', String(priceRange.minPrice))
+      if (priceRange?.maxPrice != null) params.set('maxPrice', String(priceRange.maxPrice))
+
+      const result = await request<{ records?: Array<Partial<LiveEvent>> }>(
+        `/api/live-start/search/event?${params.toString()}`
+      )
+      const records = Array.isArray(result) ? result : result.records || []
+      events.value = records.map((event) => ({
+        id: event.id || '',
+        title: event.title || '',
+        type: event.type || '',
+        cover: event.cover || event.posterUrl || '',
+        date: event.date || '',
+        venue: event.venue || '',
+        city: event.city || '',
+        artist: event.artist || '',
+        minPrice: Number(event.minPrice || 0),
+        tags: event.tags || [],
+        skus: event.skus || [],
+        ticketStage: event.ticketStage,
+        status: event.status,
+        statusText: event.statusText,
+        started: event.started,
+      }))
     } catch (err) {
       console.error('拉取演出失败', err)
       events.value = []
@@ -210,6 +245,8 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   }
 
   async function handleSearch() {
+    page.value = 1
+    await fetchEvents()
     if (searchQuery.value.trim()) {
       try {
         await request(`/api/live-start/search/click?keyword=${encodeURIComponent(searchQuery.value)}`, { method: 'POST' })

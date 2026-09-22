@@ -25,9 +25,13 @@ public interface EventMapper extends BaseMapper<EventDO> {
      * @return 演出列表
      */
     @Select("<script>" +
-            "SELECT DISTINCT e.* FROM t_event e " +
+            "SELECT e.*, v.name AS venue_name, v.city AS venue_city, " +
+            "(SELECT GROUP_CONCAT(DISTINCT p.name ORDER BY p.id SEPARATOR ', ') " +
+            " FROM t_event_performer ep JOIN t_performer p ON p.id = ep.performer_id " +
+            " WHERE ep.event_id = e.id AND p.status = 1) AS performer_name, " +
+            "(SELECT MIN(s2.selling_price) FROM t_ticket_sku s2 WHERE s2.event_id = e.id) AS min_price " +
+            "FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "LEFT JOIN t_ticket_sku sku ON e.id = sku.event_id " +
             "WHERE 1=1 " +
             "<if test='keyword != null and keyword != \"\"'>" +
             "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +
@@ -65,7 +69,6 @@ public interface EventMapper extends BaseMapper<EventDO> {
     @Select("<script>" +
             "SELECT COUNT(DISTINCT e.id) FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "LEFT JOIN t_ticket_sku sku ON e.id = sku.event_id " +
             "WHERE 1=1 " +
             "<if test='keyword != null and keyword != \"\"'>" +
             "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +

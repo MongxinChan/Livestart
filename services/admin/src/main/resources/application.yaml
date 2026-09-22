@@ -40,6 +40,9 @@ aliyun:
 
 # Livestart 用户流量风控配置
 livestart:
+    sms:
+        # 本地模拟短信开关。生产环境即使开启也不会把验证码写入日志。
+        mock-log-enabled: ${LIVESTART_SMS_MOCK_LOG_ENABLED:true}
     flow-limit:
         # 是否开启用户请求流量风控 (true=开启)
         enable: false

@@ -1,17 +1,16 @@
 package com.mongxin.livestart.engine.mq.consumer;
 
 import com.alibaba.fastjson2.JSON;
+import com.mongxin.livestart.engine.common.enums.OrderStatusEnum;
 import com.mongxin.livestart.engine.dao.entity.OrderDO;
 import com.mongxin.livestart.engine.dao.mapper.OrderMapper;
-import com.mongxin.livestart.engine.dao.mapper.TicketSkuMapper;
+import com.mongxin.livestart.engine.service.StockRestoreService;
 import com.mongxin.livestart.engine.mq.base.MessageWrapper;
 import com.mongxin.livestart.engine.mq.event.OrderDelayCloseEvent;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.script.RedisScript;
 
 import java.math.BigDecimal;
 import java.util.Date;
@@ -19,6 +18,7 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -28,16 +28,13 @@ class OrderDelayCloseConsumerTest {
     @Mock
     private OrderMapper orderMapper;
     @Mock
-    private TicketSkuMapper ticketSkuMapper;
-    @Mock
-    private StringRedisTemplate stringRedisTemplate;
+    private StockRestoreService stockRestoreService;
 
     @Test
     void shouldRollbackStockAndUserLimitWhenClosingTimeoutOrder() {
         OrderDelayCloseConsumer consumer = new OrderDelayCloseConsumer(
                 orderMapper,
-                ticketSkuMapper,
-                stringRedisTemplate
+                stockRestoreService
         );
 
         OrderDelayCloseEvent event = OrderDelayCloseEvent.builder()
@@ -63,16 +60,37 @@ class OrderDelayCloseConsumerTest {
                 .build();
 
         when(orderMapper.selectOne(any())).thenReturn(order);
-        when(orderMapper.updateOrderStatus(1L, 1001L, 2, 0)).thenReturn(1);
+        when(stockRestoreService.closeTimeoutOrder(1L, 1001L, event.getOrderNo(),
+                event.getEventId(), event.getSkuId(), event.getCount())).thenReturn(true);
 
         consumer.onMessage(message);
 
-        verify(stringRedisTemplate).execute(
-                any(RedisScript.class),
-                eq(List.of("engine:stock:sku:11", "engine:limit:user:1001:event:22")),
-                eq("2"),
-                eq("2")
-        );
-        verify(ticketSkuMapper).returnStock(11L, 2);
+        verify(stockRestoreService).closeTimeoutOrder(1L, 1001L, event.getOrderNo(),
+                event.getEventId(), event.getSkuId(), event.getCount());
+    }
+
+    @Test
+    void shouldPropagateCompensationFailureForMessageRetry() {
+        OrderDelayCloseConsumer consumer = new OrderDelayCloseConsumer(orderMapper, stockRestoreService);
+        OrderDelayCloseEvent event = OrderDelayCloseEvent.builder()
+                .orderNo("O202606250002")
+                .userId(1001L)
+                .skuId(11L)
+                .eventId(22L)
+                .count(1)
+                .build();
+        String message = JSON.toJSONString(MessageWrapper.<OrderDelayCloseEvent>builder()
+                .message(event)
+                .keys(event.getOrderNo())
+                .timestamp(new Date())
+                .build());
+        when(orderMapper.selectOne(any())).thenReturn(OrderDO.builder()
+                .id(2L).orderNo(event.getOrderNo()).userId(event.getUserId())
+                .status(OrderStatusEnum.PENDING_PAYMENT.getCode()).build());
+        when(stockRestoreService.closeTimeoutOrder(2L, event.getUserId(), event.getOrderNo(),
+                event.getEventId(), event.getSkuId(), event.getCount()))
+                .thenThrow(new IllegalStateException("task store unavailable"));
+
+        assertThrows(IllegalStateException.class, () -> consumer.onMessage(message));
     }
 }
