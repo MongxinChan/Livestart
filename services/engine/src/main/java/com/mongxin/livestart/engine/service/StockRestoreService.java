@@ -182,12 +182,31 @@ public class StockRestoreService {
             scheduleRetry(task, "订单不存在，无法确认超时关单");
             return;
         }
-        if (order.getStatus() != OrderStatusEnum.CANCELLED.getCode()) {
-            if (order.getStatus() == OrderStatusEnum.PENDING_PAYMENT.getCode()) {
-                scheduleRetry(task, "订单尚未完成关单");
+        if (order.getStatus() == OrderStatusEnum.PENDING_PAYMENT.getCode()) {
+            // 任务可能在 CAS 关单前已经落库；重试时必须继续尝试关单，不能只延迟任务。
+            int affected = orderMapper.updateOrderStatus(order.getId(), order.getUserId(),
+                    OrderStatusEnum.CANCELLED.getCode(), OrderStatusEnum.PENDING_PAYMENT.getCode());
+            if (!SqlHelper.retBool(affected)) {
+                OrderDO latest = orderMapper.selectOne(Wrappers.lambdaQuery(OrderDO.class)
+                        .eq(OrderDO::getOrderNo, task.getOrderNo())
+                        .eq(OrderDO::getUserId, task.getUserId()));
+                if (latest == null) {
+                    scheduleRetry(task, "订单不存在，无法确认超时关单");
+                    return;
+                }
+                if (latest.getStatus() != OrderStatusEnum.CANCELLED.getCode()) {
+                    // 已支付或已退款的订单不应再回补超时库存。
+                    taskMapper.deleteById(task.getId());
+                    return;
+                }
+                order = latest;
             } else {
-                taskMapper.deleteById(task.getId());
+                order.setStatus(OrderStatusEnum.CANCELLED.getCode());
             }
+        }
+        if (order.getStatus() != OrderStatusEnum.CANCELLED.getCode()) {
+            // 已支付或已退款的订单不应再回补超时库存。
+            taskMapper.deleteById(task.getId());
             return;
         }
         restoreInventory(task);

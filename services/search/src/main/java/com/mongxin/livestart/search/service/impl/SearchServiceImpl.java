@@ -21,7 +21,8 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
 
-import java.text.SimpleDateFormat;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -38,7 +39,10 @@ public class SearchServiceImpl implements SearchService {
     private final StringRedisTemplate stringRedisTemplate;
 
     private static final String HOT_SEARCH_KEY = "search:hot_keywords";
-    private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+    private static final int MAX_PAGE_NUM = 100_000;
+    private static final int MAX_SUGGEST_LIMIT = 20;
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+            .withZone(ZoneId.systemDefault());
 
     @Override
     public IPage<EventSearchRespDTO> searchEvents(EventSearchReqDTO req) {
@@ -48,7 +52,7 @@ public class SearchServiceImpl implements SearchService {
         recordHotSearch(req.getKeyword());
 
         // 分页计算
-        int pageNum = req.getPageNum() != null ? Math.max(req.getPageNum(), 1) : 1;
+        int pageNum = req.getPageNum() != null ? Math.min(Math.max(req.getPageNum(), 1), MAX_PAGE_NUM) : 1;
         int pageSize = req.getPageSize() != null ? Math.min(Math.max(req.getPageSize(), 1), 100) : 10;
         int offset = (pageNum - 1) * pageSize;
 
@@ -96,7 +100,9 @@ public class SearchServiceImpl implements SearchService {
         // 记录热搜词
         recordHotSearch(keyword);
 
-        Page<PerformerDO> page = new Page<>(pageNum, pageSize);
+        int normalizedPageNum = pageNum == null ? 1 : Math.min(Math.max(pageNum, 1), MAX_PAGE_NUM);
+        int normalizedPageSize = pageSize == null ? 10 : Math.min(Math.max(pageSize, 1), 100);
+        Page<PerformerDO> page = new Page<>(normalizedPageNum, normalizedPageSize);
         LambdaQueryWrapper<PerformerDO> queryWrapper = Wrappers.lambdaQuery(PerformerDO.class);
         if (StrUtil.isNotBlank(keyword)) {
             queryWrapper.like(PerformerDO::getName, keyword);
@@ -105,7 +111,7 @@ public class SearchServiceImpl implements SearchService {
 
         IPage<PerformerDO> performerPage = performerMapper.selectPage(page, queryWrapper);
 
-        IPage<PerformerSearchRespDTO> resultPage = new Page<>(pageNum, pageSize);
+        IPage<PerformerSearchRespDTO> resultPage = new Page<>(normalizedPageNum, normalizedPageSize);
         resultPage.setTotal(performerPage.getTotal());
         resultPage.setPages(performerPage.getPages());
 
@@ -161,6 +167,7 @@ public class SearchServiceImpl implements SearchService {
             return Collections.emptyList();
         }
         String cleanKeyword = keyword.trim();
+        int normalizedLimit = Math.min(Math.max(limit, 1), MAX_SUGGEST_LIMIT);
         Set<String> results = new LinkedHashSet<>();
 
         // 1. 从 Redis ZSet 热搜词中前缀匹配（得分高者优先）
@@ -170,20 +177,20 @@ public class SearchServiceImpl implements SearchService {
             hotTuples.stream()
                     .map(ZSetOperations.TypedTuple::getValue)
                     .filter(v -> v != null && v.contains(cleanKeyword))
-                    .limit(limit)
+                    .limit(normalizedLimit)
                     .forEach(results::add);
         }
 
         // 2. 若热搜未填满，从 DB title 中补充
-        if (results.size() < limit) {
+        if (results.size() < normalizedLimit) {
             LambdaQueryWrapper<EventDO> queryWrapper = Wrappers.lambdaQuery(EventDO.class)
                     .like(EventDO::getTitle, cleanKeyword)
                     .select(EventDO::getTitle)
-                    .last("LIMIT " + limit);
+                    .last("LIMIT " + normalizedLimit);
             eventMapper.selectList(queryWrapper).stream()
                     .map(EventDO::getTitle)
                     .filter(t -> !results.contains(t))
-                    .limit(limit - results.size())
+                    .limit(normalizedLimit - results.size())
                     .forEach(results::add);
         }
 
@@ -203,7 +210,7 @@ public class SearchServiceImpl implements SearchService {
         // 封面图（直接使用 posterUrl）
         dto.setCover(item.getPosterUrl());
         // 格式化演出时间
-        dto.setDate(item.getStartTime() != null ? DATE_FORMAT.format(item.getStartTime()) : "");
+        dto.setDate(item.getStartTime() != null ? DATE_FORMAT.format(item.getStartTime().toInstant()) : "");
         dto.setVenue(StrUtil.blankToDefault(item.getVenueName(), "未知场馆"));
         dto.setCity(StrUtil.blankToDefault(item.getVenueCity(), ""));
         dto.setArtist(StrUtil.blankToDefault(item.getPerformerName(), ""));

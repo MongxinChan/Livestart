@@ -158,6 +158,41 @@ class StockRestoreServiceTest {
         verify(taskMapper, never()).markCompleted(2L);
     }
 
+    @Test
+    void shouldRetryCasCloseWhenTimeoutTaskWasCreatedBeforeOrderClosed() {
+        StockRestoreTaskDO task = task(3L, 0, 0);
+        task.setBizType("TIMEOUT_CLOSE");
+        OrderDO pending = OrderDO.builder()
+                .id(33L)
+                .orderNo(task.getOrderNo())
+                .userId(task.getUserId())
+                .status(OrderStatusEnum.PENDING_PAYMENT.getCode())
+                .build();
+        when(orderMapper.selectOne(any())).thenReturn(pending);
+        when(orderMapper.updateOrderStatus(33L, 7L,
+                OrderStatusEnum.CANCELLED.getCode(), OrderStatusEnum.PENDING_PAYMENT.getCode()))
+                .thenReturn(1);
+        when(taskMapper.selectForUpdate(3L)).thenReturn(task);
+        when(taskMapper.selectById(3L)).thenReturn(task);
+        when(taskMapper.markDbRestored(3L)).thenReturn(1);
+        when(taskMapper.markRedisRestored(3L)).thenReturn(1);
+        when(ticketSkuMapper.returnStock(9L, 2)).thenReturn(1);
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            Consumer<TransactionStatus> callback = invocation.getArgument(0);
+            callback.accept(transactionStatus);
+            return null;
+        }).when(transactionTemplate).executeWithoutResult(any());
+        when(stringRedisTemplate.execute(any(RedisScript.class), anyList(),
+                eq("2"), eq("2"), anyString())).thenReturn(1L);
+
+        service.processTimeoutClose(task);
+
+        verify(orderMapper).updateOrderStatus(33L, 7L,
+                OrderStatusEnum.CANCELLED.getCode(), OrderStatusEnum.PENDING_PAYMENT.getCode());
+        verify(taskMapper).markCompleted(3L);
+    }
+
     private StockRestoreTaskDO task(Long id, int dbRestored, int redisRestored) {
         StockRestoreTaskDO task = new StockRestoreTaskDO();
         task.setId(id);

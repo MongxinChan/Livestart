@@ -32,7 +32,7 @@ public interface EventMapper extends BaseMapper<EventDO> {
             "(SELECT MIN(s2.selling_price) FROM t_ticket_sku s2 WHERE s2.event_id = e.id) AS min_price " +
             "FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "WHERE 1=1 " +
+            "WHERE (e.status IS NULL OR e.status IN (1, 2, 3)) " +
             "<if test='keyword != null and keyword != \"\"'>" +
             "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +
             "</if>" +
@@ -69,7 +69,7 @@ public interface EventMapper extends BaseMapper<EventDO> {
     @Select("<script>" +
             "SELECT COUNT(DISTINCT e.id) FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "WHERE 1=1 " +
+            "WHERE (e.status IS NULL OR e.status IN (1, 2, 3)) " +
             "<if test='keyword != null and keyword != \"\"'>" +
             "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +
             "</if>" +
