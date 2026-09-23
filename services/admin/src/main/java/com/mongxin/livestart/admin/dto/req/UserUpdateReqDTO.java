@@ -16,11 +16,6 @@ public class UserUpdateReqDTO {
     private String username;
 
     /**
-     * 密码
-     */
-    private String password;
-
-    /**
      * 真实姓名
      */
     private String realName;

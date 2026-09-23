@@ -2,8 +2,7 @@ package com.mongxin.livestart.admin.controller;
 
 import com.mongxin.livestart.admin.common.convention.result.Result;
 import com.mongxin.livestart.admin.common.convention.result.Results;
-import com.mongxin.livestart.admin.dto.req.UserLoginReqDTO;
-import com.mongxin.livestart.admin.dto.req.UserRegisterReqDTO;
+import com.mongxin.livestart.admin.dto.req.UserCodeLoginReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserVenueAdminBindReqDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
@@ -31,30 +30,6 @@ public class UserController {
     private final UserService userService;
 
     /**
-     * 根据手机号查询用户信息
-     */
-    @GetMapping("/api/live-start/admin/v1/user/{phone}")
-    public Result<UserRespDTO> getUserByPhone(@PathVariable("phone") String phone) {
-        return Results.success(userService.getUserByPhone(phone));
-    }
-
-    /**
-     * 查询手机号是否存在
-     */
-    @GetMapping("/api/live-start/admin/v1/has-phone/{phone}")
-    public Result<Boolean> availablePhone(@PathVariable("phone") String phone) {
-        return Results.success(userService.availablePhone(phone));
-    }
-
-    /**
-     * 注册用户（注册成功直接返回 token，前端拿到即视为已登录）
-     */
-    @PostMapping("/api/live-start/admin/v1/user")
-    public Result<UserLoginRespDTO> register(@RequestBody @Validated UserRegisterReqDTO requestParam) {
-        return Results.success(userService.register(requestParam));
-    }
-
-    /**
      * 修改用户
      */
     @PutMapping("/api/live-start/admin/v1/user")
@@ -64,21 +39,11 @@ public class UserController {
     }
 
     /**
-     * 用户登录
-     */
-    @PostMapping("/api/live-start/admin/v1/user/login")
-    public Result<UserLoginRespDTO> login(@RequestBody @Validated UserLoginReqDTO requestParam) {
-        /* log.error("【Controller】接收 username={}", requestParam.getUsername()); */
-        return Results.success(userService.login(requestParam));
-    }
-
-    /**
      * 检查用户是否登录
      */
     @GetMapping("/api/live-start/admin/v1/user/check-login")
-    public Result<Boolean> checkLogin(@RequestParam("phone") String phone,
-            @RequestParam("token") String token) {
-        return Results.success(userService.checkLogin(phone, token));
+    public Result<Boolean> checkLogin(@RequestHeader("token") String token) {
+        return Results.success(userService.checkLogin(token));
     }
 
     /**
@@ -99,9 +64,8 @@ public class UserController {
      * 用户退出登录
      */
     @DeleteMapping("/api/live-start/admin/v1/user/logout")
-    public Result<Void> logout(@RequestParam("phone") String phone,
-            @RequestParam("token") String token) {
-        userService.logout(phone, token);
+    public Result<Void> logout(@RequestHeader("token") String token) {
+        userService.logout(token);
         return Results.success();
     }
 
@@ -145,9 +109,9 @@ public class UserController {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",", 2)[0].trim();
+        String gatewayClientIp = request.getHeader("X-Livestart-Client-IP");
+        if (gatewayClientIp != null && !gatewayClientIp.isBlank()) {
+            return gatewayClientIp.trim();
         }
         return request.getRemoteAddr();
     }
@@ -156,22 +120,8 @@ public class UserController {
      * 验证码快捷登录与自动注册
      */
     @PostMapping("/api/live-start/admin/v1/user/login/code")
-    public Result<UserLoginRespDTO> loginByCode(
-            @RequestParam("phone") String phone,
-            @RequestParam("code") String code) {
-        return Results.success(userService.loginByCode(phone, code));
-    }
-
-    /**
-     * 临时管理接口：提升用户为管理员（仅用于开发测试）
-     * TODO: 生产环境应删除此接口或增加严格的权限校验
-     */
-    @PutMapping("/api/live-start/admin/v1/user/promote-admin")
-    public Result<Void> promoteToAdmin(
-            @RequestParam("userId") Long userId,
-            @RequestParam("userType") Integer userType) {
-        userService.updateUserType(userId, userType);
-        return Results.success();
+    public Result<UserLoginRespDTO> loginByCode(@RequestBody @Validated UserCodeLoginReqDTO requestParam) {
+        return Results.success(userService.loginByCode(requestParam.getPhone(), requestParam.getCode()));
     }
 
     @PutMapping("/api/live-start/admin/v1/user/type")
@@ -197,7 +147,9 @@ public class UserController {
     }
 
     @GetMapping("/api/live-start/admin/v1/user/simple/list")
-    public Result<List<UserRespDTO>> listSimpleUsersByIds(@RequestParam("userIds") List<Long> userIds) {
-        return Results.success(userService.listSimpleUsersByIds(userIds));
+    public Result<List<UserRespDTO>> listSimpleUsersByIds(
+            @RequestParam("userIds") List<Long> userIds,
+            @RequestHeader("X-Livestart-Internal-Token") String internalToken) {
+        return Results.success(userService.listSimpleUsersByIds(userIds, internalToken));
     }
 }

@@ -12,7 +12,9 @@ import com.mongxin.livestart.admin.common.biz.user.UserContext;
 import com.mongxin.livestart.admin.common.convention.exception.ClientException;
 import com.mongxin.livestart.admin.common.enums.VisitorErrorCodeEnum;
 import com.mongxin.livestart.admin.dao.entity.UserVisitorDO;
+import com.mongxin.livestart.admin.dao.entity.UserDO;
 import com.mongxin.livestart.admin.dao.mapper.UserVisitorMapper;
+import com.mongxin.livestart.admin.dao.mapper.UserMapper;
 import com.mongxin.livestart.admin.dto.req.VisitorAddReqDTO;
 import com.mongxin.livestart.admin.dto.req.VisitorUpdateReqDTO;
 import com.mongxin.livestart.admin.dto.resp.VisitorRespDTO;
@@ -41,6 +43,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisitorDO>
         implements VisitorService {
+
+    private static final int USER_TYPE_SUPER_ADMIN = 4;
+
+    private final UserMapper userMapper;
 
     /**
      * AES 加密密钥，从配置文件注入（必须 16/24/32 位）
@@ -367,11 +373,34 @@ public class VisitorServiceImpl extends ServiceImpl<UserVisitorMapper, UserVisit
 
     @Override
     public List<VisitorRespDTO> listVisitorsByUserId(Long userId) {
+        assertSuperAdmin();
+        if (userId == null) {
+            throw new ClientException("用户 ID 不能为空");
+        }
         LambdaQueryWrapper<UserVisitorDO> queryWrapper = Wrappers.lambdaQuery(UserVisitorDO.class)
                 .eq(UserVisitorDO::getUserId, userId)
                 .eq(UserVisitorDO::getDelFlag, 0)
                 .orderByDesc(UserVisitorDO::getCreateTime);
         List<UserVisitorDO> doList = baseMapper.selectList(queryWrapper);
         return doList.stream().map(this::toRespDTO).collect(Collectors.toList());
+    }
+
+    private void assertSuperAdmin() {
+        String currentUserId = UserContext.getUserId();
+        if (StrUtil.isBlank(currentUserId)) {
+            throw new ClientException("仅超级管理员可查询其他用户的观演人");
+        }
+        UserDO currentUser;
+        try {
+            currentUser = userMapper.selectOne(Wrappers.lambdaQuery(UserDO.class)
+                    .eq(UserDO::getId, Long.valueOf(currentUserId))
+                    .eq(UserDO::getDelFlag, 0));
+        } catch (NumberFormatException ex) {
+            throw new ClientException("登录用户信息无效");
+        }
+        if (currentUser == null
+                || !Integer.valueOf(USER_TYPE_SUPER_ADMIN).equals(currentUser.getUserType())) {
+            throw new ClientException("仅超级管理员可查询其他用户的观演人");
+        }
     }
 }

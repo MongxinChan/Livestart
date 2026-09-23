@@ -4,12 +4,16 @@
 # =========================================================================
 # 1. 物理数据源定义集合 (支持 HikariCP 连接池)
 # =========================================================================
+mode:
+  type: Standalone
+
 dataSources:
   # 1.1 公共配置与元数据库
   ds_common:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    # ShardingSphere JDBC 5.3.2 parses this YAML directly; Spring placeholders are not resolved here.
     username: &db_user root
     password: &db_pass 123456
   
@@ -41,11 +45,11 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: id
-            shardingAlgorithmName: user_db_inline
+            shardingAlgorithmName: user_hash_mod
         tableStrategy:
           standard:
             shardingColumn: id
-            shardingAlgorithmName: user_tbl_inline
+            shardingAlgorithmName: user_hash_mod
         # 主键生成策略 (雪花算法)
         keyGenerateStrategy:
           column: id
@@ -57,11 +61,11 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: user_profile_db_inline
+            shardingAlgorithmName: user_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: user_profile_tbl_inline
+            shardingAlgorithmName: user_hash_mod
 
       # 2.3 常用观演人表 t_user_visitor (分2库8表，按 user_id 分片)
       t_user_visitor:
@@ -69,11 +73,11 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: user_visitor_db_inline
+            shardingAlgorithmName: user_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: user_visitor_tbl_inline
+            shardingAlgorithmName: user_hash_mod
         keyGenerateStrategy:
           column: id
           keyGeneratorName: snowflake
@@ -86,45 +90,11 @@ rules:
     # 3. 分片算法具体配置
     # =========================================================================
     shardingAlgorithms:
-      # 方式 A：采用极简高吞吐的 INLINE (行内内联表达式) 算法（默认启用）
-      user_db_inline:
-        type: INLINE
+      user_hash_mod:
+        type: CLASS_BASED
         props:
-          algorithm-expression: ds_user_${id % 2}
-      
-      user_tbl_inline:
-        type: INLINE
-        props:
-          algorithm-expression: t_user_${id % 8}
-      
-      user_profile_db_inline:
-        type: INLINE
-        props:
-          algorithm-expression: ds_user_${user_id % 2}
-      
-      user_profile_tbl_inline:
-        type: INLINE
-        props:
-          algorithm-expression: t_user_profile_${user_id % 8}
-      
-      user_visitor_db_inline:
-        type: INLINE
-        props:
-          algorithm-expression: ds_user_${user_id % 2}
-      
-      user_visitor_tbl_inline:
-        type: INLINE
-        props:
-          algorithm-expression: t_user_visitor_${user_id % 8}
-
-      # 方式 B：如需使用基于自定义类的 HashMod 算法，可切换为如下 CLASS_BASED 配置：
-      # (切换前，需在项目中实现对应的 com.mongxin.livestart.admin.sharding.DBHashModShardingAlgorithm 类)
-      # user_db_class:
-      #   type: CLASS_BASED
-      #   props:
-      #     algorithmClassName: com.mongxin.livestart.admin.sharding.DBHashModShardingAlgorithm
-      #     sharding-count: 16
-      #     strategy: standard
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.admin.dao.sharding.UserHashModShardingAlgorithm
 
     # =========================================================================
     # 4. 主键生成器定义

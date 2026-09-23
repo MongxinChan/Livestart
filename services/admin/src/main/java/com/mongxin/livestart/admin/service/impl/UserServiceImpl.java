@@ -1,7 +1,7 @@
 package com.mongxin.livestart.admin.service.impl;
 
-import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.lang.UUID;
+import cn.hutool.core.lang.Singleton;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.crypto.digest.BCrypt;
@@ -10,19 +10,20 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.core.toolkit.IdWorker;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.admin.common.biz.user.UserContext;
 import com.mongxin.livestart.admin.common.convention.exception.ClientException;
 import com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum;
 import com.mongxin.livestart.admin.dao.entity.UserDO;
+import com.mongxin.livestart.admin.dao.entity.UserPhoneMappingDO;
 import com.mongxin.livestart.admin.dao.entity.UserProfileDO;
 import com.mongxin.livestart.admin.dao.entity.VenueDO;
 import com.mongxin.livestart.admin.dao.mapper.UserMapper;
+import com.mongxin.livestart.admin.dao.mapper.UserPhoneMappingMapper;
 import com.mongxin.livestart.admin.dao.mapper.UserProfileMapper;
 import com.mongxin.livestart.admin.dao.mapper.VenueMapper;
-import com.mongxin.livestart.admin.dto.req.UserLoginReqDTO;
-import com.mongxin.livestart.admin.dto.req.UserRegisterReqDTO;
 import com.mongxin.livestart.admin.dto.req.UserUpdateReqDTO;
 import com.mongxin.livestart.admin.dto.resp.UserLoginRespDTO;
 import com.mongxin.livestart.admin.dto.resp.UserRespDTO;
@@ -32,12 +33,12 @@ import com.mongxin.livestart.admin.toolkit.OssUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RBloomFilter;
-import org.redisson.api.RLock;
-import org.redisson.api.RedissonClient;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -47,12 +48,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.LOCK_USER_REGISTER_KEY;
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.USER_LOGIN_KEY;
 import static com.mongxin.livestart.admin.common.constant.RedisCacheConstant.USER_LOGIN_PHONE_INDEX_KEY;
-import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.PHONE_EXIST;
-import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.USER_EXIST;
-import static com.mongxin.livestart.admin.common.enums.UserErrorCodeEnum.USER_SAVE_ERROR;
 
 @Service
 @RequiredArgsConstructor
@@ -63,17 +60,24 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     private static final String LOGIN_CODE_SEND_PHONE_KEY_PREFIX = "login_code:send:phone:";
     private static final String LOGIN_CODE_SEND_IP_KEY_PREFIX = "login_code:send:ip:";
     private static final String LOGIN_CODE_ATTEMPT_KEY_PREFIX = "login_code:attempt:";
+    private static final String RATE_LIMIT_LUA_PATH = "lua/login_code_rate_limit.lua";
+    private static final String VERIFY_CODE_LUA_PATH = "lua/login_code_verify.lua";
     private static final int CODE_MAX_ATTEMPTS = 5;
     private static final long CODE_EXPIRE_MINUTES = 5L;
+    private static final long LOGIN_SESSION_DAYS = 30L;
 
     @Value("${livestart.sms.mock-log-enabled:true}")
     private boolean mockSmsLogEnabled;
+    @Value("${livestart.sms.mock-fixed-code:}")
+    private String mockFixedCode;
     @Value("${spring.profiles.active:}")
     private String activeProfiles;
+    @Value("${livestart.admin.internal-token:change-me}")
+    private String internalToken;
 
     private final RBloomFilter<String> userRegisterCachePenetrationBloomFilter;
-    private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
+    private final UserPhoneMappingMapper userPhoneMappingMapper;
     private final UserProfileMapper userProfileMapper;
     private final VenueMapper venueMapper;
     private final OssUtil ossUtil;
@@ -88,12 +92,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
 
     @Override
     public UserRespDTO getUserByPhone(String phone) {
-        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
-                .eq(UserDO::getPhone, phone);
-        UserDO userDO = baseMapper.selectOne(queryWrapper);
-        if (userDO == null) {
-            throw new ClientException(UserErrorCodeEnum.USER_NULL);
-        }
+        UserDO userDO = findMappedUser(normalizePhone(phone));
         UserRespDTO result = new UserRespDTO();
         BeanUtils.copyProperties(userDO, result);
         UserProfileDO userProfileDO = userProfileMapper.selectById(userDO.getId());
@@ -101,53 +100,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
             BeanUtils.copyProperties(userProfileDO, result);
         }
         return result;
-    }
-
-    @Override
-    public Boolean availablePhone(String phone) {
-        return !userRegisterCachePenetrationBloomFilter.contains(phone);
-    }
-
-    @Transactional(rollbackFor = Exception.class)
-    @Override
-    public UserLoginRespDTO register(UserRegisterReqDTO requestParam) {
-        requestParam.setPhone(normalizePhone(requestParam.getPhone()));
-        if (!availablePhone(requestParam.getPhone())) {
-            throw new ClientException(UserErrorCodeEnum.PHONE_EXIST);
-        }
-
-        if (StrUtil.isNotBlank(requestParam.getCode())) {
-            verifyLoginCode(requestParam.getPhone(), requestParam.getCode());
-        }
-
-        RLock lock = redissonClient.getLock(LOCK_USER_REGISTER_KEY + requestParam.getPhone());
-        if (!lock.tryLock()) {
-            throw new ClientException(PHONE_EXIST);
-        }
-
-        try {
-            UserDO userDO = BeanUtil.toBean(requestParam, UserDO.class);
-            if (StrUtil.isBlank(userDO.getUsername())) {
-                userDO.setUsername("Live_" + RandomUtil.randomString(4));
-            }
-
-            userDO.setPassword(BCrypt.hashpw(requestParam.getPassword(), BCrypt.gensalt()));
-            int inserted = baseMapper.insert(userDO);
-            if (inserted < 1) {
-                throw new ClientException(USER_SAVE_ERROR);
-            }
-
-            UserProfileDO userProfileDO = new UserProfileDO();
-            userProfileDO.setUserId(userDO.getId());
-            userProfileMapper.insert(userProfileDO);
-
-            userRegisterCachePenetrationBloomFilter.add(requestParam.getPhone());
-            return issueToken(userDO, requestParam.getPhone());
-        } catch (DuplicateKeyException ex) {
-            throw new ClientException(USER_EXIST);
-        } finally {
-            lock.unlock();
-        }
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -162,7 +114,9 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         String targetPhone = currentPhone;
 
+        Long currentUserId = currentUserId();
         LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getId, currentUserId)
                 .eq(UserDO::getPhone, targetPhone)
                 .eq(UserDO::getDelFlag, 0);
         UserDO userDO = baseMapper.selectOne(queryWrapper);
@@ -177,9 +131,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
         if (StrUtil.isNotBlank(requestParam.getRealName())) {
             userUpdate.setRealName(requestParam.getRealName().trim());
-        }
-        if (StrUtil.isNotBlank(requestParam.getPassword())) {
-            userUpdate.setPassword(BCrypt.hashpw(requestParam.getPassword(), BCrypt.gensalt()));
         }
         baseMapper.updateById(userUpdate);
 
@@ -205,49 +156,32 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     }
 
     @Override
-    public UserLoginRespDTO login(UserLoginReqDTO requestParam) {
-        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
-                .eq(UserDO::getPhone, requestParam.getPhone())
-                .eq(UserDO::getDelFlag, 0);
-        UserDO userDO = baseMapper.selectOne(queryWrapper);
-        if (userDO != null && Integer.valueOf(0).equals(userDO.getStatus())) {
-            throw new ClientException("该账户已被封禁，请联系超级管理员");
-        }
-        if (userDO == null || !BCrypt.checkpw(requestParam.getPassword(), userDO.getPassword())) {
-            throw new ClientException("该手机号绑定的用户不存在或密码校验失败");
-        }
-
-        String existingToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + requestParam.getPhone());
-        if (StrUtil.isNotBlank(existingToken)
-                && Boolean.TRUE.equals(stringRedisTemplate.hasKey(USER_LOGIN_KEY + existingToken))) {
-            stringRedisTemplate.expire(USER_LOGIN_KEY + existingToken, 30L, TimeUnit.MINUTES);
-            stringRedisTemplate.expire(USER_LOGIN_PHONE_INDEX_KEY + requestParam.getPhone(), 30L, TimeUnit.MINUTES);
-            return new UserLoginRespDTO(existingToken);
-        }
-        return issueToken(userDO, requestParam.getPhone());
-    }
-
-    @Override
-    public Boolean checkLogin(String phone, String token) {
-        if (StrUtil.isBlank(token)) {
+    public Boolean checkLogin(String token) {
+        String currentPhone = UserContext.getPhone();
+        if (StrUtil.isBlank(token) || StrUtil.isBlank(currentPhone)) {
             return false;
         }
-        return Boolean.TRUE.equals(stringRedisTemplate.hasKey(USER_LOGIN_KEY + token));
+        String payload = stringRedisTemplate.opsForValue().get(USER_LOGIN_KEY + token);
+        if (StrUtil.isBlank(payload)) {
+            return false;
+        }
+        UserDO user = JSON.parseObject(payload, UserDO.class);
+        return user != null && currentPhone.equals(user.getPhone());
     }
 
     @Override
-    public void logout(String phone, String token) {
-        if (StrUtil.isNotBlank(token)) {
-            stringRedisTemplate.delete(USER_LOGIN_KEY + token);
-        } else if (StrUtil.isNotBlank(phone)) {
-            String existingToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + phone);
-            if (StrUtil.isNotBlank(existingToken)) {
-                stringRedisTemplate.delete(USER_LOGIN_KEY + existingToken);
-            }
+    public void logout(String token) {
+        String currentPhone = UserContext.getPhone();
+        if (StrUtil.isBlank(currentPhone) || StrUtil.isBlank(token)) {
+            throw new ClientException("当前用户未登录");
         }
-        if (StrUtil.isNotBlank(phone)) {
-            stringRedisTemplate.delete(USER_LOGIN_PHONE_INDEX_KEY + phone);
+        String payload = stringRedisTemplate.opsForValue().get(USER_LOGIN_KEY + token);
+        UserDO user = StrUtil.isBlank(payload) ? null : JSON.parseObject(payload, UserDO.class);
+        if (user == null || !currentPhone.equals(user.getPhone())) {
+            throw new ClientException("登录凭证与当前用户不匹配");
         }
+        stringRedisTemplate.delete(USER_LOGIN_KEY + token);
+        stringRedisTemplate.delete(USER_LOGIN_PHONE_INDEX_KEY + currentPhone);
     }
 
     @Override
@@ -314,17 +248,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (!phone.matches("^1[3-9]\\d{9}$")) {
             throw new ClientException("请输入有效的手机号");
         }
+        if (isProductionProfile()) {
+            throw new ClientException("生产环境短信通道未配置，暂无法发送验证码");
+        }
         if (StrUtil.isBlank(clientIp)) {
             clientIp = "unknown";
         }
         enforceRateLimit(LOGIN_CODE_SEND_PHONE_KEY_PREFIX + phone, 1, 60, "该手机号操作频繁，请 60 秒后再试");
         enforceRateLimit(LOGIN_CODE_SEND_IP_KEY_PREFIX + clientIp, 20, 60, "请求过于频繁，请稍后再试");
 
-        String code = RandomUtil.randomNumbers(6);
+        String code = mockSmsLogEnabled
+                && mockFixedCode != null && mockFixedCode.matches("^\\d{6}$")
+                ? mockFixedCode
+                : RandomUtil.randomNumbers(6);
         String codeKey = LOGIN_CODE_KEY_PREFIX + phone;
         stringRedisTemplate.opsForValue().set(codeKey, code, CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
         stringRedisTemplate.delete(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
-        if (mockSmsLogEnabled && !isProductionProfile()) {
+        if (mockSmsLogEnabled) {
             log.info("【模拟短信通道】已向手机号 {} 发送登录验证码: {}", phone, code);
         } else {
             log.info("【短信通道】验证码已发送，phone={}", maskPhone(phone));
@@ -336,11 +276,14 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     }
 
     private void enforceRateLimit(String key, int maxCount, long expireSeconds, String message) {
-        Long count = stringRedisTemplate.opsForValue().increment(key);
-        if (count != null && count == 1L) {
-            stringRedisTemplate.expire(key, expireSeconds, TimeUnit.SECONDS);
+        Long count = stringRedisTemplate.execute(
+                loadLongRedisScript(RATE_LIMIT_LUA_PATH),
+                Collections.singletonList(key),
+                String.valueOf(expireSeconds));
+        if (count == null) {
+            throw new IllegalStateException("验证码限流执行失败");
         }
-        if (count != null && count > maxCount) {
+        if (count > maxCount) {
             throw new ClientException(message);
         }
     }
@@ -350,19 +293,27 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         if (!phone.matches("^1[3-9]\\d{9}$") || code == null || !code.matches("^\\d{6}$")) {
             throw new ClientException("手机号或验证码格式错误");
         }
-        String codeKey = LOGIN_CODE_KEY_PREFIX + phone;
-        String cacheCode = stringRedisTemplate.opsForValue().get(codeKey);
-        if (cacheCode == null || !cacheCode.equals(code)) {
-            Long attempts = stringRedisTemplate.opsForValue().increment(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
-            stringRedisTemplate.expire(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone, CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-            if (attempts != null && attempts >= CODE_MAX_ATTEMPTS) {
-                stringRedisTemplate.delete(codeKey);
-                stringRedisTemplate.delete(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
-            }
+        Long result = stringRedisTemplate.execute(
+                loadLongRedisScript(VERIFY_CODE_LUA_PATH),
+                List.of(LOGIN_CODE_KEY_PREFIX + phone, LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone),
+                code,
+                String.valueOf(CODE_MAX_ATTEMPTS),
+                String.valueOf(TimeUnit.MINUTES.toSeconds(CODE_EXPIRE_MINUTES)));
+        if (result == null) {
+            throw new IllegalStateException("验证码校验执行失败");
+        }
+        if (result != 1L) {
             throw new ClientException("验证码错误或已失效");
         }
-        stringRedisTemplate.delete(codeKey);
-        stringRedisTemplate.delete(LOGIN_CODE_ATTEMPT_KEY_PREFIX + phone);
+    }
+
+    private DefaultRedisScript<Long> loadLongRedisScript(String classpath) {
+        return Singleton.get(classpath, () -> {
+            DefaultRedisScript<Long> script = new DefaultRedisScript<>();
+            script.setLocation(new ClassPathResource(classpath));
+            script.setResultType(Long.class);
+            return script;
+        });
     }
 
     private boolean isProductionProfile() {
@@ -383,21 +334,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         phone = normalizePhone(phone);
         verifyLoginCode(phone, code);
 
-        LambdaQueryWrapper<UserDO> queryWrapper = Wrappers.lambdaQuery(UserDO.class)
-                .eq(UserDO::getPhone, phone)
-                .eq(UserDO::getDelFlag, 0);
-        UserDO userDO = baseMapper.selectOne(queryWrapper);
+        UserDO userDO = findOrMigrateUser(phone);
 
         if (userDO == null) {
-            userDO = new UserDO();
-            userDO.setPhone(phone);
-            userDO.setUsername("Live_" + RandomUtil.randomString(4));
-            userDO.setPassword(BCrypt.hashpw("LiveStart123", BCrypt.gensalt()));
-            userDO.setIsVerified(0);
-            userDO.setStatus(1);
-            userDO.setUserType(1);
+            long userId = IdWorker.getId();
+            UserPhoneMappingDO mapping = claimPhone(phone, userId);
+            if (!Long.valueOf(userId).equals(mapping.getUserId())) {
+                userDO = requireMappedUser(mapping, phone);
+            } else {
+                userDO = new UserDO();
+                userDO.setId(userId);
+                userDO.setPhone(phone);
+                userDO.setUsername("Live_" + RandomUtil.randomString(4));
+                userDO.setPassword(BCrypt.hashpw(UUID.fastUUID().toString(true), BCrypt.gensalt()));
+                userDO.setIsVerified(0);
+                userDO.setStatus(1);
+                userDO.setUserType(1);
 
-            try {
                 int inserted = baseMapper.insert(userDO);
                 if (inserted < 1) {
                     throw new ClientException("自动注册插入失败");
@@ -406,11 +359,6 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
                 userProfileDO.setUserId(userDO.getId());
                 userProfileMapper.insert(userProfileDO);
                 userRegisterCachePenetrationBloomFilter.add(phone);
-            } catch (DuplicateKeyException ex) {
-                userDO = baseMapper.selectOne(queryWrapper);
-                if (userDO == null) {
-                    throw new ClientException("用户注册并发异常，请稍后重试");
-                }
             }
         }
 
@@ -421,6 +369,74 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         return issueToken(userDO, phone);
     }
 
+    private UserDO findOrMigrateUser(String phone) {
+        UserPhoneMappingDO mapping = userPhoneMappingMapper.selectById(phone);
+        if (mapping != null) {
+            return requireMappedUser(mapping, phone);
+        }
+
+        UserDO legacyUser = baseMapper.selectOne(Wrappers.lambdaQuery(UserDO.class)
+                .eq(UserDO::getPhone, phone)
+                .eq(UserDO::getDelFlag, 0));
+        if (legacyUser == null) {
+            return null;
+        }
+        UserPhoneMappingDO claimed = claimPhone(phone, legacyUser.getId());
+        if (!legacyUser.getId().equals(claimed.getUserId())) {
+            return requireMappedUser(claimed, phone);
+        }
+        return legacyUser;
+    }
+
+    private UserDO findMappedUser(String phone) {
+        UserPhoneMappingDO mapping = userPhoneMappingMapper.selectById(phone);
+        if (mapping == null) {
+            throw new ClientException(UserErrorCodeEnum.USER_NULL);
+        }
+        return requireMappedUser(mapping, phone);
+    }
+
+    private UserPhoneMappingDO claimPhone(String phone, Long userId) {
+        UserPhoneMappingDO candidate = new UserPhoneMappingDO();
+        candidate.setPhone(phone);
+        candidate.setUserId(userId);
+        try {
+            if (userPhoneMappingMapper.insert(candidate) < 1) {
+                throw new ClientException("手机号全局路由创建失败");
+            }
+            return candidate;
+        } catch (DuplicateKeyException ex) {
+            UserPhoneMappingDO existing = userPhoneMappingMapper.selectById(phone);
+            if (existing == null) {
+                throw new ClientException("手机号注册并发异常，请稍后重试");
+            }
+            return existing;
+        }
+    }
+
+    private UserDO requireMappedUser(UserPhoneMappingDO mapping, String phone) {
+        UserDO user = baseMapper.selectById(mapping.getUserId());
+        if (user == null) {
+            user = baseMapper.selectOne(Wrappers.lambdaQuery(UserDO.class)
+                    .eq(UserDO::getPhone, phone));
+        }
+        if (user == null || !phone.equals(user.getPhone())) {
+            throw new ClientException("手机号路由与用户数据不一致，请联系管理员");
+        }
+        if (Integer.valueOf(1).equals(user.getDelFlag())) {
+            throw new ClientException("该账户已注销");
+        }
+        return user;
+    }
+
+    private Long currentUserId() {
+        try {
+            return Long.valueOf(UserContext.getUserId());
+        } catch (NumberFormatException ex) {
+            throw new ClientException("当前用户身份无效，请重新登录");
+        }
+    }
+
     private UserLoginRespDTO issueToken(UserDO userDO, String phone) {
         String oldToken = stringRedisTemplate.opsForValue().get(USER_LOGIN_PHONE_INDEX_KEY + phone);
         if (StrUtil.isNotBlank(oldToken)) {
@@ -428,8 +444,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
 
         String uuid = UUID.randomUUID().toString();
-        stringRedisTemplate.opsForValue().set(USER_LOGIN_KEY + uuid, JSON.toJSONString(userDO), 30L, TimeUnit.DAYS);
-        stringRedisTemplate.opsForValue().set(USER_LOGIN_PHONE_INDEX_KEY + phone, uuid, 30L, TimeUnit.DAYS);
+        stringRedisTemplate.opsForValue().set(
+                USER_LOGIN_KEY + uuid, JSON.toJSONString(userDO), LOGIN_SESSION_DAYS, TimeUnit.DAYS);
+        stringRedisTemplate.opsForValue().set(
+                USER_LOGIN_PHONE_INDEX_KEY + phone, uuid, LOGIN_SESSION_DAYS, TimeUnit.DAYS);
         return new UserLoginRespDTO(uuid);
     }
 
@@ -541,9 +559,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
         }
 
         unbindOwnedVenues(userId);
-        venueMapper.update(null, Wrappers.lambdaUpdate(VenueDO.class)
+        int bound = venueMapper.update(null, Wrappers.lambdaUpdate(VenueDO.class)
                 .eq(VenueDO::getId, venueId)
+                .and(each -> each.isNull(VenueDO::getOwnerUserId)
+                        .or()
+                        .eq(VenueDO::getOwnerUserId, userId))
                 .set(VenueDO::getOwnerUserId, userId));
+        if (bound < 1) {
+            throw new ClientException("该场馆已绑定其他场地管理员，请刷新后重试");
+        }
         clearLoginCache(existingUser.getPhone());
         log.info("Bound venue admin and cleared login cache, userId={}, venueId={}", userId, venueId);
     }
@@ -596,7 +620,10 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, UserDO> implements 
     }
 
     @Override
-    public List<UserRespDTO> listSimpleUsersByIds(List<Long> userIds) {
+    public List<UserRespDTO> listSimpleUsersByIds(List<Long> userIds, String requestInternalToken) {
+        if (StrUtil.isBlank(requestInternalToken) || !requestInternalToken.equals(internalToken)) {
+            throw new ClientException("内部调用凭证无效");
+        }
         if (userIds == null || userIds.isEmpty()) {
             return Collections.emptyList();
         }

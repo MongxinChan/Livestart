@@ -40,9 +40,13 @@ aliyun:
 
 # Livestart 用户流量风控配置
 livestart:
+    admin:
+        internal-token: ${LIVESTART_INTERNAL_TOKEN:change-me}
     sms:
-        # 本地模拟短信开关。生产环境即使开启也不会把验证码写入日志。
+        # 仅供本地演示；生产环境未接入短信通道时直接拒绝发送请求。
         mock-log-enabled: ${LIVESTART_SMS_MOCK_LOG_ENABLED:true}
+        # 本地压测可设为 888888；生产环境不会发送验证码。
+        mock-fixed-code: ${LIVESTART_SMS_MOCK_CODE:}
     flow-limit:
         # 是否开启用户请求流量风控 (true=开启)
         enable: false
