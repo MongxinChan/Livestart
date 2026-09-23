@@ -22,6 +22,11 @@ public class EventDO {
     private Long id;
 
     /**
+     * 来源商户演出 ID。商户创建的原始演出为空，分销发布产生的副本指向原始演出。
+     */
+    private Long sourceEventId;
+
+    /**
      * 演出标题
      */
     private String title;

@@ -9,6 +9,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ClientException;
+import com.mongxin.livestart.framework.exception.ServiceException;
+import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.merchant.admin.common.constant.MerchantAdminRedisConstant;
 import com.mongxin.livestart.merchant.admin.common.enums.EventStatusEnum;
 import com.mongxin.livestart.merchant.admin.dao.entity.EventConfigDO;
@@ -18,6 +20,7 @@ import com.mongxin.livestart.merchant.admin.dao.entity.StyleDO;
 import com.mongxin.livestart.merchant.admin.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.EventMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.EventStyleRelationMapper;
+import com.mongxin.livestart.merchant.admin.dao.mapper.RefundPolicyMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.StyleMapper;
 import com.mongxin.livestart.merchant.admin.dao.mapper.TicketSkuMapper;
 import com.mongxin.livestart.merchant.admin.dto.req.EventImportExcelDTO;
@@ -37,12 +40,16 @@ import com.mongxin.livestart.merchant.admin.remote.dto.DistributionSaleStageSkuP
 import com.mongxin.livestart.merchant.admin.remote.dto.DistributionTicketSkuParamDTO;
 import com.mongxin.livestart.merchant.admin.service.EventConfigService;
 import com.mongxin.livestart.merchant.admin.service.EventService;
+import com.mongxin.livestart.merchant.admin.service.StockCacheService;
 import com.mongxin.livestart.merchant.admin.service.basics.chain.MerchantAdminChainContext;
+import com.mongxin.livestart.merchant.admin.service.security.MerchantAccessControl;
 import com.mongxin.livestart.merchant.admin.toolkit.EasyExcelImportUtil;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -50,7 +57,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.annotation.PostConstruct;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
@@ -70,59 +76,34 @@ import static com.mongxin.livestart.merchant.admin.common.enums.ChainBizMarkEnum
 @Slf4j
 public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implements EventService {
 
-    private static final String ENGINE_TICKET_STOCK_KEY = "engine:stock:sku:%d";
 
     private final EventConfigService eventConfigService;
     private final StringRedisTemplate stringRedisTemplate;
     private final MerchantAdminChainContext merchantAdminChainContext;
     private final JdbcTemplate jdbcTemplate;
     private final EventStyleRelationMapper eventStyleRelationMapper;
+    private final RefundPolicyMapper refundPolicyMapper;
     private final StyleMapper styleMapper;
     private final TicketSkuMapper ticketSkuMapper;
+    private final StockCacheService stockCacheService;
     private final DistributionRemoteService distributionRemoteService;
+    private final MerchantAccessControl accessControl;
+    private final ObjectProvider<EventService> selfProvider;
 
-    @PostConstruct
-    public void initEventPerformerTable() {
-        try {
-            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `t_event_performer` (\n" +
-                    "  `id` bigint NOT NULL AUTO_INCREMENT,\n" +
-                    "  `event_id` bigint NOT NULL COMMENT '演出ID',\n" +
-                    "  `performer_id` bigint NOT NULL COMMENT '艺人ID',\n" +
-                    "  PRIMARY KEY (`id`),\n" +
-                    "  UNIQUE KEY `idx_event_performer` (`event_id`,`performer_id`)\n" +
-                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出艺人关联表';");
-            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `t_event_ticket_stage` (\n" +
-                    "  `id` bigint NOT NULL AUTO_INCREMENT,\n" +
-                    "  `event_id` bigint NOT NULL COMMENT '演出ID',\n" +
-                    "  `ticket_stage` tinyint(1) NOT NULL DEFAULT '1' COMMENT '开票阶段 1:一开 2:二开',\n" +
-                    "  PRIMARY KEY (`id`),\n" +
-                    "  UNIQUE KEY `idx_event_stage` (`event_id`)\n" +
-                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出开票阶段单表';");
-            jdbcTemplate.execute("CREATE TABLE IF NOT EXISTS `t_event_sale_stage_config` (\n" +
-                    "  `id` bigint NOT NULL AUTO_INCREMENT,\n" +
-                    "  `event_id` bigint NOT NULL COMMENT '演出ID',\n" +
-                    "  `stage_no` tinyint NOT NULL COMMENT '阶段序号',\n" +
-                    "  `stage_name` varchar(64) NOT NULL COMMENT '阶段名称',\n" +
-                    "  `sale_start_time` datetime NOT NULL COMMENT '阶段开售时间',\n" +
-                    "  `remark` varchar(255) DEFAULT NULL COMMENT '备注',\n" +
-                    "  PRIMARY KEY (`id`),\n" +
-                    "  UNIQUE KEY `uk_event_stage_no` (`event_id`,`stage_no`)\n" +
-                    ") ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='演出开售阶段配置表';");
-            log.info("[merchant-admin] 演出关联表与开售阶段配置表校验完成");
-        } catch (Exception e) {
-            log.error("[merchant-admin] 初始化关联表失败", e);
-        }
-    }
+    @Value("${livestart.merchant-admin.internal-token:change-me}")
+    private String distributionInternalToken;
 
     @LogRecord(success = """
             创建演出：{{#requestParam.title}}；
             演出类型：{{#requestParam.eventType == 0 ? 'Livehouse(站票)' : '演唱会(选座)'}}；
             关联场馆ID：{{#requestParam.venueId}}；
             演出时间：{{#requestParam.startTime}};
-            """, type = "Event", bizNo = "{{#bizNo}}", extra = "{{#requestParam.toString()}}")
+            """, fail = "创建演出失败：{{#requestParam.title}}", type = "Event", subType = "Create",
+            bizNo = "{{#bizNo}}", extra = "{{#modifiedData}}")
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void createEvent(EventSaveReqDTO requestParam) {
+        accessControl.requireVenueAccess(requestParam.getVenueId());
         merchantAdminChainContext.handler(MERCHANT_ADMIN_CREATE_EVENT_KEY.name(), requestParam);
 
         EventDO eventDO = BeanUtil.toBean(requestParam, EventDO.class);
@@ -148,14 +129,20 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
         warmUpEventCache(eventDO, defaultConfig);
         LogRecordContext.putVariable("bizNo", eventDO.getId());
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(eventDO));
     }
 
+    @LogRecord(success = "批量导入演出：总数 {{#importTotal}}，成功 {{#importSuccess}}，失败 {{#importFail}}",
+            fail = "批量导入演出失败", type = "Event", subType = "Import",
+            bizNo = "BATCH_IMPORT", extra = "{{#modifiedData}}")
     @Override
     public ImportResultRespDTO importEvents(MultipartFile file) {
+        accessControl.requireAdminAccess();
         List<EventImportExcelDTO> rows = EasyExcelImportUtil.readFirstSheet(file, EventImportExcelDTO.class);
         ImportResultRespDTO result = new ImportResultRespDTO();
         if (rows.isEmpty()) {
             result.addFail(1, "Excel 没有可导入的数据行，请保留表头并从第 2 行开始填写");
+            fillImportLogVariables(result);
             return result;
         }
         for (int i = 0; i < rows.size(); i++) {
@@ -171,13 +158,21 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
                 requestParam.setStartTime(row.getStartTime());
                 requestParam.setPosterUrl(row.getPosterUrl() == null ? null : row.getPosterUrl().trim());
                 requestParam.setTicketStage(row.getTicketStage() == null ? 1 : row.getTicketStage());
-                createEvent(requestParam);
+                selfProvider.getObject().createEvent(requestParam);
                 result.addSuccess();
             } catch (Exception ex) {
                 result.addFail(rowIndex, ex.getMessage());
             }
         }
+        fillImportLogVariables(result);
         return result;
+    }
+
+    private void fillImportLogVariables(ImportResultRespDTO result) {
+        LogRecordContext.putVariable("importTotal", result.getTotal());
+        LogRecordContext.putVariable("importSuccess", result.getSuccess());
+        LogRecordContext.putVariable("importFail", result.getFail());
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(result));
     }
 
     private void validateEventImportRow(EventImportExcelDTO row) {
@@ -206,9 +201,12 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
     @Override
     public IPage<EventPageQueryRespDTO> pageQueryEvents(EventPageQueryReqDTO requestParam) {
+        List<Long> venueIds = accessControl.accessibleVenueIds();
         LambdaQueryWrapper<EventDO> queryWrapper = Wrappers.lambdaQuery(EventDO.class)
+                .isNull(EventDO::getSourceEventId)
                 .eq(requestParam.getStatus() != null, EventDO::getStatus, requestParam.getStatus())
                 .orderByDesc(EventDO::getId);
+        restrictToVenues(queryWrapper, venueIds);
         IPage<EventDO> selectPage = baseMapper.selectPage(requestParam, queryWrapper);
         return selectPage
                 .convert(each -> enrichEventPageResp(BeanUtil.toBean(each, EventPageQueryRespDTO.class), each.getId()));
@@ -216,22 +214,21 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
 
     @Override
     public EventQueryRespDTO getEventById(Long id) {
-        EventDO eventDO = getById(id);
-        if (eventDO == null) {
-            return null;
-        }
+        EventDO eventDO = accessControl.requireEventAccess(id);
         return enrichEventDetailResp(BeanUtil.toBean(eventDO, EventQueryRespDTO.class), id);
     }
 
-    @LogRecord(success = "修改演出信息：演出ID {{#requestParam.id}}", type = "Event", bizNo = "{{#requestParam.id}}", extra = "{{#requestParam.toString()}}")
+    @LogRecord(success = "修改演出信息：演出ID {{#requestParam.id}}", fail = "修改演出失败：演出ID {{#requestParam.id}}",
+            type = "Event", subType = "Update",
+            bizNo = "{{#requestParam.id}}", extra = "{{#modifiedData}}")
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void updateEvent(EventUpdateReqDTO requestParam) {
-        EventDO originalEvent = getById(requestParam.getId());
+        EventDO originalEvent = accessControl.requireEventAccess(requestParam.getId());
+        accessControl.requireVenueAccess(requestParam.getVenueId() == null
+                ? originalEvent.getVenueId() : requestParam.getVenueId());
         Integer originalTicketStage = getTicketStage(requestParam.getId());
-        if (originalEvent != null) {
-            LogRecordContext.putVariable("originalData", JSON.toJSONString(originalEvent));
-        }
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(originalEvent));
 
         EventDO eventDO = BeanUtil.toBean(requestParam, EventDO.class);
         updateById(eventDO);
@@ -247,6 +244,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         releaseStage2StockIfNeeded(requestParam.getId(), originalTicketStage, currentTicketStage);
 
         EventDO latestEvent = getById(requestParam.getId());
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(latestEvent));
         EventConfigDO latestConfig = eventConfigService.getByEventId(requestParam.getId());
         if (latestEvent != null && latestConfig != null) {
             warmUpEventCache(latestEvent, latestConfig);
@@ -254,23 +252,35 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         }
     }
 
-    @LogRecord(success = "删除演出：演出ID {{#id}}", type = "Event", bizNo = "{{#id}}")
+    @LogRecord(success = "删除演出：演出ID {{#id}}", fail = "删除演出失败：演出ID {{#id}}",
+            type = "Event", subType = "Delete", bizNo = "{{#id}}")
     @Transactional(rollbackFor = Exception.class)
     @Override
     public void deleteEvent(Long id) {
-        EventDO originalEvent = getById(id);
-        if (originalEvent != null) {
-            LogRecordContext.putVariable("originalData", JSON.toJSONString(originalEvent));
+        EventDO originalEvent = accessControl.requireEventAccess(id);
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(originalEvent));
+
+        if (!ticketSkuMapper.selectByEventId(id).isEmpty()) {
+            throw new ClientException("演出仍有票档，请先删除票档");
+        }
+        Long orderItemCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_order_item WHERE event_id = ?", Long.class, id);
+        if (orderItemCount != null && orderItemCount > 0) {
+            throw new ClientException("演出已有订单记录，不能删除，可改为下架或终止售票");
         }
 
         LambdaQueryWrapper<EventConfigDO> configQuery = Wrappers.lambdaQuery(EventConfigDO.class)
                 .eq(EventConfigDO::getEventId, id);
         eventConfigService.remove(configQuery);
+        refundPolicyMapper.delete(Wrappers.lambdaQuery(com.mongxin.livestart.merchant.admin.dao.entity.RefundPolicyDO.class)
+                .eq(com.mongxin.livestart.merchant.admin.dao.entity.RefundPolicyDO::getEventId, id));
         removeById(id);
 
         jdbcTemplate.update("DELETE FROM t_event_performer WHERE event_id = ?", id);
         jdbcTemplate.update("DELETE FROM t_event_ticket_stage WHERE event_id = ?", id);
         jdbcTemplate.update("DELETE FROM t_event_sale_stage_config WHERE event_id = ?", id);
+        jdbcTemplate.update("DELETE FROM t_event_sale_stage_sku WHERE event_id = ?", id);
+        jdbcTemplate.update("DELETE FROM t_event_sale_stage WHERE event_id = ?", id);
         eventStyleRelationMapper.delete(
                 Wrappers.lambdaQuery(EventStyleRelationDO.class)
                         .eq(EventStyleRelationDO::getEventId, id));
@@ -283,67 +293,84 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         }
     }
 
-    @LogRecord(success = "演出上架开售：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_2'}}", type = "Event", bizNo = "{{#id}}")
+    @LogRecord(success = "演出上架开售：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_2'}}",
+            fail = "演出上架失败：演出ID {{#id}}", type = "Event", subType = "Publish",
+            bizNo = "{{#id}}", extra = "{{#modifiedData}}")
     @Override
     public void publishEvent(Long id) {
-        EventDO event = getById(id);
-        if (event == null) {
-            throw new ClientException("演出不存在");
-        }
+        EventDO event = accessControl.requireEventAccess(id);
         if (ObjectUtil.notEqual(event.getStatus(), EventStatusEnum.PRESALE.getStatus())) {
             throw new ClientException("仅预售状态的演出可以上架开售");
         }
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(event));
 
         DistributionEventPublishReqDTO publishReqDTO = buildDistributionPublishReq(event);
-        distributionRemoteService.publishEvent(publishReqDTO);
+        Result<Void> publishResult = distributionRemoteService.publishEvent(publishReqDTO, distributionInternalToken);
+        if (publishResult == null || publishResult.isFail()) {
+            throw new ServiceException("分销演出发布失败，商户演出未上架");
+        }
 
         EventDO update = new EventDO();
         update.setId(id);
         update.setStatus(EventStatusEnum.ON_SALE.getStatus());
         updateById(update);
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(getById(id)));
 
         syncCacheField(id, "status", String.valueOf(EventStatusEnum.ON_SALE.getStatus()));
         log.info("演出已上架开售 | eventId={}", id);
     }
 
-    @LogRecord(success = "演出下架：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_0'}}", type = "Event", bizNo = "{{#id}}")
+    @LogRecord(success = "演出下架：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_0'}}",
+            fail = "演出下架失败：演出ID {{#id}}", type = "Event", subType = "Shelve",
+            bizNo = "{{#id}}", extra = "{{#modifiedData}}")
     @Override
     public void shelveEvent(Long id) {
-        EventDO event = getById(id);
-        if (event == null) {
-            throw new ClientException("演出不存在");
-        }
+        EventDO event = accessControl.requireEventAccess(id);
         if (ObjectUtil.notEqual(event.getStatus(), EventStatusEnum.ON_SALE.getStatus())) {
             throw new ClientException("仅在售状态的演出可以下架");
         }
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(event));
 
         EventDO update = new EventDO();
         update.setId(id);
         update.setStatus(EventStatusEnum.OFF_SHELF.getStatus());
         updateById(update);
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(getById(id)));
 
         syncCacheField(id, "status", String.valueOf(EventStatusEnum.OFF_SHELF.getStatus()));
         log.info("演出已下架 | eventId={}", id);
     }
 
-    @LogRecord(success = "终止演出售票：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_0'}}", type = "Event", bizNo = "{{#id}}")
+    @LogRecord(success = "终止演出售票：演出ID {{#id}}，状态变更为 {COMMON_ENUM_PARSE{'EventStatusEnum_0'}}",
+            fail = "终止演出售票失败：演出ID {{#id}}", type = "Event", subType = "Terminate",
+            bizNo = "{{#id}}", extra = "{{#modifiedData}}")
     @Override
     public void terminateEvent(Long id) {
-        EventDO event = getById(id);
-        if (event == null) {
-            throw new ClientException("演出不存在");
-        }
+        EventDO event = accessControl.requireEventAccess(id);
         if (ObjectUtil.equal(event.getStatus(), EventStatusEnum.OFF_SHELF.getStatus())) {
             throw new ClientException("演出已处于下架状态，无需终止");
         }
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(event));
 
         EventDO update = new EventDO();
         update.setId(id);
         update.setStatus(EventStatusEnum.OFF_SHELF.getStatus());
         updateById(update);
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(getById(id)));
 
         syncCacheField(id, "status", String.valueOf(EventStatusEnum.OFF_SHELF.getStatus()));
         log.info("演出已终止售票 | eventId={}", id);
+    }
+
+    private void restrictToVenues(LambdaQueryWrapper<EventDO> queryWrapper, List<Long> venueIds) {
+        if (venueIds == null) {
+            return;
+        }
+        if (venueIds.isEmpty()) {
+            queryWrapper.apply("1 = 0");
+            return;
+        }
+        queryWrapper.in(EventDO::getVenueId, venueIds);
     }
 
     private EventPageQueryRespDTO enrichEventPageResp(EventPageQueryRespDTO dto, Long eventId) {
@@ -522,6 +549,7 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
         }
 
         DistributionEventPublishReqDTO requestDTO = new DistributionEventPublishReqDTO();
+        requestDTO.setSourceEventId(event.getId());
         requestDTO.setTitle(detail.getTitle());
         requestDTO.setArtistId(detail.getPerformerId());
         requestDTO.setArtistName(detail.getPerformerName());
@@ -616,29 +644,24 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
             return;
         }
 
+        List<TicketSkuDO> pendingSkus = ticketSkuMapper.selectByEventId(eventId).stream()
+                .filter(sku -> sku.getStage2Stock() != null && sku.getStage2Stock() > 0)
+                .filter(sku -> sku.getStage2Released() == null || sku.getStage2Released() == 0)
+                .toList();
         int affected = ticketSkuMapper.releaseStage2StockByEventId(eventId);
         if (affected <= 0) {
             log.info("演出切换到二开，无需释放二开库存 | eventId={}", eventId);
             return;
         }
 
-        List<TicketSkuDO> ticketSkus = ticketSkuMapper.selectByEventId(eventId);
-        for (TicketSkuDO each : ticketSkus) {
-            syncTicketStockCache(each.getId(), each.getRemainingStock());
+        for (TicketSkuDO sku : pendingSkus) {
+            if (affected == pendingSkus.size()) {
+                stockCacheService.adjustAfterCommit(sku.getId(), sku.getStage2Stock());
+            } else {
+                stockCacheService.invalidateAfterCommit(sku.getId());
+            }
         }
         log.info("演出切换到二开，已释放二开库存 | eventId={} | releasedSkuCount={}", eventId, affected);
-    }
-
-    private void syncTicketStockCache(Long skuId, Integer stock) {
-        try {
-            String stockValue = String.valueOf(stock);
-            String merchantKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
-            String engineKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
-            stringRedisTemplate.opsForValue().set(merchantKey, stockValue);
-            stringRedisTemplate.opsForValue().set(engineKey, stockValue);
-        } catch (Exception e) {
-            log.error("同步票种库存缓存失败 | skuId={}", skuId, e);
-        }
     }
 
     private void warmUpEventCache(EventDO event, EventConfigDO config) {

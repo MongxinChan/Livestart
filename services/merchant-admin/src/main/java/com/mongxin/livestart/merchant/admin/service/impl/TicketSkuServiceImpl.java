@@ -9,7 +9,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.exception.ServiceException;
-import com.mongxin.livestart.merchant.admin.common.constant.MerchantAdminRedisConstant;
 import com.mongxin.livestart.merchant.admin.dao.entity.TicketSkuDO;
 import com.mongxin.livestart.merchant.admin.dao.mapper.TicketSkuMapper;
 import com.mongxin.livestart.merchant.admin.dto.req.TicketSkuImportExcelDTO;
@@ -20,14 +19,18 @@ import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.TicketSkuQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.TicketSkuService;
+import com.mongxin.livestart.merchant.admin.service.StockCacheService;
 import com.mongxin.livestart.merchant.admin.service.basics.chain.MerchantAdminChainContext;
+import com.mongxin.livestart.merchant.admin.service.security.MerchantAccessControl;
 import com.mongxin.livestart.merchant.admin.toolkit.EasyExcelImportUtil;
 import com.mzt.logapi.context.LogRecordContext;
 import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
@@ -44,10 +47,11 @@ import static com.mongxin.livestart.merchant.admin.common.enums.ChainBizMarkEnum
 @Slf4j
 public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSkuDO> implements TicketSkuService {
 
-    private static final String ENGINE_TICKET_STOCK_KEY = "engine:stock:sku:%d";
-
-    private final StringRedisTemplate stringRedisTemplate;
+    private final StockCacheService stockCacheService;
     private final MerchantAdminChainContext merchantAdminChainContext;
+    private final MerchantAccessControl accessControl;
+    private final JdbcTemplate jdbcTemplate;
+    private final ObjectProvider<TicketSkuService> selfProvider;
 
     @LogRecord(
             success = """
@@ -58,11 +62,15 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
                     单人限购：{{#requestParam.limitNum}};
                     """,
             type = "TicketSku",
+            subType = "Create",
+            fail = "创建票种失败：{{#requestParam.title}}",
             bizNo = "{{#bizNo}}",
-            extra = "{{#requestParam.toString()}}"
+            extra = "{{#modifiedData}}"
     )
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void createTicketSku(TicketSkuSaveReqDTO requestParam) {
+        accessControl.requireEventAccess(requestParam.getEventId());
         // 通过责任链验证请求参数
         merchantAdminChainContext.handler(MERCHANT_ADMIN_CREATE_TICKET_SKU_KEY.name(), requestParam);
 
@@ -82,27 +90,24 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         ticketSkuDO.setRemainingStock(stage1Stock);
         save(ticketSkuDO);
 
-        // 库存缓存预热
-        try {
-            syncStockCache(ticketSkuDO.getId(), ticketSkuDO.getRemainingStock());
-            log.info("票种库存预热成功 | skuId={} | stage1Stock={} | stage2Stock={} | releasedStock={}",
-                    ticketSkuDO.getId(), ticketSkuDO.getStage1Stock(), ticketSkuDO.getStage2Stock(), ticketSkuDO.getRemainingStock());
-        } catch (Exception e) {
-            log.error("票种库存缓存预热失败 | skuId={}", ticketSkuDO.getId(), e);
-        }
+        stockCacheService.initializeAfterCommit(ticketSkuDO.getId(), ticketSkuDO.getRemainingStock());
 
         // 将运行时生成的票种ID放入日志上下文
         LogRecordContext.putVariable("bizNo", ticketSkuDO.getId());
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(ticketSkuDO));
     }
 
     @Override
     @LogRecord(
             success = "Excel 批量导入票档：总数 {{#importTotal}}，成功 {{#importSuccess}}，失败 {{#importFail}}",
+            fail = "批量导入票档失败",
             type = "TicketSku",
+            subType = "Import",
             bizNo = "BATCH_IMPORT",
-            extra = "{{#importResult.toString()}}"
+            extra = "{{#modifiedData}}"
     )
     public ImportResultRespDTO importTicketSkus(MultipartFile file) {
+        accessControl.requireAdminAccess();
         List<TicketSkuImportExcelDTO> rows = EasyExcelImportUtil.readFirstSheet(file, TicketSkuImportExcelDTO.class);
         ImportResultRespDTO result = new ImportResultRespDTO();
         if (rows.isEmpty()) {
@@ -124,7 +129,7 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
                 requestParam.setStage1Stock(row.getStage1Stock());
                 requestParam.setStage2Stock(row.getStage2Stock());
                 requestParam.setLimitNum(row.getLimitNum());
-                createTicketSku(requestParam);
+                selfProvider.getObject().createTicketSku(requestParam);
                 result.addSuccess();
             } catch (Exception ex) {
                 result.addFail(rowIndex, ex.getMessage());
@@ -171,11 +176,12 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         LogRecordContext.putVariable("importTotal", result.getTotal());
         LogRecordContext.putVariable("importSuccess", result.getSuccess());
         LogRecordContext.putVariable("importFail", result.getFail());
-        LogRecordContext.putVariable("importResult", result);
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(result));
     }
 
     @Override
     public List<TicketSkuQueryRespDTO> listByEventId(Long eventId) {
+        accessControl.requireEventAccess(eventId);
         LambdaQueryWrapper<TicketSkuDO> queryWrapper = Wrappers.lambdaQuery(TicketSkuDO.class)
                 .eq(TicketSkuDO::getEventId, eventId);
         List<TicketSkuDO> list = list(queryWrapper);
@@ -186,34 +192,41 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
 
     @Override
     public IPage<TicketSkuPageQueryRespDTO> pageQueryTicketSkus(TicketSkuPageQueryReqDTO requestParam) {
+        if (requestParam.getEventId() != null) {
+            accessControl.requireEventAccess(requestParam.getEventId());
+        }
         LambdaQueryWrapper<TicketSkuDO> queryWrapper = Wrappers.lambdaQuery(TicketSkuDO.class)
                 .eq(requestParam.getEventId() != null, TicketSkuDO::getEventId, requestParam.getEventId())
                 .orderByDesc(TicketSkuDO::getId);
+        if (requestParam.getEventId() == null) {
+            restrictToAccessibleEvents(queryWrapper);
+        }
         IPage<TicketSkuDO> selectPage = baseMapper.selectPage(requestParam, queryWrapper);
         return selectPage.convert(each -> BeanUtil.toBean(each, TicketSkuPageQueryRespDTO.class));
     }
 
     @Override
     public TicketSkuQueryRespDTO getTicketSkuById(Long id) {
-        TicketSkuDO ticketSkuDO = getById(id);
+        TicketSkuDO ticketSkuDO = accessControl.requireTicketSkuAccess(id);
         return BeanUtil.toBean(ticketSkuDO, TicketSkuQueryRespDTO.class);
     }
 
     @LogRecord(
             success = "票种库存增发：票种ID {{#requestParam.skuId}}，增发数量 +{{#requestParam.count}}",
+            fail = "票种库存增发失败：票种ID {{#requestParam.skuId}}",
             type = "TicketSku",
-            bizNo = "{{#requestParam.skuId}}"
+            subType = "IncreaseStock",
+            bizNo = "{{#requestParam.skuId}}",
+            extra = "{{#modifiedData}}"
     )
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void increaseStock(TicketSkuIncreaseStockReqDTO requestParam) {
         if (requestParam.getCount() == null || requestParam.getCount() <= 0) {
             throw new ClientException("增发库存数量必须为正整数");
         }
 
-        TicketSkuDO sku = getById(requestParam.getSkuId());
-        if (sku == null) {
-            throw new ClientException("票种不存在");
-        }
+        TicketSkuDO sku = accessControl.requireTicketSkuAccess(requestParam.getSkuId());
 
         // 保存增发前的原始数据到日志上下文
         LogRecordContext.putVariable("originalData", JSON.toJSONString(sku));
@@ -223,50 +236,54 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         if (!SqlHelper.retBool(affected)) {
             throw new ServiceException("票种库存增发失败");
         }
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(getById(requestParam.getSkuId())));
 
-        try {
-            incrementStockCache(requestParam.getSkuId(), requestParam.getCount());
-            log.info("票种库存增发成功 | skuId={} | +{} | DB总库存{}",
-                    requestParam.getSkuId(), requestParam.getCount(), sku.getTotalStock() + requestParam.getCount());
-        } catch (Exception e) {
-            log.error("票种库存缓存增发同步失败（非阻塞）| skuId={}", requestParam.getSkuId(), e);
-        }
+        stockCacheService.adjustAfterCommit(requestParam.getSkuId(), requestParam.getCount());
+        log.info("票种库存增发成功 | skuId={} | +{} | DB总库存{}",
+                requestParam.getSkuId(), requestParam.getCount(), sku.getTotalStock() + requestParam.getCount());
     }
 
     @LogRecord(
             success = "删除票种：票种ID {{#id}}",
+            fail = "删除票种失败：票种ID {{#id}}",
             type = "TicketSku",
+            subType = "Delete",
             bizNo = "{{#id}}"
     )
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteTicketSku(Long id) {
         // 保存删除前的原始数据到日志上下文
-        TicketSkuDO originalSku = getById(id);
-        if (originalSku != null) {
-            LogRecordContext.putVariable("originalData", JSON.toJSONString(originalSku));
+        TicketSkuDO originalSku = accessControl.requireTicketSkuAccess(id);
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(originalSku));
+
+        Long orderItemCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_order_item WHERE sku_id = ?", Long.class, id);
+        if (orderItemCount != null && orderItemCount > 0) {
+            throw new ClientException("票档已有订单记录，不能删除");
         }
+
+        jdbcTemplate.update("DELETE FROM t_event_sale_stage_sku WHERE ticket_sku_id = ?", id);
 
         removeById(id);
 
-        try {
-            deleteStockCache(id);
-            log.info("票种删除完成 & 库存缓存已清除 | skuId={}", id);
-        } catch (Exception e) {
-            log.error("票种库存缓存清除失败（非阻塞）| skuId={}", id, e);
-        }
+        stockCacheService.invalidateAfterCommit(id);
     }
 
     @LogRecord(
             success = "修改票档：票档ID {{#requestParam.id}}",
+            fail = "修改票档失败：票档ID {{#requestParam.id}}",
             type = "TicketSku",
-            bizNo = "{{#requestParam.id}}"
+            subType = "Update",
+            bizNo = "{{#requestParam.id}}",
+            extra = "{{#modifiedData}}"
     )
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void updateTicketSku(TicketSkuDO requestParam) {
-        TicketSkuDO oldSku = getById(requestParam.getId());
-        if (oldSku == null) {
-            throw new ClientException("票种不存在");
-        }
+        TicketSkuDO oldSku = accessControl.requireTicketSkuAccess(requestParam.getId());
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(oldSku));
+        int originalRemainingStock = oldSku.getRemainingStock() == null ? 0 : oldSku.getRemainingStock();
 
         Integer nextStage1Stock = requestParam.getStage1Stock() == null ? oldSku.getStage1Stock() : requestParam.getStage1Stock();
         Integer nextStage2Stock = requestParam.getStage2Stock() == null ? oldSku.getStage2Stock() : requestParam.getStage2Stock();
@@ -296,33 +313,27 @@ public class TicketSkuServiceImpl extends ServiceImpl<TicketSkuMapper, TicketSku
         oldSku.setStage1Stock(normalizedStage1Stock);
         oldSku.setStage2Stock(normalizedStage2Stock);
         oldSku.setLimitNum(requestParam.getLimitNum());
-        updateById(oldSku);
-
-        try {
-            syncStockCache(oldSku.getId(), oldSku.getRemainingStock());
-        } catch (Exception e) {
-            log.error("票种库存缓存同步失败（非阻塞）| skuId={}", oldSku.getId(), e);
+        if (!updateById(oldSku)) {
+            throw new ServiceException("票档已被其他操作修改，请刷新后重试");
         }
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(oldSku));
+        stockCacheService.adjustAfterCommit(oldSku.getId(), oldSku.getRemainingStock() - originalRemainingStock);
     }
 
-    private void syncStockCache(Long skuId, Integer stock) {
-        String merchantStockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
-        String engineStockCacheKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
-        String stockValue = String.valueOf(stock);
-        stringRedisTemplate.opsForValue().set(merchantStockCacheKey, stockValue);
-        stringRedisTemplate.opsForValue().set(engineStockCacheKey, stockValue);
-    }
-
-    private void incrementStockCache(Long skuId, Integer count) {
-        String merchantStockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
-        String engineStockCacheKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
-        stringRedisTemplate.opsForValue().increment(merchantStockCacheKey, count);
-        stringRedisTemplate.opsForValue().increment(engineStockCacheKey, count);
-    }
-
-    private void deleteStockCache(Long skuId) {
-        String merchantStockCacheKey = String.format(MerchantAdminRedisConstant.TICKET_STOCK_KEY, skuId);
-        String engineStockCacheKey = String.format(ENGINE_TICKET_STOCK_KEY, skuId);
-        stringRedisTemplate.delete(List.of(merchantStockCacheKey, engineStockCacheKey));
+    private void restrictToAccessibleEvents(LambdaQueryWrapper<TicketSkuDO> queryWrapper) {
+        List<Long> venueIds = accessControl.accessibleVenueIds();
+        if (venueIds == null) {
+            return;
+        }
+        if (venueIds.isEmpty()) {
+            queryWrapper.apply("1 = 0");
+            return;
+        }
+        List<Long> eventIds = accessControl.findEventIdsByVenueIds(venueIds);
+        if (eventIds.isEmpty()) {
+            queryWrapper.apply("1 = 0");
+            return;
+        }
+        queryWrapper.in(TicketSkuDO::getEventId, eventIds);
     }
 }

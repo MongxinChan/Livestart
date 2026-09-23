@@ -13,6 +13,11 @@ import java.util.List;
 public class DistributionEventPublishReqDTO {
 
     /**
+     * 待发布的商户演出 ID，供分销服务记录演出来源。
+     */
+    private Long sourceEventId;
+
+    /**
      * 演出标题
      */
     private String title;

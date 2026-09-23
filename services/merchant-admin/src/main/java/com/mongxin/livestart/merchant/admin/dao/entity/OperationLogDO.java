@@ -28,9 +28,19 @@ public class OperationLogDO {
     private Long id;
 
     /**
+     * 日志租户
+     */
+    private String tenant;
+
+    /**
      * 操作类型 (如 Event, TicketSku)
      */
     private String type;
+
+    /**
+     * 操作子类型
+     */
+    private String subType;
 
     /**
      * 业务单号 (演出ID / 票种ID 等)
@@ -61,6 +71,11 @@ public class OperationLogDO {
      * 修改后数据 (JSON)
      */
     private String modifiedData;
+
+    /**
+     * 是否为失败日志
+     */
+    private Integer fail;
 
     /**
      * 创建时间

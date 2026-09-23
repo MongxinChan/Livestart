@@ -5,6 +5,7 @@ import org.mybatis.spring.annotation.MapperScan;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.cloud.openfeign.EnableFeignClients;
+import org.springframework.core.Ordered;
 
 /**
  * Livestart 后台商家管理系统自动装配启动类
@@ -15,7 +16,7 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 })
 @EnableFeignClients(basePackages = "com.mongxin.livestart.merchant.admin.remote")
 @MapperScan("com.mongxin.livestart.merchant.admin.dao.mapper")
-@EnableLogRecord(tenant = "MerchantAdmin")
+@EnableLogRecord(tenant = "MerchantAdmin", order = Ordered.HIGHEST_PRECEDENCE)
 public class LiveStartMerchantAdminApplication {
 
     public static void main(String[] args) {

@@ -5,6 +5,7 @@ import com.mongxin.livestart.merchant.admin.remote.dto.DistributionEventPublishR
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 @FeignClient(
         name = "livestart-distribution",
@@ -13,6 +14,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 )
 public interface DistributionRemoteService {
 
+    String INTERNAL_TOKEN_HEADER = "X-Livestart-Internal-Token";
+
     @PostMapping("/event/publish")
-    Result<Void> publishEvent(@RequestBody DistributionEventPublishReqDTO requestParam);
+    Result<Void> publishEvent(@RequestBody DistributionEventPublishReqDTO requestParam,
+                              @RequestHeader(INTERNAL_TOKEN_HEADER) String internalToken);
 }

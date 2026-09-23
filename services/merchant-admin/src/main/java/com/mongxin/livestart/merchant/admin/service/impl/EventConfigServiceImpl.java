@@ -1,6 +1,7 @@
 package com.mongxin.livestart.merchant.admin.service.impl;
 
 import cn.hutool.core.bean.BeanUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.framework.exception.ClientException;
@@ -11,6 +12,9 @@ import com.mongxin.livestart.merchant.admin.dao.mapper.RefundPolicyMapper;
 import com.mongxin.livestart.merchant.admin.dto.req.EventConfigUpdateReqDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.EventConfigQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.EventConfigService;
+import com.mongxin.livestart.merchant.admin.service.security.MerchantAccessControl;
+import com.mzt.logapi.context.LogRecordContext;
+import com.mzt.logapi.starter.annotation.LogRecord;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,20 +31,31 @@ public class EventConfigServiceImpl extends ServiceImpl<EventConfigMapper, Event
 
     private static final int MAX_DEADLINE_HOURS = 24 * 365;
     private final RefundPolicyMapper refundPolicyMapper;
+    private final MerchantAccessControl accessControl;
 
     @Override
     @Transactional(rollbackFor = Exception.class)
+    @LogRecord(success = "修改演出配置：演出ID {{#requestParam.eventId}}", fail = "修改演出配置失败：演出ID {{#requestParam.eventId}}",
+            type = "EventConfig", subType = "Update",
+            bizNo = "{{#requestParam.eventId}}", extra = "{{#modifiedData}}")
     public void saveOrUpdateConfig(EventConfigUpdateReqDTO requestParam) {
+        accessControl.requireEventAccess(requestParam.getEventId());
         validateRefundPolicy(requestParam);
+        EventConfigDO originalConfig = getById(requestParam.getEventId());
+        if (originalConfig != null) {
+            LogRecordContext.putVariable("originalData", JSON.toJSONString(originalConfig));
+        }
         EventConfigDO configDO = BeanUtil.toBean(requestParam, EventConfigDO.class);
         // 关键设计：eventId 直接作为 config 表的主键 (Shared Primary Key)
         // 存在则更新，不存在则录入，保障演出与其配置的高内聚性
         saveOrUpdate(configDO);
         saveOrUpdateRefundPolicy(requestParam);
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(configDO));
     }
 
     @Override
     public EventConfigQueryRespDTO getConfigByEventId(Long eventId) {
+        accessControl.requireEventAccess(eventId);
         EventConfigDO configDO = getById(eventId);
         return BeanUtil.toBean(configDO, EventConfigQueryRespDTO.class);
     }

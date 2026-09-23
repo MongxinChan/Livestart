@@ -8,6 +8,9 @@ import lombok.Data;
 import java.math.BigDecimal;
 import java.util.Date;
 
+/**
+ * 演出退票策略持久化实体，对应 {@code t_refund_policy}。
+ */
 @Data
 @TableName("t_refund_policy")
 public class RefundPolicyDO {

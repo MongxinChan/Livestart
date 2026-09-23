@@ -20,6 +20,10 @@ spring:
       port: 6379
       # password: "" # 根据你的本地环境填写密码
 
+livestart:
+  merchant-admin:
+    internal-token: ${LIVESTART_INTERNAL_TOKEN:change-me}
+
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true

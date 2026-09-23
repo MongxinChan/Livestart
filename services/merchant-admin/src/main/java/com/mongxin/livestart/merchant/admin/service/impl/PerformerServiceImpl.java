@@ -3,6 +3,7 @@ package com.mongxin.livestart.merchant.admin.service.impl;
 import cn.hutool.core.bean.BeanUtil;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.StrUtil;
+import com.alibaba.fastjson2.JSON;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
@@ -21,9 +22,15 @@ import com.mongxin.livestart.merchant.admin.dto.resp.ImportResultRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerPageQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.dto.resp.PerformerQueryRespDTO;
 import com.mongxin.livestart.merchant.admin.service.PerformerService;
+import com.mongxin.livestart.merchant.admin.service.security.MerchantAccessControl;
 import com.mongxin.livestart.merchant.admin.toolkit.EasyExcelImportUtil;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.mzt.logapi.context.LogRecordContext;
+import com.mzt.logapi.starter.annotation.LogRecord;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
@@ -34,16 +41,22 @@ import java.util.stream.Collectors;
  * 艺人/乐队服务实现层
  */
 @Service
+@RequiredArgsConstructor
 public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, PerformerDO> implements PerformerService {
 
-    @Autowired
-    private StyleMapper styleMapper;
-
-    @Autowired
-    private PerformerStyleRelationMapper performerStyleRelationMapper;
+    private final StyleMapper styleMapper;
+    private final PerformerStyleRelationMapper performerStyleRelationMapper;
+    private final JdbcTemplate jdbcTemplate;
+    private final MerchantAccessControl accessControl;
+    private final ObjectProvider<PerformerService> selfProvider;
 
     @Override
+    @LogRecord(success = "创建艺人/乐队：{{#requestParam.name}}", fail = "创建艺人/乐队失败：{{#requestParam.name}}",
+            type = "Performer", subType = "Create",
+            bizNo = "{{#bizNo}}", extra = "{{#modifiedData}}")
+    @Transactional(rollbackFor = Exception.class)
     public void createPerformer(PerformerSaveReqDTO requestParam) {
+        accessControl.requireSuperAdminAccess();
         LambdaQueryWrapper<PerformerDO> queryWrapper = Wrappers.lambdaQuery(PerformerDO.class)
                 .eq(PerformerDO::getName, requestParam.getName());
         if (baseMapper.selectCount(queryWrapper) > 0) {
@@ -84,14 +97,21 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
                     .styleId(performerDO.getStyleId())
                     .build());
         }
+        LogRecordContext.putVariable("bizNo", performerDO.getId());
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(performerDO));
     }
 
     @Override
+    @LogRecord(success = "批量导入艺人：总数 {{#importTotal}}，成功 {{#importSuccess}}，失败 {{#importFail}}",
+            fail = "批量导入艺人失败", type = "Performer", subType = "Import",
+            bizNo = "BATCH_IMPORT", extra = "{{#modifiedData}}")
     public ImportResultRespDTO importPerformers(MultipartFile file) {
+        accessControl.requireSuperAdminAccess();
         List<PerformerImportExcelDTO> rows = EasyExcelImportUtil.readFirstSheet(file, PerformerImportExcelDTO.class);
         ImportResultRespDTO result = new ImportResultRespDTO();
         if (rows.isEmpty()) {
             result.addFail(1, "Excel 没有可导入的数据行，请保留表头并从第 2 行开始填写");
+            fillImportLogVariables(result);
             return result;
         }
         for (int i = 0; i < rows.size(); i++) {
@@ -105,13 +125,21 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
                 requestParam.setAvatar(StrUtil.trim(row.getAvatar()));
                 requestParam.setBio(StrUtil.trim(row.getBio()));
                 requestParam.setStatus(row.getStatus() == null ? 1 : row.getStatus());
-                createPerformer(requestParam);
+                selfProvider.getObject().createPerformer(requestParam);
                 result.addSuccess();
             } catch (Exception ex) {
                 result.addFail(rowIndex, ex.getMessage());
             }
         }
+        fillImportLogVariables(result);
         return result;
+    }
+
+    private void fillImportLogVariables(ImportResultRespDTO result) {
+        LogRecordContext.putVariable("importTotal", result.getTotal());
+        LogRecordContext.putVariable("importSuccess", result.getSuccess());
+        LogRecordContext.putVariable("importFail", result.getFail());
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(result));
     }
 
     private void validatePerformerImportRow(PerformerImportExcelDTO row) {
@@ -128,6 +156,7 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
 
     @Override
     public IPage<PerformerPageQueryRespDTO> pageQueryPerformers(PerformerPageQueryReqDTO requestParam) {
+        accessControl.requireAdminAccess();
         LambdaQueryWrapper<PerformerDO> queryWrapper = Wrappers.lambdaQuery(PerformerDO.class)
                 .like(StrUtil.isNotBlank(requestParam.getName()), PerformerDO::getName, requestParam.getName())
                 .orderByDesc(PerformerDO::getId);
@@ -152,14 +181,10 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
             );
             List<Long> styleIds = relations.stream().map(PerformerStyleRelationDO::getStyleId).collect(Collectors.toList());
             
-            // 存量数据平滑自动迁移
+            // 兼容尚未迁移到关联表的存量数据，查询接口保持只读
             if (CollUtil.isEmpty(styleIds) && each.getStyleId() != null) {
                 styleIds = new ArrayList<>();
                 styleIds.add(each.getStyleId());
-                performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
-                        .performerId(each.getId())
-                        .styleId(each.getStyleId())
-                        .build());
             }
 
             dto.setStyleIds(styleIds);
@@ -178,6 +203,7 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
 
     @Override
     public PerformerQueryRespDTO getPerformerById(Long id) {
+        accessControl.requireAdminAccess();
         PerformerDO performerDO = getById(id);
         if (performerDO == null) {
             return null;
@@ -195,14 +221,10 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
         );
         List<Long> styleIds = relations.stream().map(PerformerStyleRelationDO::getStyleId).collect(Collectors.toList());
 
-        // 存量数据平滑自动迁移
+        // 兼容尚未迁移到关联表的存量数据，查询接口保持只读
         if (CollUtil.isEmpty(styleIds) && performerDO.getStyleId() != null) {
             styleIds = new ArrayList<>();
             styleIds.add(performerDO.getStyleId());
-            performerStyleRelationMapper.insert(PerformerStyleRelationDO.builder()
-                    .performerId(performerDO.getId())
-                    .styleId(performerDO.getStyleId())
-                    .build());
         }
 
         dto.setStyleIds(styleIds);
@@ -219,11 +241,17 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
     }
 
     @Override
+    @LogRecord(success = "修改艺人/乐队：艺人ID {{#requestParam.id}}", fail = "修改艺人/乐队失败：艺人ID {{#requestParam.id}}",
+            type = "Performer", subType = "Update",
+            bizNo = "{{#requestParam.id}}", extra = "{{#modifiedData}}")
+    @Transactional(rollbackFor = Exception.class)
     public void updatePerformer(PerformerSaveReqDTO requestParam) {
+        accessControl.requireSuperAdminAccess();
         PerformerDO performerDO = getById(requestParam.getId());
         if (performerDO == null) {
             throw new ServiceException("未找到对应的艺人数据");
         }
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(performerDO));
         performerDO.setName(requestParam.getName());
         performerDO.setStatus(requestParam.getStatus());
         
@@ -263,10 +291,25 @@ public class PerformerServiceImpl extends ServiceImpl<PerformerMapper, Performer
                     .styleId(performerDO.getStyleId())
                     .build());
         }
+        LogRecordContext.putVariable("modifiedData", JSON.toJSONString(performerDO));
     }
 
     @Override
+    @LogRecord(success = "删除艺人/乐队：艺人ID {{#id}}", fail = "删除艺人/乐队失败：艺人ID {{#id}}",
+            type = "Performer", subType = "Delete", bizNo = "{{#id}}")
+    @Transactional(rollbackFor = Exception.class)
     public void deletePerformer(Long id) {
+        accessControl.requireSuperAdminAccess();
+        PerformerDO originalPerformer = getById(id);
+        if (originalPerformer == null) {
+            throw new ServiceException("未找到对应的艺人数据");
+        }
+        LogRecordContext.putVariable("originalData", JSON.toJSONString(originalPerformer));
+        Long eventCount = jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM t_event_performer WHERE performer_id = ?", Long.class, id);
+        if (eventCount != null && eventCount > 0) {
+            throw new ServiceException("艺人仍有关联演出，不能删除");
+        }
         removeById(id);
         // 级联清除多风格中间表记录
         performerStyleRelationMapper.delete(

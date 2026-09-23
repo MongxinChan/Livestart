@@ -2,31 +2,21 @@
 # 提供商户端专用的分数据源和广播同步规则
 
 # =========================================================================
-# 1. 物理数据源集合（需要与 livestart_all_sharding.sql 中的 7 个分库保持一致）
+# 1. 物理数据源集合。商户后台只访问公共库和订单库。
 # =========================================================================
+mode:
+  type: Standalone
+
 dataSources:
   # 公共与元数据中心
   ds_common:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    # ShardingSphere JDBC 5.3.2 parses this YAML directly; Spring placeholders are not resolved here.
     username: &db_user root
     password: &db_pass 123456
   
-  # 用户物理库
-  ds_user_0:
-    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
-    driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_user_0?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: *db_user
-    password: *db_pass
-  ds_user_1:
-    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
-    driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_user_1?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: *db_user
-    password: *db_pass
-
   # 订单物理库
   ds_order_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
@@ -38,20 +28,6 @@ dataSources:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order_1?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: *db_user
-    password: *db_pass
-
-  # 座位物理库
-  ds_seat_0:
-    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
-    driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_seat_0?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: *db_user
-    password: *db_pass
-  ds_seat_1:
-    dataSourceClassName: com.zaxxer.hikari.HikariDataSource
-    driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_seat_1?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: *db_user
     password: *db_pass
 
@@ -84,7 +60,7 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: order_database_inline
+            shardingAlgorithmName: order_database_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
@@ -94,7 +70,7 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: order_database_inline
+            shardingAlgorithmName: order_database_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
@@ -103,10 +79,11 @@ rules:
       - t_order,t_order_item
 
     shardingAlgorithms:
-      order_database_inline:
-        type: INLINE
+      order_database_hash_mod:
+        type: CLASS_BASED
         props:
-          algorithm-expression: ds_order_${Math.abs(user_id.hashCode()) % 2}
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.merchant.admin.dao.sharding.OrderDatabaseHashModShardingAlgorithm
       order_table_hash_mod:
         type: CLASS_BASED
         props:
