@@ -11,7 +11,6 @@ import org.springframework.core.Ordered;
 import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -31,12 +30,8 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
 
     private static final String USER_LOGIN_KEY = "live-start:login:";
     private static final List<String> SKIP_PATHS = List.of(
-            "/api/live-start/admin/v1/user/login",
             "/api/live-start/admin/v1/user/login/code",
             "/api/live-start/admin/v1/user/send-code",
-            "/api/live-start/admin/v1/user",
-            "/api/live-start/admin/v1/has-phone/**",
-            "/api/live-start/admin/v1/user/check-login",
             "/api/live-start/pay/callback/**",
             "/api/pay/callback/**",
             "/api/live-start/engine/event/**",
@@ -44,16 +39,21 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
     );
     private static final AntPathMatcher PATH_MATCHER = new AntPathMatcher();
 
-    private static final List<String> TRUSTED_HEADERS = List.of("userId", "username", "phone", "realName", "userType");
+    private static final String CLIENT_IP_HEADER = "X-Livestart-Client-IP";
+    private static final String INTERNAL_TOKEN_HEADER = "X-Livestart-Internal-Token";
+    private static final List<String> TRUSTED_HEADERS = List.of(
+            "userId", "username", "phone", "realName", "userType",
+            CLIENT_IP_HEADER, INTERNAL_TOKEN_HEADER);
 
     private final ReactiveStringRedisTemplate reactiveStringRedisTemplate;
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
         String requestPath = exchange.getRequest().getPath().value();
+        ServerWebExchange sanitizedExchange = addClientIp(stripTrustedHeaders(exchange));
         if (isSkipPath(exchange)) {
             log.debug("[Gateway-Auth] Skip auth for path={}", requestPath);
-            return chain.filter(stripTrustedHeaders(exchange));
+            return chain.filter(sanitizedExchange);
         }
 
         String token = exchange.getRequest().getHeaders().getFirst("token");
@@ -63,20 +63,36 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
         }
 
         String redisKey = USER_LOGIN_KEY + token;
-        log.info("[Gateway-Auth] Checking Redis: key={}", redisKey);
+        log.debug("[Gateway-Auth] Checking login state, path={}", requestPath);
         return reactiveStringRedisTemplate.opsForValue().get(redisKey)
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.warn("[Gateway-Auth] Login record not found in redis, token={}", token);
+                    log.warn("[Gateway-Auth] Login record not found, path={}", requestPath);
                     return Mono.error(new RuntimeException("Login record not found"));
                 }))
-                .flatMap(userPayload -> {
+                .materialize()
+                .flatMap(signal -> {
+                    if (signal.isOnError()) {
+                        Throwable error = signal.getThrowable();
+                        if (error != null && "Login record not found".equals(error.getMessage())) {
+                            return writeUnauthorized(exchange, "登录态已失效，请重新登录");
+                        }
+                        log.error("[Gateway-Auth] Login state lookup failed, path={}", requestPath, error);
+                        return writeUnauthorized(exchange, "认证异常，请重试");
+                    }
+                    String userPayload = signal.get();
                     if (StrUtil.isBlank(userPayload) || "null".equals(userPayload)) {
                         log.warn("[Gateway-Auth] Invalid token, payload={}", userPayload);
                         return writeUnauthorized(exchange, "登录态已失效，请重新登录");
                     }
 
                     JSONObject userInfo = JSON.parseObject(userPayload);
-                    ServerHttpRequest mutatedRequest = stripTrustedHeaders(exchange).getRequest().mutate()
+                    Integer userType = userInfo.getInteger("userType");
+                    if (!RolePermissionPolicy.isAllowed(requestPath, exchange.getRequest().getMethod(), userType)) {
+                        log.warn("[Gateway-Auth] Forbidden, path={}, userId={}, userType={}",
+                                requestPath, userInfo.getString("id"), userType);
+                        return writeForbidden(exchange, "当前账号无权访问该后台功能");
+                    }
+                    ServerHttpRequest mutatedRequest = sanitizedExchange.getRequest().mutate()
                             .header("userId", valueOrEmpty(userInfo.getString("id")))
                             .header("username", valueOrEmpty(userInfo.getString("username")))
                             .header("phone", valueOrEmpty(userInfo.getString("phone")))
@@ -85,14 +101,7 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
                             .build();
 
                     log.info("[Gateway-Auth] Auth success, userId={}, username={}", userInfo.getString("id"), userInfo.getString("username"));
-                    return chain.filter(exchange.mutate().request(mutatedRequest).build());
-                })
-                .onErrorResume(e -> {
-                    if ("Login record not found".equals(e.getMessage())) {
-                        return writeUnauthorized(exchange, "登录态已失效，请重新登录");
-                    }
-                    log.error("[Gateway-Auth] Unexpected error: {}", e.getMessage(), e);
-                    return writeUnauthorized(exchange, "认证异常，请重试");
+                    return chain.filter(sanitizedExchange.mutate().request(mutatedRequest).build());
                 });
     }
 
@@ -103,14 +112,7 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
 
     private boolean isSkipPath(ServerWebExchange exchange) {
         String requestPath = exchange.getRequest().getPath().value();
-        HttpMethod method = exchange.getRequest().getMethod();
-        if (HttpMethod.POST.equals(method) && "/api/live-start/admin/v1/user".equals(requestPath)) {
-            return true;
-        }
         for (String skipPath : SKIP_PATHS) {
-            if ("/api/live-start/admin/v1/user".equals(skipPath)) {
-                continue;
-            }
             if (PATH_MATCHER.match(skipPath, requestPath)) {
                 return true;
             }
@@ -130,12 +132,30 @@ public class TokenValidateFilter implements GlobalFilter, Ordered {
         return exchange.mutate().request(builder.build()).build();
     }
 
+    private ServerWebExchange addClientIp(ServerWebExchange exchange) {
+        String clientIp = exchange.getRequest().getRemoteAddress() == null
+                ? "unknown"
+                : exchange.getRequest().getRemoteAddress().getAddress().getHostAddress();
+        ServerHttpRequest request = exchange.getRequest().mutate()
+                .header(CLIENT_IP_HEADER, clientIp)
+                .build();
+        return exchange.mutate().request(request).build();
+    }
+
     private Mono<Void> writeUnauthorized(ServerWebExchange exchange, String msg) {
+        return writeError(exchange, HttpStatus.UNAUTHORIZED, "A000004", msg);
+    }
+
+    private Mono<Void> writeForbidden(ServerWebExchange exchange, String msg) {
+        return writeError(exchange, HttpStatus.FORBIDDEN, "A000005", msg);
+    }
+
+    private Mono<Void> writeError(ServerWebExchange exchange, HttpStatus status, String code, String msg) {
         ServerHttpResponse response = exchange.getResponse();
-        response.setStatusCode(HttpStatus.UNAUTHORIZED);
+        response.setStatusCode(status);
         response.getHeaders().setContentType(MediaType.APPLICATION_JSON);
         Map<String, Object> body = Map.of(
-                "code", "A000004",
+                "code", code,
                 "message", msg,
                 "data", ""
         );
