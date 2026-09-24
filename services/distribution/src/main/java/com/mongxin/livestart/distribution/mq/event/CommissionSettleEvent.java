@@ -25,6 +25,11 @@ public class CommissionSettleEvent {
     private String orderNo;
 
     /**
+     * 购票用户 ID，用于延迟结算时按分片路由核对订单状态。
+     */
+    private Long userId;
+
+    /**
      * 动作 1:代扣个税完成票房分成正式入账到可用余额 2:歌迷退票分成明细取消
      */
     private Integer action;

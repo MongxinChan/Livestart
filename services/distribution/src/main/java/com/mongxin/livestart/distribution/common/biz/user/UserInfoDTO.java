@@ -28,4 +28,9 @@ public class UserInfoDTO {
      * 当前登录手机号
      */
     private String phone;
+
+    /**
+     * 用户类型：1乐迷，2艺人，3场地管理员，4超级管理员。
+     */
+    private Integer userType;
 }

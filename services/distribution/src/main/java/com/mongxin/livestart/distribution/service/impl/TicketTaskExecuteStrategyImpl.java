@@ -24,11 +24,10 @@ import lombok.NoArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
 
 /**
@@ -42,6 +41,7 @@ public class TicketTaskExecuteStrategyImpl implements DistributionExecuteStrateg
     private final TicketTaskMapper ticketTaskMapper;
     private final TicketSkuMapper ticketSkuMapper;
     private final UserTicketMapper userTicketMapper;
+    private final TransactionTemplate transactionTemplate;
 
     @Override
     public String mark() {
@@ -99,17 +99,19 @@ public class TicketTaskExecuteStrategyImpl implements DistributionExecuteStrateg
                 excelSuccess = true;
             }
         } catch (Exception e) {
-            log.warn("[批量分发策略] 解析名单 Excel 异常，启动演示测试容错回退机制，file={}", task.getFileUrl(), e);
+            log.warn("[批量分发策略] 解析名单 Excel 异常，任务终止，file={}", task.getFileUrl(), e);
         }
 
-        // 3. 演示容错回退：自动模拟为 5 个测试用户直接赠票出票
+        // 名单缺失或为空时终止任务，禁止向固定演示账号发放真实门票。
         if (!excelSuccess || CollUtil.isEmpty(userIds)) {
-            log.info("[批量分发策略] 已回退为演示模拟发票名单，模拟用户 ID：10001, 10002, 10003, 10004, 10005");
-            userIds.add(10001L);
-            userIds.add(10002L);
-            userIds.add(10003L);
-            userIds.add(10004L);
-            userIds.add(10005L);
+            task.setStatus(TicketTaskStatusEnum.FAILED.getCode());
+            task.setTotalCount(0);
+            task.setSuccessCount(0);
+            task.setFailCount(0);
+            ticketTaskMapper.updateById(task);
+            log.warn("[批量分发策略] 发票名单不存在或为空，任务终止，taskId={}, fileUrl={}",
+                    taskId, task.getFileUrl());
+            return;
         }
 
         int successCount = 0;
@@ -118,7 +120,9 @@ public class TicketTaskExecuteStrategyImpl implements DistributionExecuteStrateg
         // 4. 循环发票
         for (Long userId : userIds) {
             try {
-                boolean success = executeSingleUserDistribution(userId, skuId, sku.getEventId());
+                Boolean successResult = transactionTemplate.execute(status ->
+                        executeSingleUserDistribution(userId, skuId, sku.getEventId()));
+                boolean success = Boolean.TRUE.equals(successResult);
                 if (success) {
                     successCount++;
                 } else {
@@ -141,7 +145,6 @@ public class TicketTaskExecuteStrategyImpl implements DistributionExecuteStrateg
                 taskId, userIds.size(), successCount, failCount);
     }
 
-    @Transactional(rollbackFor = Exception.class)
     public boolean executeSingleUserDistribution(Long userId, Long skuId, Long eventId) {
         // 乐观锁扣减票档的可用库存
         int affected = ticketSkuMapper.update(null, Wrappers.lambdaUpdate(TicketSkuDO.class)
@@ -164,7 +167,9 @@ public class TicketTaskExecuteStrategyImpl implements DistributionExecuteStrateg
                 .status(TicketStatusEnum.UNUSED.getCode())
                 .checkCode(uniqueCheckCode)
                 .build();
-        userTicketMapper.insert(userTicket);
+        if (userTicketMapper.insert(userTicket) <= 0) {
+            throw new IllegalStateException("用户门票写入失败");
+        }
 
         return true;
     }

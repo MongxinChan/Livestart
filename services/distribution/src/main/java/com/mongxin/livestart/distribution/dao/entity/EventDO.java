@@ -14,7 +14,10 @@ import lombok.NoArgsConstructor;
 import java.util.Date;
 
 /**
- * Distribution-side event aggregate mapped to {@code t_event}.
+ * 分销服务演出持久化实体（DO）。
+ *
+ * <p>对应公共库 {@code t_event}，保存商户演出发布后的分销副本、来源演出关联及售票状态。
+ * {@code sourceEventId} 指向商户原始演出，{@code id} 仍是当前分销副本的全局主键。</p>
  */
 @Data
 @Builder
@@ -29,45 +32,76 @@ public class EventDO {
     @TableId(type = IdType.ASSIGN_ID)
     private Long id;
 
-    /** Event title. */
+    /**
+     * 商户后台的原始演出 ID，用于关联分销演出副本与来源演出。
+     */
+    private Long sourceEventId;
+
+    /**
+     * 演出标题。
+     */
     private String title;
 
-    /** Performer or artist id. */
+    /**
+     * 主演艺人用户 ID。
+     */
     private Long artistId;
 
-    /** Performer or artist name. */
+    /**
+     * 主演艺人名称。
+     */
     private String artistName;
 
-    /** Related venue id. */
+    /**
+     * 关联场馆 ID。
+     */
     private Long venueId;
 
-    /** Event type: 0 livehouse, 1 concert. */
+    /**
+     * 演出类型：0 表示 Livehouse 站票，1 表示演唱会选座。
+     */
     private Integer eventType;
 
-    /** Canonical event start time used by shared event schema. */
+    /**
+     * 公共演出表使用的标准开始时间。
+     */
     private Date startTime;
 
-    /** Event start time. */
+    /**
+     * 演出开始时间，兼容分销接口字段。
+     */
     private Date eventTime;
 
-    /** Ticket sale start time. */
+    /**
+     * 最早开售时间。
+     */
     private Date saleStartTime;
 
-    /** Event sale status. */
+    /**
+     * 演出状态：0 下架，1 待售，2 在售，3 售罄。
+     */
     private Integer status;
 
-    /** Bound XXL-JOB id for scheduled sale release. */
+    /**
+     * 定时开售对应的 XXL-JOB 任务 ID。
+     */
     private Integer xxlJobId;
 
-    /** Create time. */
+    /**
+     * 创建时间。
+     */
     @TableField(fill = FieldFill.INSERT)
     private Date createTime;
 
-    /** Update time. */
+    /**
+     * 修改时间。
+     */
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private Date updateTime;
 
-    /** Logical delete flag. */
+    /**
+     * 逻辑删除标记：0 未删除，1 已删除。
+     */
     @TableLogic
     private Integer delFlag;
 }

@@ -1,6 +1,8 @@
 package com.mongxin.livestart.distribution.dto.resp;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.annotation.JsonSerialize;
+import com.fasterxml.jackson.databind.ser.std.ToStringSerializer;
 import lombok.Data;
 
 import java.util.Date;
@@ -15,11 +17,13 @@ public class TicketReminderRespDTO {
     /**
      * 提醒记录主键 ID
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long id;
 
     /**
      * 关联的演出 ID
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long eventId;
 
     /**
@@ -30,6 +34,7 @@ public class TicketReminderRespDTO {
     /**
      * 关联的开售阶段 ID
      */
+    @JsonSerialize(using = ToStringSerializer.class)
     private Long stageId;
 
     /**

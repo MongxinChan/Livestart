@@ -20,13 +20,16 @@ import com.mongxin.livestart.distribution.dao.mapper.InviteCodeMapper;
 import com.mongxin.livestart.distribution.dao.mapper.InviteRelationMapper;
 import com.mongxin.livestart.distribution.dao.mapper.OrderMapper;
 import com.mongxin.livestart.distribution.dto.resp.ArtistCommissionRespDTO;
+import com.mongxin.livestart.distribution.dto.req.ArtistBindReqDTO;
 import com.mongxin.livestart.distribution.dto.resp.InviteCodeRespDTO;
 import com.mongxin.livestart.distribution.mq.event.CommissionSettleEvent;
 import com.mongxin.livestart.distribution.mq.event.OrderPaySuccessEvent;
 import com.mongxin.livestart.distribution.mq.producer.CommissionSettleProducer;
 import com.mongxin.livestart.distribution.service.ArtistCommissionService;
+import com.mongxin.livestart.distribution.service.ArtistWalletService;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.exception.ServiceException;
+import com.mongxin.livestart.framework.errorcode.BaseErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.redisson.api.RLock;
@@ -47,12 +50,15 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRecordMapper, ArtistCommissionRecordDO> implements ArtistCommissionService {
 
+    private static final int ORDER_STATUS_PAID = 1;
+
     private final InviteCodeMapper inviteCodeMapper;
     private final InviteRelationMapper inviteRelationMapper;
     private final OrderMapper orderMapper;
     private final RedissonClient redissonClient;
     private final StringRedisTemplate stringRedisTemplate;
     private final CommissionSettleProducer commissionSettleProducer;
+    private final ArtistWalletService artistWalletService;
 
     /** 固定艺人宣发票房分成比率 (10%) */
     private static final BigDecimal DEFAULT_COMMISSION_RATE = new BigDecimal("0.10");
@@ -63,6 +69,7 @@ public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRec
 
     @Override
     public InviteCodeRespDTO getOrCreateArtistPromoCode() {
+        requireArtistUser();
         String userIdStr = UserContext.getUserId();
         if (StrUtil.isBlank(userIdStr)) {
             throw new ClientException("艺人用户未登录");
@@ -120,6 +127,39 @@ public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRec
         return respDTO;
     }
 
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void bindArtist(ArtistBindReqDTO request) {
+        requireFanUser();
+        Long inviteeUserId = Long.valueOf(UserContext.getUserId());
+        String inviteCode = request.getInviteCode().trim().toUpperCase();
+        InviteCodeDO inviteCodeDO = inviteCodeMapper.selectOne(Wrappers.lambdaQuery(InviteCodeDO.class)
+                .eq(InviteCodeDO::getInviteCode, inviteCode));
+        if (inviteCodeDO == null) {
+            throw new ClientException("艺人推广码不存在");
+        }
+        if (inviteeUserId.equals(inviteCodeDO.getUserId())) {
+            throw new ClientException("不能绑定自己的推广码");
+        }
+        InviteRelationDO existing = inviteRelationMapper.selectOne(Wrappers.lambdaQuery(InviteRelationDO.class)
+                .eq(InviteRelationDO::getInviteeUserId, inviteeUserId));
+        if (existing != null) {
+            if (existing.getInviterUserId().equals(inviteCodeDO.getUserId())) {
+                return;
+            }
+            throw new ClientException("当前用户已经绑定其他艺人");
+        }
+        InviteRelationDO relation = InviteRelationDO.builder()
+                .inviterUserId(inviteCodeDO.getUserId())
+                .inviteeUserId(inviteeUserId)
+                .inviteCode(inviteCode)
+                .bindTime(new Date())
+                .build();
+        if (inviteRelationMapper.insert(relation) <= 0) {
+            throw new ServiceException("绑定艺人失败");
+        }
+    }
+
     private InviteCodeDO doGeneratePromoCode(Long artistId) {
         String code = null;
         boolean unique = false;
@@ -163,63 +203,76 @@ public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRec
     public void processOrderPaySuccess(OrderPaySuccessEvent event) {
         Long inviteeUserId = event.getUserId();
         String orderNo = event.getOrderNo();
-
-        // 1. 查询购票歌迷是否有绑定的推广渠道关系
-        InviteRelationDO relation = inviteRelationMapper.selectOne(
-                Wrappers.lambdaQuery(InviteRelationDO.class).eq(InviteRelationDO::getInviteeUserId, inviteeUserId)
-        );
-        if (relation == null) {
-            log.info("[分销分成] 购票歌迷没有推荐人艺人，忽略，userId={}", inviteeUserId);
-            return;
-        }
-        Long artistId = relation.getInviterUserId();
-
-        // 2. 利用追加的分表路由查购票实付票房款
-        LambdaQueryWrapper<OrderDO> queryWrapper = Wrappers.lambdaQuery(OrderDO.class)
-                .eq(OrderDO::getOrderNo, orderNo)
-                .eq(OrderDO::getUserId, inviteeUserId);
-        OrderDO order = orderMapper.selectOne(queryWrapper);
-
-        if (order == null) {
-            log.warn("[分销分成] 未查询到歌迷购票分表的关联订单金额，orderNo={}", orderNo);
-            return;
-        }
-
-        // 3. 税务与票房分成代扣计算
-        BigDecimal ticketAmount = order.getTotalAmount();
-        BigDecimal commissionAmount = ticketAmount.multiply(DEFAULT_COMMISSION_RATE); // 税前提成
-        BigDecimal taxAmount = commissionAmount.multiply(DEFAULT_TAX_RATE); // 代扣税费 (20%)
-        BigDecimal actualAmount = commissionAmount.subtract(taxAmount); // 税后实得 (80%)
-
-        ArtistCommissionRecordDO record = ArtistCommissionRecordDO.builder()
-                .artistId(artistId)
-                .artistPromoCode(relation.getInviteCode())
-                .orderNo(orderNo)
-                .ticketAmount(ticketAmount)
-                .commissionRate(DEFAULT_COMMISSION_RATE)
-                .commissionAmount(commissionAmount)
-                .taxRate(DEFAULT_TAX_RATE)
-                .taxAmount(taxAmount)
-                .actualAmount(actualAmount)
-                .status(CommissionStatusEnum.PENDING.getCode())
-                .build();
-
-        baseMapper.insert(record);
-        log.info("[分销分成] 歌迷购票成功出票！已为艺人创建待到账分成明细 (已税后核算)，artistId={}，歌迷支付={}，分成额(税前)={}，代扣个税={}，艺人税后实得={}",
-                artistId, ticketAmount, commissionAmount, taxAmount, actualAmount);
-
-        // 4. 发送 15 天后延迟正式到账入账结算消息，保障退票周期
-        CommissionSettleEvent settleEvent = CommissionSettleEvent.builder()
-                .commissionRecordId(record.getId())
-                .orderNo(orderNo)
-                .action(1) // 1-正式到账
-                .build();
-
+        RLock orderLock = redissonClient.getLock("livestart:artist:commission:order:" + orderNo);
+        orderLock.lock();
         try {
-            commissionSettleProducer.sendDelayMessage(settleEvent, SETTLE_DELAY_MS);
-            log.info("[分销分成] 已成功向 MQ 投递个税延迟结算通知，将于 15 天后到账，recordId={}", record.getId());
-        } catch (Exception e) {
-            log.error("[分销分成] 发送延迟结算消息到 MQ 异常，recordId={}", record.getId(), e);
+            ArtistCommissionRecordDO existingRecord = baseMapper.selectOne(Wrappers.lambdaQuery(ArtistCommissionRecordDO.class)
+                    .eq(ArtistCommissionRecordDO::getOrderNo, orderNo)
+                    .last("LIMIT 1"));
+            if (existingRecord != null) {
+                log.info("[分销分成] 订单佣金已处理，跳过重复消息，orderNo={}", orderNo);
+                return;
+            }
+
+            // 1. 查询购票歌迷是否有绑定的推广渠道关系
+            InviteRelationDO relation = inviteRelationMapper.selectOne(
+                    Wrappers.lambdaQuery(InviteRelationDO.class).eq(InviteRelationDO::getInviteeUserId, inviteeUserId)
+            );
+            if (relation == null) {
+                log.info("[分销分成] 购票歌迷没有推荐人艺人，忽略，userId={}", inviteeUserId);
+                return;
+            }
+            Long artistId = relation.getInviterUserId();
+
+            // 2. 利用追加的分表路由查购票实付票房款
+            LambdaQueryWrapper<OrderDO> queryWrapper = Wrappers.lambdaQuery(OrderDO.class)
+                    .eq(OrderDO::getOrderNo, orderNo)
+                    .eq(OrderDO::getUserId, inviteeUserId);
+            OrderDO order = orderMapper.selectOne(queryWrapper);
+            if (order == null) {
+                log.warn("[分销分成] 未查询到歌迷购票分表的关联订单金额，orderNo={}", orderNo);
+                return;
+            }
+
+            // 3. 税务与票房分成代扣计算
+            BigDecimal ticketAmount = order.getTotalAmount();
+            BigDecimal commissionAmount = ticketAmount.multiply(DEFAULT_COMMISSION_RATE).setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal taxAmount = commissionAmount.multiply(DEFAULT_TAX_RATE).setScale(2, java.math.RoundingMode.HALF_UP);
+            BigDecimal actualAmount = commissionAmount.subtract(taxAmount).setScale(2, java.math.RoundingMode.HALF_UP);
+
+            ArtistCommissionRecordDO record = ArtistCommissionRecordDO.builder()
+                    .artistId(artistId)
+                    .artistPromoCode(relation.getInviteCode())
+                    .orderNo(orderNo)
+                    .ticketAmount(ticketAmount)
+                    .commissionRate(DEFAULT_COMMISSION_RATE)
+                    .commissionAmount(commissionAmount)
+                    .taxRate(DEFAULT_TAX_RATE)
+                    .taxAmount(taxAmount)
+                    .actualAmount(actualAmount)
+                    .status(CommissionStatusEnum.PENDING.getCode())
+                    .build();
+
+            baseMapper.insert(record);
+            log.info("[分销分成] 已创建待到账分成明细，artistId={}，orderNo={}，actualAmount={}",
+                    artistId, orderNo, actualAmount);
+
+            // 4. 发送15天后的正式到账消息，覆盖退款窗口
+            CommissionSettleEvent settleEvent = CommissionSettleEvent.builder()
+                    .commissionRecordId(record.getId())
+                    .orderNo(orderNo)
+                    .userId(inviteeUserId)
+                    .action(1)
+                    .build();
+            try {
+                commissionSettleProducer.sendDelayMessage(settleEvent, SETTLE_DELAY_MS);
+            } catch (Exception e) {
+                log.error("[分销分成] 发送延迟结算消息异常，recordId={}", record.getId(), e);
+                // 回滚待结算记录，让 RocketMQ 重试；吞掉异常会造成永久待结算。
+                throw new ServiceException("佣金延迟结算消息投递失败，等待 MQ 重试", e, BaseErrorCode.SERVICE_ERROR);
+            }
+        } finally {
+            orderLock.unlock();
         }
     }
 
@@ -239,6 +292,27 @@ public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRec
         }
 
         if (event.getAction() == 1) {
+            Long buyerUserId = event.getUserId();
+            if (buyerUserId == null) {
+                throw new ServiceException("佣金结算消息缺少购票用户，无法核对退款状态");
+            }
+            OrderDO latestOrder = orderMapper.selectOne(Wrappers.lambdaQuery(OrderDO.class)
+                    .eq(OrderDO::getOrderNo, record.getOrderNo())
+                    .eq(OrderDO::getUserId, buyerUserId));
+            if (latestOrder == null) {
+                throw new ServiceException("佣金结算订单不存在，等待消息重试");
+            }
+            if (!Integer.valueOf(ORDER_STATUS_PAID).equals(latestOrder.getStatus())) {
+                int cancelled = baseMapper.update(null, Wrappers.lambdaUpdate(ArtistCommissionRecordDO.class)
+                        .eq(ArtistCommissionRecordDO::getId, recordId)
+                        .eq(ArtistCommissionRecordDO::getStatus, CommissionStatusEnum.PENDING.getCode())
+                        .set(ArtistCommissionRecordDO::getStatus, CommissionStatusEnum.CANCELLED.getCode()));
+                if (cancelled > 0) {
+                    log.info("[个税结算] 订单已退款或关闭，取消待结算分成，recordId={}, orderStatus={}",
+                            recordId, latestOrder.getStatus());
+                }
+                return;
+            }
             // 正式入账
             int affected = baseMapper.update(null, Wrappers.lambdaUpdate(ArtistCommissionRecordDO.class)
                     .eq(ArtistCommissionRecordDO::getId, recordId)
@@ -247,6 +321,7 @@ public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRec
                     .set(ArtistCommissionRecordDO::getSettleTime, new Date())
             );
             if (affected > 0) {
+                artistWalletService.creditCommission(record.getArtistId(), record.getId(), record.getActualAmount());
                 log.info("[个税结算] 提成正式结算入账成功，已代扣个税打入艺人余额，artistId={}，票房={}, 艺人税后净得={}",
                         record.getArtistId(), record.getTicketAmount(), record.getActualAmount());
             }
@@ -265,6 +340,7 @@ public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRec
 
     @Override
     public IPage<ArtistCommissionRespDTO> pageQueryArtistCommissions(int pageNo, int pageSize, Integer status) {
+        requireArtistUser();
         String userIdStr = UserContext.getUserId();
         if (StrUtil.isBlank(userIdStr)) {
             throw new ClientException("艺人用户未登录");
@@ -296,5 +372,17 @@ public class ArtistCommissionServiceImpl extends ServiceImpl<ArtistCommissionRec
             dto.setCreateTime(item.getCreateTime());
             return dto;
         });
+    }
+
+    private void requireArtistUser() {
+        if (!Integer.valueOf(2).equals(UserContext.getUserType()) || StrUtil.isBlank(UserContext.getUserId())) {
+            throw new ClientException("当前账号不是艺人账号");
+        }
+    }
+
+    private void requireFanUser() {
+        if (!Integer.valueOf(1).equals(UserContext.getUserType()) || StrUtil.isBlank(UserContext.getUserId())) {
+            throw new ClientException("只有歌迷账号可以绑定艺人");
+        }
     }
 }

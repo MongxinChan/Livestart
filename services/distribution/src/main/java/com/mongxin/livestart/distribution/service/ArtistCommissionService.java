@@ -3,6 +3,7 @@ package com.mongxin.livestart.distribution.service;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.mongxin.livestart.distribution.dao.entity.ArtistCommissionRecordDO;
+import com.mongxin.livestart.distribution.dto.req.ArtistBindReqDTO;
 import com.mongxin.livestart.distribution.dto.resp.ArtistCommissionRespDTO;
 import com.mongxin.livestart.distribution.mq.event.CommissionSettleEvent;
 import com.mongxin.livestart.distribution.mq.event.OrderPaySuccessEvent;
@@ -18,6 +19,13 @@ public interface ArtistCommissionService extends IService<ArtistCommissionRecord
      * @return 艺人宣发码推广情况及收益统计
      */
     com.mongxin.livestart.distribution.dto.resp.InviteCodeRespDTO getOrCreateArtistPromoCode();
+
+    /**
+     * 当前歌迷绑定艺人推广关系。
+     *
+     * @param request 绑定请求
+     */
+    void bindArtist(ArtistBindReqDTO request);
 
     /**
      * 购票成功（普通订单）触发：校验歌迷分销推广链路，自动核算艺人 10% 分成与 20% 个税代扣

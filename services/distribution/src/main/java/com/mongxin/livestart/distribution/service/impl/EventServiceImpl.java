@@ -1,6 +1,7 @@
 package com.mongxin.livestart.distribution.service.impl;
 
 import cn.hutool.core.collection.CollUtil;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.mongxin.livestart.distribution.common.constant.DistributionRedisConstant;
 import com.mongxin.livestart.distribution.common.enums.EventSaleStageStatusEnum;
@@ -17,6 +18,8 @@ import com.mongxin.livestart.distribution.dto.req.EventPublishReqDTO;
 import com.mongxin.livestart.distribution.dto.req.SaleStageParamDTO;
 import com.mongxin.livestart.distribution.dto.req.SaleStageSkuParamDTO;
 import com.mongxin.livestart.distribution.dto.req.TicketSkuParam;
+import com.mongxin.livestart.distribution.dto.resp.SaleStagePreviewRespDTO;
+import com.mongxin.livestart.distribution.dto.resp.SaleStageRespDTO;
 import com.mongxin.livestart.distribution.service.EventService;
 import com.mongxin.livestart.distribution.service.XxlJobApiService;
 import com.mongxin.livestart.framework.exception.ServiceException;
@@ -49,14 +52,65 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
     private final XxlJobApiService xxlJobApiService;
 
     @Override
+    public SaleStagePreviewRespDTO getNextSaleStage(Long sourceEventId) {
+        EventDO distributionEvent = getOne(Wrappers.lambdaQuery(EventDO.class)
+                .eq(EventDO::getSourceEventId, sourceEventId)
+                .orderByDesc(EventDO::getCreateTime)
+                .last("LIMIT 1"));
+        if (distributionEvent == null) {
+            return null;
+        }
+        EventSaleStageDO stage = eventSaleStageMapper.selectOne(Wrappers.lambdaQuery(EventSaleStageDO.class)
+                .eq(EventSaleStageDO::getEventId, distributionEvent.getId())
+                .eq(EventSaleStageDO::getStatus, EventSaleStageStatusEnum.PENDING.getCode())
+                .gt(EventSaleStageDO::getSaleStartTime, new Date())
+                .orderByAsc(EventSaleStageDO::getSaleStartTime)
+                .last("LIMIT 1"));
+        if (stage == null) {
+            return null;
+        }
+        SaleStagePreviewRespDTO result = new SaleStagePreviewRespDTO();
+        result.setEventId(distributionEvent.getId());
+        result.setId(stage.getId());
+        result.setStageName(stage.getStageName());
+        result.setSaleStartTime(stage.getSaleStartTime());
+        return result;
+    }
+
+    @Override
+    public List<SaleStageRespDTO> listSaleStages(Long eventId) {
+        return eventSaleStageMapper.selectList(Wrappers.lambdaQuery(EventSaleStageDO.class)
+                        .eq(EventSaleStageDO::getEventId, eventId)
+                        .orderByAsc(EventSaleStageDO::getStageNo))
+                .stream()
+                .map(stage -> {
+                    SaleStageRespDTO result = new SaleStageRespDTO();
+                    result.setId(stage.getId());
+                    result.setEventId(stage.getEventId());
+                    result.setStageNo(stage.getStageNo());
+                    result.setStageName(stage.getStageName());
+                    result.setSaleStartTime(stage.getSaleStartTime());
+                    result.setStatus(stage.getStatus());
+                    return result;
+                })
+                .toList();
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public void publishEvent(EventPublishReqDTO requestParam) {
         validatePublishRequest(requestParam);
+        if (getOne(Wrappers.lambdaQuery(EventDO.class)
+                .eq(EventDO::getSourceEventId, requestParam.getSourceEventId())
+                .last("LIMIT 1")) != null) {
+            return;
+        }
 
         Date earliestSaleStartTime = resolveEarliestSaleStartTime(requestParam);
         boolean immediateRelease = earliestSaleStartTime == null || !earliestSaleStartTime.after(new Date());
 
         EventDO eventDO = EventDO.builder()
+                .sourceEventId(requestParam.getSourceEventId())
                 .title(requestParam.getTitle())
                 .artistId(requestParam.getArtistId())
                 .artistName(requestParam.getArtistName())
@@ -176,25 +230,33 @@ public class EventServiceImpl extends ServiceImpl<EventMapper, EventDO> implemen
                         .thenComparing(EventSaleStageDO::getStageNo))
                 .orElseThrow(() -> new ServiceException("No sale stage saved"));
 
+        Integer jobId = null;
         try {
             String cronExpression = dateToCron(earliestStage.getSaleStartTime());
-            int jobId = xxlJobApiService.addTicketReleaseJob(eventDO.getId(), eventDO.getTitle(), cronExpression);
+            jobId = xxlJobApiService.addTicketReleaseJob(eventDO.getId(), eventDO.getTitle(), cronExpression);
 
             EventDO eventUpdateDO = new EventDO();
             eventUpdateDO.setId(eventDO.getId());
             eventUpdateDO.setXxlJobId(jobId);
-            updateById(eventUpdateDO);
+            if (!updateById(eventUpdateDO)) {
+                throw new ServiceException("保存演出开售任务失败");
+            }
 
             EventSaleStageDO stageUpdateDO = new EventSaleStageDO();
             stageUpdateDO.setId(earliestStage.getId());
             stageUpdateDO.setXxlJobId(jobId);
-            eventSaleStageMapper.updateById(stageUpdateDO);
+            if (eventSaleStageMapper.updateById(stageUpdateDO) <= 0) {
+                throw new ServiceException("保存开售阶段任务失败");
+            }
 
             log.info("[Event Publish] Registered earliest stage release job. eventId={}, stageId={}, jobId={}, saleStartTime={}",
                     eventDO.getId(), earliestStage.getId(), jobId, earliestStage.getSaleStartTime());
         } catch (Exception e) {
             log.error("[Event Publish] Failed to register scheduled release job. eventId={}", eventDO.getId(), e);
-            log.warn("[Event Publish] Event and stage configs were saved, but XXL-JOB registration failed.");
+            if (jobId != null) {
+                xxlJobApiService.removeJob(jobId);
+            }
+            throw new ServiceException("开售任务注册失败，演出未发布");
         }
     }
 

@@ -45,6 +45,15 @@ public final class UserContext {
     }
 
     /**
+     * 获取当前用户类型。
+     */
+    public static Integer getUserType() {
+        return Optional.ofNullable(USER_THREAD_LOCAL.get())
+                .map(UserInfoDTO::getUserType)
+                .orElse(null);
+    }
+
+    /**
      * 清理上下文，防范内存泄露
      */
     public static void removeUser() {

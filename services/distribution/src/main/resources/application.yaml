@@ -58,6 +58,7 @@ rocketmq:
 
 livestart:
   distribution:
+    internal-token: ${LIVESTART_INTERNAL_TOKEN:change-me}
     mq:
       enabled: ${LIVESTART_DISTRIBUTION_MQ_ENABLED:false}
 

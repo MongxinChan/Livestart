@@ -20,6 +20,13 @@ import java.util.List;
 public class EventPublishReqDTO {
 
     /**
+     * 商户后台的原始演出 ID，用于发布后查询对应的分销演出。
+     */
+    @Schema(description = "商户后台演出 ID")
+    @NotNull(message = "商户后台演出 ID 不能为空")
+    private Long sourceEventId;
+
+    /**
      * 演出标题
      */
     @Schema(description = "演出标题", requiredMode = Schema.RequiredMode.REQUIRED, example = "周杰伦 2026 嘉年华演唱会")

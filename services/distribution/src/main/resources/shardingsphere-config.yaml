@@ -13,6 +13,7 @@ dataSources:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order_0?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    # ShardingSphere JDBC 5.3.2 parses this YAML directly; Spring placeholders are not resolved here.
     username: &db_user root
     password: &db_pass 123456
   ds_order_1:
@@ -36,7 +37,7 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: order_database_inline
+            shardingAlgorithmName: order_database_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
@@ -49,17 +50,18 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: order_database_inline
+            shardingAlgorithmName: order_database_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
             shardingAlgorithmName: user_ticket_table_hash_mod
 
     shardingAlgorithms:
-      order_database_inline:
-        type: INLINE
+      order_database_hash_mod:
+        type: CLASS_BASED
         props:
-          algorithm-expression: ds_order_${Math.abs(user_id.hashCode()) % 2}
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.distribution.dao.sharding.OrderDatabaseHashModShardingAlgorithm
       user_ticket_table_hash_mod:
         type: CLASS_BASED
         props:

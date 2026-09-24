@@ -24,12 +24,15 @@ public class UserTransmitFilter implements Filter {
         String userId = request.getHeader("userId");
         String username = request.getHeader("username");
         String phone = request.getHeader("phone");
+        String userType = request.getHeader("userType");
 
         if (StrUtil.isNotBlank(userId)) {
+            Integer parsedUserType = parseUserType(userType);
             UserInfoDTO userInfoDTO = UserInfoDTO.builder()
                     .userId(userId)
                     .username(username)
                     .phone(phone)
+                    .userType(parsedUserType)
                     .build();
             UserContext.setUser(userInfoDTO);
         }
@@ -38,6 +41,17 @@ public class UserTransmitFilter implements Filter {
             filterChain.doFilter(servletRequest, servletResponse);
         } finally {
             UserContext.removeUser();
+        }
+    }
+
+    private Integer parseUserType(String userType) {
+        if (StrUtil.isBlank(userType)) {
+            return null;
+        }
+        try {
+            return Integer.valueOf(userType);
+        } catch (NumberFormatException ex) {
+            return null;
         }
     }
 }
