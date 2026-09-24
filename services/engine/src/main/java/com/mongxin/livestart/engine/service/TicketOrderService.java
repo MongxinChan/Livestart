@@ -10,8 +10,11 @@ import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketVerifyRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyRecordRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyStatsRespDTO;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 /**
  * 购票订单服务接口
@@ -96,4 +99,12 @@ public interface TicketOrderService {
      * 后台验票人员根据电子票核销码核验入场。
      */
     TicketVerifyRespDTO verifyTicket(String checkCode);
+
+    /**
+     * 查询当前后台用户可见范围内的验票统计。
+     */
+    TicketVerifyStatsRespDTO getVerifyStats(Long eventId);
+
+    /** 查询当前后台用户可见范围内最近 10 条成功核销记录。 */
+    List<TicketVerifyRecordRespDTO> getRecentVerifyRecords(Long eventId);
 }

@@ -4,6 +4,7 @@ import com.mongxin.livestart.engine.remote.dto.AdminUserSimpleRespDTO;
 import com.mongxin.livestart.framework.result.Result;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -15,5 +16,7 @@ import java.util.List;
 public interface AdminRemoteService {
 
     @GetMapping("/api/live-start/admin/v1/user/simple/list")
-    Result<List<AdminUserSimpleRespDTO>> listSimpleUsersByIds(@RequestParam("userIds") List<Long> userIds);
+    Result<List<AdminUserSimpleRespDTO>> listSimpleUsersByIds(
+            @RequestParam("userIds") List<Long> userIds,
+            @RequestHeader("X-Livestart-Internal-Token") String internalToken);
 }

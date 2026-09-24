@@ -18,6 +18,7 @@ import org.apache.rocketmq.client.producer.SendStatus;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -36,6 +37,8 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 @ExtendWith(MockitoExtension.class)
 class TicketOrderCreateConsumerTest {
@@ -96,14 +99,37 @@ class TicketOrderCreateConsumerTest {
             return null;
         }).when(transactionTemplate).executeWithoutResult(any());
         when(ticketSkuMapper.decrementStock(11L, 2, 3)).thenThrow(new RuntimeException("db fail"));
+        when(stringRedisTemplate.execute(any(RedisScript.class), any(List.class), eq("2"), eq("2")))
+                .thenReturn(0L);
         consumer.onMessage(message);
 
         verify(stringRedisTemplate).execute(
                 any(RedisScript.class),
-                eq(List.of("engine:stock:sku:11", "engine:limit:user:1001:event:22")),
+                eq(List.of("engine:stock:sku:11", "engine:limit:user:1001:event:22",
+                        "engine:stock:rollback:create-order:O202606250001")),
                 eq("2"),
                 eq("2")
         );
+    }
+
+    @Test
+    void shouldRetryMessageWhenRedisRollbackFails() {
+        TicketOrderCreateConsumer consumer = new TicketOrderCreateConsumer(
+                orderMapper, orderItemMapper, ticketSkuMapper, merchantAdminRemoteService,
+                stringRedisTemplate, transactionTemplate, orderDelayCloseProducer);
+        TicketOrderCreateEvent event = TicketOrderCreateEvent.builder()
+                .orderNo("O202606250003").userId(1001L).skuId(11L).eventId(22L)
+                .count(1).visitorIds(List.of(1L)).build();
+        String message = JSON.toJSONString(MessageWrapper.<TicketOrderCreateEvent>builder()
+                .message(event).keys(event.getOrderNo()).timestamp(new Date()).build());
+        when(merchantAdminRemoteService.getTicketSku(11L)).thenReturn(Results.success(new MerchantTicketSkuDetailRespDTO()));
+        org.mockito.Mockito.doThrow(new IllegalStateException("db fail"))
+                .when(transactionTemplate).executeWithoutResult(any());
+        when(stringRedisTemplate.execute(any(RedisScript.class), any(List.class), eq("1"), eq("1")))
+                .thenThrow(new IllegalStateException("redis unavailable"));
+
+        assertThrows(com.mongxin.livestart.framework.exception.ServiceException.class,
+                () -> consumer.onMessage(message));
     }
 
     @Test
@@ -163,7 +189,10 @@ class TicketOrderCreateConsumerTest {
         verify(ticketSkuMapper).decrementStock(11L, 1, 3);
         verify(ticketSkuMapper).decrementStock(11L, 1, 4);
         verify(orderMapper, times(1)).insert(any(OrderDO.class));
-        verify(orderItemMapper, times(1)).insert(any(OrderItemDO.class));
+        ArgumentCaptor<OrderItemDO> ticket = ArgumentCaptor.forClass(OrderItemDO.class);
+        verify(orderItemMapper, times(1)).insert(ticket.capture());
+        assertEquals(32, ticket.getValue().getCheckCode().length());
+        assertEquals(1001L, Long.parseLong(ticket.getValue().getCheckCode().substring(1, 14), 36));
     }
 
     private SendResult buildSendResult() {

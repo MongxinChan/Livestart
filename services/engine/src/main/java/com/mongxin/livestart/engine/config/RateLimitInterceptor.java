@@ -38,6 +38,7 @@ public class RateLimitInterceptor implements HandlerInterceptor {
     private final StringRedisTemplate stringRedisTemplate;
 
     private static final String LUA_PATH = "lua/rate_limit.lua";
+    private static final String CLIENT_IP_HEADER = "X-Livestart-Client-IP";
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -108,16 +109,9 @@ public class RateLimitInterceptor implements HandlerInterceptor {
      * 获取客户端真实 IP
      */
     private String getClientIp(HttpServletRequest request) {
-        String ip = request.getHeader("X-Forwarded-For");
-        if (StrUtil.isBlank(ip) || "unknown".equalsIgnoreCase(ip)) {
-            ip = request.getHeader("X-Real-IP");
-        }
+        String ip = request.getHeader(CLIENT_IP_HEADER);
         if (StrUtil.isBlank(ip) || "unknown".equalsIgnoreCase(ip)) {
             ip = request.getRemoteAddr();
-        }
-        // 多级代理时取第一个
-        if (ip != null && ip.contains(",")) {
-            ip = ip.split(",")[0].trim();
         }
         return ip;
     }

@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 public class OrderPaySuccessConsumer implements RocketMQListener<String> {
 
+    private static final String PROCESSING = "PROCESSING";
+    private static final String COMPLETED = "COMPLETED";
     private final StringRedisTemplate stringRedisTemplate;
 
     @Override
@@ -41,15 +43,25 @@ public class OrderPaySuccessConsumer implements RocketMQListener<String> {
 
         String notifyKey = "engine:order:pay-success:notification:" + event.getOrderNo();
         Boolean firstDelivery = stringRedisTemplate.opsForValue()
-                .setIfAbsent(notifyKey, "1", 30, TimeUnit.DAYS);
+                .setIfAbsent(notifyKey, PROCESSING, 5, TimeUnit.MINUTES);
         if (!Boolean.TRUE.equals(firstDelivery)) {
-            log.info("[消费者] 支付成功后置通知已处理，跳过重复消息，orderNo={}", event.getOrderNo());
-            return;
+            String state = stringRedisTemplate.opsForValue().get(notifyKey);
+            if (COMPLETED.equals(state)) {
+                log.info("[消费者] 支付成功后置通知已处理，跳过重复消息，orderNo={}", event.getOrderNo());
+                return;
+            }
+            throw new IllegalStateException("支付成功后置通知正在处理，等待消息重试");
         }
 
-        // 毕业设计阶段使用本地模拟通知，替换为真实短信/App 推送实现时无需改变消费幂等逻辑。
-        log.info("[模拟短信通知] 订单支付成功，orderNo={}，userId={}，tradeNo={}",
-                event.getOrderNo(), event.getUserId(), event.getTradeNo());
-        log.info("[消费者] 订单出票后置处理完成，orderNo={}，userId={}", event.getOrderNo(), event.getUserId());
+        try {
+            // 毕业设计阶段使用本地模拟通知；接入真实通道后，异常会交给 MQ 重试。
+            log.info("[模拟短信通知] 订单支付成功，orderNo={}，userId={}，tradeNo={}",
+                    event.getOrderNo(), event.getUserId(), event.getTradeNo());
+            stringRedisTemplate.opsForValue().set(notifyKey, COMPLETED, 30, TimeUnit.DAYS);
+            log.info("[消费者] 订单出票后置处理完成，orderNo={}，userId={}", event.getOrderNo(), event.getUserId());
+        } catch (Exception ex) {
+            stringRedisTemplate.delete(notifyKey);
+            throw ex;
+        }
     }
 }

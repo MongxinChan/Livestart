@@ -1,5 +1,7 @@
 package com.mongxin.livestart.engine.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.mongxin.livestart.engine.common.biz.user.UserContext;
 import com.mongxin.livestart.engine.common.biz.user.UserInfoDTO;
 import com.mongxin.livestart.engine.config.AlipayConfig;
@@ -14,13 +16,18 @@ import com.mongxin.livestart.engine.mq.producer.TicketOrderCreateProducer;
 import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
 import com.mongxin.livestart.engine.remote.PayRemoteService;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
+import com.mongxin.livestart.engine.remote.dto.MerchantEventRespDTO;
+import com.mongxin.livestart.engine.remote.dto.MerchantVenueRespDTO;
 import com.mongxin.livestart.engine.remote.dto.RefundCreateResponseDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyStatsRespDTO;
 import com.mongxin.livestart.engine.service.impl.TicketOrderServiceImpl;
 import com.mongxin.livestart.engine.service.StockRestoreService;
+import com.mongxin.livestart.engine.toolkit.TicketCheckCodeUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.result.Result;
 import org.apache.rocketmq.client.exception.MQClientException;
 import org.apache.rocketmq.client.producer.SendResult;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,9 +41,11 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.SimpleTransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 
 import java.math.BigDecimal;
 import java.util.Collections;
+import java.util.List;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -44,9 +53,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -85,6 +96,9 @@ class TicketOrderServiceImplTest {
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
+        MapperBuilderAssistant assistant = new MapperBuilderAssistant(new MybatisConfiguration(), "");
+        TableInfoHelper.initTableInfo(assistant, OrderDO.class);
+        TableInfoHelper.initTableInfo(assistant, OrderItemDO.class);
         ReflectionTestUtils.setField(ticketOrderService, "mqEnabled", true);
         ReflectionTestUtils.setField(ticketOrderService, "localOrderMode", false);
     }
@@ -121,11 +135,14 @@ class TicketOrderServiceImplTest {
                 .status(1)
                 .totalAmount(new BigDecimal("88.00"))
                 .build();
+        SendResult sendResult = org.mockito.Mockito.mock(SendResult.class);
         when(orderMapper.selectOne(any())).thenReturn(order);
+        when(orderPaySuccessProducer.sendMessage(any())).thenReturn(sendResult);
+        when(sendResult.getSendStatus()).thenReturn(org.apache.rocketmq.client.producer.SendStatus.SEND_OK);
 
         assertDoesNotThrow(() -> ticketOrderService.paySuccess("O202406100002", "TRADE-2", new BigDecimal("88.00")));
         verify(orderMapper, never()).updateOrderStatus(anyLong(), anyLong(), anyInt(), anyInt());
-        verify(orderPaySuccessProducer, never()).sendMessage(any());
+        verify(orderPaySuccessProducer).sendMessage(any());
     }
 
     @Test
@@ -187,6 +204,185 @@ class TicketOrderServiceImplTest {
         verify(orderMapper).updateOrderStatus(4L, 4004L, 1, 0);
         verify(orderMapper).updatePayTime(eq(4L), eq(4004L), any());
         verify(orderPaySuccessProducer, never()).sendMessage(any());
+    }
+
+    @Test
+    void shouldRejectVerifyStatsForOrdinaryUser() {
+        UserContext.setUser(UserInfoDTO.builder().userId("1001").userType(1).build());
+
+        ClientException ex = assertThrows(ClientException.class,
+                () -> ticketOrderService.getVerifyStats(null));
+
+        assertEquals("当前用户无验票统计查看权限", ex.getMessage());
+        verify(orderItemMapper, never()).countPaidTickets(any(), anyBoolean());
+    }
+
+    @Test
+    void shouldReturnAllVerifyStatsForSuperAdmin() {
+        UserContext.setUser(UserInfoDTO.builder().userId("1").userType(4).build());
+        when(orderItemMapper.countPaidTickets(null, false)).thenReturn(10L);
+        when(orderItemMapper.countPaidTickets(null, true)).thenReturn(4L);
+
+        TicketVerifyStatsRespDTO result = ticketOrderService.getVerifyStats(null);
+
+        assertEquals(10L, result.getTotalCount());
+        assertEquals(4L, result.getCheckedCount());
+        assertEquals(6L, result.getUncheckedCount());
+        assertEquals(new BigDecimal("40.00"), result.getCheckedRate());
+        verify(merchantAdminRemoteService, never()).pageQueryEvents(anyInt(), anyInt());
+    }
+
+    @Test
+    void shouldLimitVenueAdminVerifyStatsToManagedEvents() {
+        UserContext.setUser(UserInfoDTO.builder().userId("7").userType(3).build());
+        MerchantEventRespDTO managedEvent = event(101L, 11L);
+        MerchantEventRespDTO otherEvent = event(202L, 22L);
+        Page<MerchantEventRespDTO> eventPage = new Page<>(1, 200, 2);
+        eventPage.setRecords(List.of(managedEvent, otherEvent));
+        when(merchantAdminRemoteService.pageQueryEvents(1, 200))
+                .thenReturn(new Result<Page<MerchantEventRespDTO>>()
+                        .setCode(Result.SUCCESS_CODE)
+                        .setData(eventPage));
+        when(merchantAdminRemoteService.getVenue(11L))
+                .thenReturn(successVenue(11L, 7L));
+        when(merchantAdminRemoteService.getVenue(22L))
+                .thenReturn(successVenue(22L, 8L));
+        when(orderItemMapper.countPaidTickets(List.of(101L), false)).thenReturn(8L);
+        when(orderItemMapper.countPaidTickets(List.of(101L), true)).thenReturn(3L);
+
+        TicketVerifyStatsRespDTO result = ticketOrderService.getVerifyStats(null);
+
+        assertEquals(8L, result.getTotalCount());
+        assertEquals(3L, result.getCheckedCount());
+        verify(merchantAdminRemoteService).getVenue(11L);
+        verify(merchantAdminRemoteService).getVenue(22L);
+    }
+
+    @Test
+    void shouldReturnEmptyVerifyStatsWhenVenueAdminHasNoManagedEvents() {
+        UserContext.setUser(UserInfoDTO.builder().userId("7").userType(3).build());
+        Page<MerchantEventRespDTO> eventPage = new Page<>(1, 200, 1);
+        eventPage.setRecords(List.of(event(202L, 22L)));
+        when(merchantAdminRemoteService.pageQueryEvents(1, 200))
+                .thenReturn(new Result<Page<MerchantEventRespDTO>>()
+                        .setCode(Result.SUCCESS_CODE)
+                        .setData(eventPage));
+        when(merchantAdminRemoteService.getVenue(22L))
+                .thenReturn(successVenue(22L, 8L));
+
+        TicketVerifyStatsRespDTO result = ticketOrderService.getVerifyStats(null);
+
+        assertEquals(0L, result.getTotalCount());
+        assertEquals(BigDecimal.ZERO, result.getCheckedRate());
+        verify(orderItemMapper, never()).countPaidTickets(any(), anyBoolean());
+    }
+
+    @Test
+    void shouldRejectTicketVerificationOutsideManagedVenue() {
+        UserContext.setUser(UserInfoDTO.builder().userId("7").userType(3).build());
+        OrderItemDO item = OrderItemDO.builder()
+                .userId(20L).orderNo("ORDER-1").eventId(101L).checkCode("CODE-1").build();
+        when(orderItemMapper.selectOne(any())).thenReturn(item);
+        when(merchantAdminRemoteService.getEvent(101L)).thenReturn(successEvent(101L, 11L));
+        when(merchantAdminRemoteService.getVenue(11L)).thenReturn(successVenue(11L, 8L));
+
+        ClientException ex = assertThrows(ClientException.class, () -> ticketOrderService.verifyTicket("CODE-1"));
+
+        assertEquals("无权核验其他场馆的电子票", ex.getMessage());
+        verify(orderMapper, never()).selectOne(any());
+        verify(orderItemMapper, never()).update(any(), any());
+    }
+
+    @Test
+    void shouldVerifyTicketInsideManagedVenue() {
+        UserContext.setUser(UserInfoDTO.builder().userId("7").userType(3).build());
+        OrderItemDO item = OrderItemDO.builder()
+                .userId(20L).orderNo("ORDER-1").eventId(101L).checkCode("CODE-1").build();
+        when(orderItemMapper.selectOne(any())).thenReturn(item);
+        when(merchantAdminRemoteService.getEvent(101L)).thenReturn(successEvent(101L, 11L));
+        when(merchantAdminRemoteService.getVenue(11L)).thenReturn(successVenue(11L, 7L));
+        when(orderMapper.selectOne(any())).thenReturn(OrderDO.builder().status(1).build());
+        when(orderItemMapper.update(isNull(), any())).thenReturn(1);
+
+        assertEquals("CODE-1", ticketOrderService.verifyTicket("CODE-1").getCheckCode());
+        verify(orderItemMapper).selectOne(org.mockito.ArgumentMatchers.argThat(query ->
+                !query.getSqlSegment().contains("user_id")));
+        verify(orderItemMapper).update(isNull(), org.mockito.ArgumentMatchers.argThat(update ->
+                update.getSqlSet().contains("checked_at")
+                        && update.getSqlSet().contains("checked_by")
+                        && update.getSqlSet().contains("is_checked")));
+    }
+
+    @Test
+    void shouldVerifyLegacyTicketWithNullCheckedFlag() {
+        UserContext.setUser(UserInfoDTO.builder().userId("1").userType(4).build());
+        OrderItemDO item = OrderItemDO.builder()
+                .userId(20L).orderNo("ORDER-LEGACY").eventId(101L).checkCode("LEGACY-CODE")
+                .isChecked(null)
+                .build();
+        when(orderItemMapper.selectOne(any())).thenReturn(item);
+        when(orderMapper.selectOne(any())).thenReturn(OrderDO.builder().status(1).build());
+        when(orderItemMapper.update(isNull(), any())).thenReturn(1);
+
+        assertEquals("LEGACY-CODE", ticketOrderService.verifyTicket("LEGACY-CODE").getCheckCode());
+        verify(orderItemMapper).update(isNull(), org.mockito.ArgumentMatchers.argThat(update ->
+                update.getSqlSegment().contains("is_checked")
+                        && update.getSqlSegment().contains("IS NULL")));
+    }
+
+    @Test
+    void shouldRouteNewTicketCodeAndOrderByUserId() {
+        UserContext.setUser(UserInfoDTO.builder().userId("1").userType(4).build());
+        String checkCode = TicketCheckCodeUtil.generate(20L);
+        assertEquals(32, checkCode.length());
+        OrderItemDO item = OrderItemDO.builder()
+                .userId(20L).orderNo("ORDER-2").eventId(101L).checkCode(checkCode).build();
+        when(orderItemMapper.selectOne(any())).thenReturn(item);
+        when(orderMapper.selectOne(any())).thenReturn(OrderDO.builder().status(1).build());
+        when(orderItemMapper.update(isNull(), any())).thenReturn(1);
+
+        assertEquals(checkCode, ticketOrderService.verifyTicket(checkCode).getCheckCode());
+        verify(orderItemMapper).selectOne(org.mockito.ArgumentMatchers.argThat(query ->
+                query.getSqlSegment().contains("user_id")));
+        verify(orderMapper).selectOne(org.mockito.ArgumentMatchers.argThat(query ->
+                query.getSqlSegment().contains("user_id")));
+    }
+
+    @Test
+    void shouldReturnPersistentRecentVerifyRecords() {
+        UserContext.setUser(UserInfoDTO.builder().userId("1").userType(4).build());
+        OrderItemDO item = OrderItemDO.builder()
+                .id(11L).orderNo("ORDER-1").checkCode("CODE-1")
+                .eventId(101L).isChecked(1).checkedBy(7L).checkedAt(new java.util.Date())
+                .build();
+        when(orderItemMapper.selectList(any())).thenReturn(List.of(item));
+
+        var records = ticketOrderService.getRecentVerifyRecords(101L);
+
+        assertEquals(1, records.size());
+        assertEquals(7L, records.get(0).getCheckedBy());
+        verify(orderItemMapper).selectList(org.mockito.ArgumentMatchers.argThat(query ->
+                query.getSqlSegment().contains("event_id")
+                        && query.getSqlSegment().contains("checked_at")));
+    }
+
+    @Test
+    void shouldAllowPathTokenAfterStockIsIncreased() {
+        UserContext.setUser(UserInfoDTO.builder().userId("7").userType(1).build());
+        ReflectionTestUtils.setField(ticketOrderService, "autoWarmStockOnMiss", false);
+        MerchantTicketSkuDetailRespDTO soldOut = new MerchantTicketSkuDetailRespDTO();
+        soldOut.setId(99L);
+        soldOut.setRemainingStock(0);
+        MerchantTicketSkuDetailRespDTO restocked = new MerchantTicketSkuDetailRespDTO();
+        restocked.setId(99L);
+        restocked.setRemainingStock(5);
+        when(merchantAdminRemoteService.getTicketSku(99L)).thenReturn(
+                new Result<MerchantTicketSkuDetailRespDTO>().setCode(Result.SUCCESS_CODE).setData(soldOut),
+                new Result<MerchantTicketSkuDetailRespDTO>().setCode(Result.SUCCESS_CODE).setData(restocked));
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+
+        assertThrows(ClientException.class, () -> ticketOrderService.generatePathToken(99L));
+        assertDoesNotThrow(() -> ticketOrderService.generatePathToken(99L));
     }
 
     @Test
@@ -280,5 +476,27 @@ class TicketOrderServiceImplTest {
         verify(ticketSkuMapper).decrementStock(200326L, 1, 1);
         verify(orderMapper).insert(any());
         verify(orderItemMapper).insert(any());
+    }
+
+    private MerchantEventRespDTO event(Long eventId, Long venueId) {
+        MerchantEventRespDTO event = new MerchantEventRespDTO();
+        event.setId(eventId);
+        event.setVenueId(venueId);
+        return event;
+    }
+
+    private Result<MerchantEventRespDTO> successEvent(Long eventId, Long venueId) {
+        return new Result<MerchantEventRespDTO>()
+                .setCode(Result.SUCCESS_CODE)
+                .setData(event(eventId, venueId));
+    }
+
+    private Result<MerchantVenueRespDTO> successVenue(Long venueId, Long ownerUserId) {
+        MerchantVenueRespDTO venue = new MerchantVenueRespDTO();
+        venue.setId(venueId);
+        venue.setOwnerUserId(ownerUserId);
+        return new Result<MerchantVenueRespDTO>()
+                .setCode(Result.SUCCESS_CODE)
+                .setData(venue);
     }
 }

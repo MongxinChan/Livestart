@@ -2,11 +2,18 @@
 --
 -- KEYS[1]: stock key
 -- KEYS[2]: user limit key
+-- KEYS[3]: optional rollback marker for MQ retry safety
 -- ARGV[1]: rollback stock count
 -- ARGV[2]: rollback user limit count
 
 local rollbackStock = tonumber(ARGV[1])
 local rollbackLimit = tonumber(ARGV[2])
+
+if KEYS[3] ~= nil and KEYS[3] ~= '' then
+    if redis.call('SET', KEYS[3], '1', 'NX', 'EX', 2592000) == false then
+        return 0
+    end
+end
 
 if rollbackStock ~= nil and rollbackStock > 0 then
     redis.call('INCRBY', KEYS[1], rollbackStock)

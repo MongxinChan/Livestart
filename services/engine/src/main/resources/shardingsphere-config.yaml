@@ -1,6 +1,6 @@
 ######################################
 # ShardingSphere 分片配置
-# 订单库：单库（ds_order）16分表
+# 订单库：2 个物理库（ds_order_0、ds_order_1），每库 16 分表
 #   - t_order_{0..15}       按 user_id hash
 #   - t_order_item_{0..15}  按 user_id hash（Binding Table）
 # 公共库：ds_common（t_event, t_ticket_sku, t_event_config 等）
@@ -14,6 +14,7 @@ dataSources:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
     jdbcUrl: jdbc:mysql://127.0.0.1:3306/ds_order_0?useUnicode=true&characterEncoding=UTF-8&rewriteBatchedStatements=true&allowMultiQueries=true&serverTimezone=Asia/Shanghai
+    # ShardingSphere JDBC 5.3.2 parses this YAML directly; Spring placeholders are not resolved here.
     username: &db_user root
     password: &db_pass 123456
   ds_order_1:
@@ -37,7 +38,7 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: order_database_inline
+            shardingAlgorithmName: order_database_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
@@ -50,7 +51,7 @@ rules:
         databaseStrategy:
           standard:
             shardingColumn: user_id
-            shardingAlgorithmName: order_database_inline
+            shardingAlgorithmName: order_database_hash_mod
         tableStrategy:
           standard:
             shardingColumn: user_id
@@ -61,10 +62,11 @@ rules:
     bindingTables:
       - t_order,t_order_item
     shardingAlgorithms:
-      order_database_inline:
-        type: INLINE
+      order_database_hash_mod:
+        type: CLASS_BASED
         props:
-          algorithm-expression: ds_order_${Math.abs(user_id.hashCode()) % 2}
+          strategy: standard
+          algorithmClassName: com.mongxin.livestart.engine.dao.sharding.OrderDatabaseHashModShardingAlgorithm
       order_table_hash_mod:
         type: CLASS_BASED
         props:

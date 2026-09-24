@@ -25,9 +25,9 @@ public interface PayRemoteService {
     @PostMapping("/api/pay/refund")
     Result<RefundCreateResponseDTO> refund(@RequestBody RefundCreateRequestDTO request,
                                            @RequestHeader("userId") String userId,
-                                           @RequestHeader("X-Internal-Token") String internalToken);
+                                           @RequestHeader("X-Livestart-Internal-Token") String internalToken);
 
     @GetMapping("/api/pay/refund/{orderNo}")
     Result<RefundCreateResponseDTO> refundStatus(@PathVariable("orderNo") String orderNo,
-                                                 @RequestHeader("X-Internal-Token") String internalToken);
+                                                 @RequestHeader("X-Livestart-Internal-Token") String internalToken);
 }

@@ -12,7 +12,7 @@ import lombok.Data;
 public class TicketOrderCheckReqDTO {
 
     /**
-     * 电子票核销码（电脑端输入票码，模拟扫码）
+     * 电子票核销码，可手输或由扫码器读取。
      */
     @NotBlank(message = "电子票码不能为空")
     @Schema(description = "电子票核销码", requiredMode = Schema.RequiredMode.REQUIRED)

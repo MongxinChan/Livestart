@@ -8,6 +8,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Date;
+
 /**
  * 订单明细 / 电子票（分16表：t_order_item_{0..15}，与 t_order Binding Table）
  */
@@ -55,7 +57,7 @@ public class OrderItemDO {
     private Long seatId;
 
     /**
-     * 电子票唯一核销码（入场时扫描验证）
+     * 电子票唯一核销码。新票码为 T + 13 位用户 ID（36 进制）+ 18 位随机码；旧票码为 32 位 UUID。
      */
     private String checkCode;
 
@@ -63,4 +65,14 @@ public class OrderItemDO {
      * 入场状态 0:未入场 1:已入场
      */
     private Integer isChecked;
+
+    /**
+     * 成功核销时间；未核销时为空。
+     */
+    private Date checkedAt;
+
+    /**
+     * 成功核销的后台用户 ID；未核销时为空。
+     */
+    private Long checkedBy;
 }

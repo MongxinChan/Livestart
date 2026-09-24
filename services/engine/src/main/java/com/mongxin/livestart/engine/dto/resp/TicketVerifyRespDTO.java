@@ -53,4 +53,10 @@ public class TicketVerifyRespDTO {
      */
     @Schema(description = "核验时间")
     private Date checkedAt;
+
+    /**
+     * 核销操作人的后台用户 ID。
+     */
+    @Schema(description = "核销操作人的后台用户 ID")
+    private Long checkedBy;
 }

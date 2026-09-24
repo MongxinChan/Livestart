@@ -19,9 +19,6 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderTimeoutCloseFallbackJob {
 
-    private static final int ORDER_DATABASES_COUNT = 2;
-    private static final int ORDER_TABLES_COUNT = 16;
-
     private final JdbcTemplate jdbcTemplate;
     private final OrderItemMapper orderItemMapper;
     private final StockRestoreService stockRestoreService;
@@ -41,25 +38,25 @@ public class OrderTimeoutCloseFallbackJob {
             return;
         }
 
-        int closedCount = 0;
-        for (int databaseIndex = 0; databaseIndex < ORDER_DATABASES_COUNT; databaseIndex++) {
-            for (int tableIndex = 0; tableIndex < ORDER_TABLES_COUNT; tableIndex++) {
-                closedCount += closeTimeoutPendingOrdersInShard(databaseIndex, tableIndex);
-            }
-        }
+        int closedCount = closeTimeoutPendingOrdersInShards();
         if (closedCount > 0) {
             log.info("[超时关单兜底] 本轮关闭待支付订单数量={}", closedCount);
         }
     }
 
-    private int closeTimeoutPendingOrdersInShard(int databaseIndex, int tableIndex) {
-        String sql = String.format("""
+    /**
+     * 使用逻辑表查询，让 ShardingSphere 广播到全部订单分片。
+     * 不能在 ShardingSphere 数据源上直接写 ds_order_0.t_order_0 这类物理库表名，
+     * 否则会被当成未知逻辑库并在定时任务中持续抛出 UnknownDatabaseException。
+     */
+    private int closeTimeoutPendingOrdersInShards() {
+        String sql = """
                 SELECT id, order_no, user_id
-                FROM ds_order_%d.t_order_%d
+                FROM t_order
                 WHERE status = ? AND create_time <= DATE_SUB(NOW(), INTERVAL ? MINUTE)
                 ORDER BY create_time ASC
                 LIMIT ?
-                """, databaseIndex, tableIndex);
+                """;
         List<TimeoutOrderRow> rows = jdbcTemplate.query(sql, (rs, rowNum) -> new TimeoutOrderRow(
                 rs.getLong("id"),
                 rs.getString("order_no"),

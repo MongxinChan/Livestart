@@ -260,7 +260,6 @@ public class StockRestoreService {
         }
 
         taskMapper.markCompleted(task.getId());
-        releaseSoldOutMark(task.getSkuId());
         log.info("[库存补偿] 库存回补完成，bizType={}, orderNo={}, taskId={}, count={}",
                 task.getBizType(), task.getOrderNo(), task.getId(), task.getRestoreCount());
     }
@@ -338,9 +337,4 @@ public class StockRestoreService {
         return script;
     }
 
-    private void releaseSoldOutMark(Long skuId) {
-        if (skuId != null) {
-            com.mongxin.livestart.engine.service.impl.TicketOrderServiceImpl.releaseSoldOutMark(skuId);
-        }
-    }
 }

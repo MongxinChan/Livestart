@@ -14,6 +14,8 @@ import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketVerifyRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyRecordRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyStatsRespDTO;
 import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.framework.result.Result;
 import com.mongxin.livestart.framework.web.Results;
@@ -28,7 +30,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 /**
  * 购票订单 Controller
@@ -121,11 +126,26 @@ public class TicketOrderController {
     }
 
     /**
-     * 现场验票（电脑端输入票码，模拟扫码）。
+     * 现场验票。
      */
     @Operation(summary = "现场验票", description = "后台验票人员输入电子票核销码并完成入场核验")
+    @RateLimit(permits = 120, timeWindowMs = 1000)
     @PostMapping("/verify")
     public Result<TicketVerifyRespDTO> verifyTicket(@Valid @RequestBody TicketOrderCheckReqDTO requestParam) {
         return Results.success(ticketOrderService.verifyTicket(requestParam.getCheckCode()));
+    }
+
+    @Operation(summary = "验票统计", description = "超管查看全量统计，场馆管理员仅查看所属场馆的演出统计")
+    @GetMapping("/verify/stats")
+    public Result<TicketVerifyStatsRespDTO> getVerifyStats(
+            @RequestParam(value = "eventId", required = false) Long eventId) {
+        return Results.success(ticketOrderService.getVerifyStats(eventId));
+    }
+
+    @Operation(summary = "最近验票记录", description = "超管查看全量记录，场馆管理员仅查看所属场馆记录")
+    @GetMapping("/verify/records")
+    public Result<List<TicketVerifyRecordRespDTO>> getRecentVerifyRecords(
+            @RequestParam(value = "eventId", required = false) Long eventId) {
+        return Results.success(ticketOrderService.getRecentVerifyRecords(eventId));
     }
 }

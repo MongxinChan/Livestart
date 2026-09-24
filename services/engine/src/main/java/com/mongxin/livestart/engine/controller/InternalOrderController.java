@@ -34,7 +34,7 @@ public class InternalOrderController {
     public Result<PayableOrderResponse> getPayableOrder(@PathVariable String orderNo,
                                                         @RequestParam Long userId,
                                                         HttpServletRequest request) {
-        if (!internalToken.equals(request.getHeader("X-Internal-Token"))) {
+        if (!internalToken.equals(request.getHeader("X-Livestart-Internal-Token"))) {
             return failure("AUTH_ERROR", "内部调用认证失败");
         }
         OrderDO order = orderMapper.selectOne(Wrappers.lambdaQuery(OrderDO.class)

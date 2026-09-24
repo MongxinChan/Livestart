@@ -5,6 +5,9 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+/**
+ * 购票引擎内部透传的当前用户信息。
+ */
 @Data
 @Builder
 @NoArgsConstructor

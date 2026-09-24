@@ -1,7 +1,6 @@
 package com.mongxin.livestart.engine.mq.consumer;
 
 import cn.hutool.core.lang.Singleton;
-import cn.hutool.core.lang.UUID;
 import com.alibaba.fastjson2.JSON;
 import com.alibaba.fastjson2.TypeReference;
 import com.baomidou.mybatisplus.extension.toolkit.SqlHelper;
@@ -19,6 +18,7 @@ import com.mongxin.livestart.engine.mq.event.TicketOrderCreateEvent;
 import com.mongxin.livestart.engine.mq.producer.OrderDelayCloseProducer;
 import com.mongxin.livestart.engine.remote.MerchantAdminRemoteService;
 import com.mongxin.livestart.engine.remote.dto.MerchantTicketSkuDetailRespDTO;
+import com.mongxin.livestart.engine.toolkit.TicketCheckCodeUtil;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.framework.idempotent.NoMQDuplicateConsume;
 import com.mongxin.livestart.framework.result.Result;
@@ -112,7 +112,7 @@ public class TicketOrderCreateConsumer implements RocketMQListener<String> {
                                 .visitorId(visitorId)
                                 .eventId(latestSku.getEventId())
                                 .skuId(latestSku.getId())
-                                .checkCode(generateCheckCode())
+                                .checkCode(TicketCheckCodeUtil.generate(event.getUserId()))
                                 .isChecked(0)
                                 .build());
                     }
@@ -139,15 +139,20 @@ public class TicketOrderCreateConsumer implements RocketMQListener<String> {
                     event.getUserId(),
                     event.getEventId()
             );
-            stringRedisTemplate.execute(
+            String rollbackKey = "engine:stock:rollback:create-order:" + event.getOrderNo();
+            Long result = stringRedisTemplate.execute(
                     loadLongRedisScript(STOCK_ROLLBACK_LUA_PATH),
-                    List.of(stockKey, userLimitKey),
+                    List.of(stockKey, userLimitKey, rollbackKey),
                     String.valueOf(event.getCount()),
                     String.valueOf(event.getCount())
             );
+            if (result == null) {
+                throw new IllegalStateException("Redis 库存回滚脚本无返回值");
+            }
             log.info("[异步建单] Redis 库存与限购计数已回滚，orderNo={}", event.getOrderNo());
         } catch (Exception ex) {
             log.error("[异步建单] Redis 回滚失败，orderNo={}", event.getOrderNo(), ex);
+            throw new ServiceException("异步建单库存回滚失败，等待 MQ 重试");
         }
     }
 
@@ -169,10 +174,6 @@ public class TicketOrderCreateConsumer implements RocketMQListener<String> {
         } catch (Exception ex) {
             log.error("[异步建单] 延时关单消息发送失败，orderNo={}", event.getOrderNo(), ex);
         }
-    }
-
-    private String generateCheckCode() {
-        return UUID.fastUUID().toString(true).toUpperCase();
     }
 
     private TicketSkuDO decrementStockWithRetry(Long skuId, int count) {

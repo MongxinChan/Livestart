@@ -31,6 +31,8 @@ import com.mongxin.livestart.engine.dto.resp.AdminOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderDetailRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketOrderPageQueryRespDTO;
 import com.mongxin.livestart.engine.dto.resp.TicketVerifyRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyRecordRespDTO;
+import com.mongxin.livestart.engine.dto.resp.TicketVerifyStatsRespDTO;
 import com.mongxin.livestart.engine.mq.event.OrderPaySuccessEvent;
 import com.mongxin.livestart.engine.mq.event.TicketOrderCreateEvent;
 import com.mongxin.livestart.engine.mq.producer.OrderPaySuccessProducer;
@@ -48,6 +50,7 @@ import com.mongxin.livestart.engine.service.TicketOrderService;
 import com.mongxin.livestart.engine.service.RefundPolicyEvaluator;
 import com.mongxin.livestart.engine.service.StockRestoreService;
 import com.mongxin.livestart.engine.toolkit.StockDecrementReturnCombinedUtil;
+import com.mongxin.livestart.engine.toolkit.TicketCheckCodeUtil;
 import com.mongxin.livestart.framework.exception.ClientException;
 import com.mongxin.livestart.framework.exception.ServiceException;
 import com.mongxin.livestart.framework.result.Result;
@@ -71,7 +74,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -83,7 +85,6 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private static final String STOCK_DECREMENT_LUA_PATH = "lua/stock_decrement.lua";
     private static final String STOCK_ROLLBACK_LUA_PATH = "lua/stock_rollback.lua";
     private static final long USER_LIMIT_KEY_EXPIRE_SECONDS = 7 * 24 * 3600L;
-    private static final ConcurrentHashMap<Long, Boolean> SOLD_OUT_MAP = new ConcurrentHashMap<>();
     private static final String PATH_TOKEN_KEY = "engine:pathtoken:%s:%s";
     private static final String SECRET_SALT = "LiveStart_Engine_PathToken_Salt_Key";
     private static final int USER_TYPE_VENUE_ADMIN = 3;
@@ -123,10 +124,6 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         if (skuId == null) {
             throw new ClientException("票种不存在");
         }
-        if (Boolean.TRUE.equals(SOLD_OUT_MAP.get(skuId))) {
-            throw new ClientException("该票种已售罄");
-        }
-
         TicketSkuDO sku = loadTicketSku(skuId);
         if (sku == null) {
             log.warn("[下单Token] 票种不存在，拒绝生成 token，userId={}, skuId={}", userId, skuId);
@@ -135,6 +132,9 @@ public class TicketOrderServiceImpl implements TicketOrderService {
 
         log.info("[下单Token] 票种校验通过，userId={}, skuId={}, eventId={}, remainingStock={}",
                 userId, skuId, sku.getEventId(), sku.getRemainingStock());
+        if (sku.getRemainingStock() == null || sku.getRemainingStock() <= 0) {
+            throw new ClientException("该票种已售罄");
+        }
         ensureStockCacheWarm(sku);
 
         String tokenSource = userId + "_" + skuId + "_" + SECRET_SALT + "_" + UUID.fastUUID().toString(true);
@@ -148,10 +148,6 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     public String createOrder(TicketOrderCreateReqDTO requestParam, String pathToken) {
         String userId = requireUserId();
         Long skuId = requestParam.getSkuId();
-        if (Boolean.TRUE.equals(SOLD_OUT_MAP.get(skuId))) {
-            throw new ClientException("该票种已售罄");
-        }
-
         validatePathToken(pathToken, userId, skuId);
         validateVisitorCount(requestParam);
 
@@ -164,8 +160,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
 
         log.info("[下单] 票种查询成功，userId={}, skuId={}, eventId={}, remainingStock={}, count={}",
                 userId, skuId, sku.getEventId(), sku.getRemainingStock(), requestParam.getCount());
-        if (sku.getRemainingStock() <= 0) {
-            SOLD_OUT_MAP.put(skuId, true);
+        if (sku.getRemainingStock() == null || sku.getRemainingStock() <= 0) {
             throw new ClientException("该票种已售罄");
         }
 
@@ -193,9 +188,6 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         long errorCode = StockDecrementReturnCombinedUtil.extractErrorCode(luaResult);
         if (StockDecrementErrorEnum.isFail(errorCode)) {
             StockDecrementErrorEnum error = StockDecrementErrorEnum.fromCode(errorCode);
-            if (errorCode == StockDecrementErrorEnum.STOCK_INSUFFICIENT.getCode()) {
-                SOLD_OUT_MAP.put(sku.getId(), true);
-            }
             throw new ServiceException(error.getMessage());
         }
 
@@ -272,7 +264,9 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         }
 
         if (order.getStatus() == OrderStatusEnum.PAID.getCode()) {
-            log.info("[支付成功通知] 订单已支付，忽略重复通知，orderNo={}", orderNo);
+            // 订单状态可能已在上一次尝试中提交，但出票消息投递失败。重复通知必须重发消息，不能直接丢弃。
+            publishPaySuccessEvent(order, tradeNo);
+            log.info("[支付成功通知] 订单已支付，已重发出票事件，orderNo={}", orderNo);
             return;
         }
 
@@ -318,22 +312,34 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             }
         });
 
-        OrderPaySuccessEvent payEvent = OrderPaySuccessEvent.builder()
-                .orderNo(orderNo)
-                .userId(order.getUserId())
-                .tradeNo(tradeNo)
-                .build();
+        publishPaySuccessEvent(order, tradeNo);
+        log.info("[支付成功通知] 支付处理成功并已投递出票事件，orderNo={}", orderNo);
+    }
+
+    private void publishPaySuccessEvent(OrderDO order, String tradeNo) {
         if (shouldSkipMqSend()) {
-            log.info("[支付成功通知] 本地直写模式已处理支付成功，跳过 RocketMQ 投递，orderNo={}", orderNo);
+            log.info("[支付成功通知] 本地直写模式已处理支付成功，跳过 RocketMQ 投递，orderNo={}", order.getOrderNo());
             return;
         }
 
-        SendResult sendResult = orderPaySuccessProducer.sendMessage(payEvent);
-        if (!"SEND_OK".equals(sendResult.getSendStatus().name())) {
-            log.warn("[支付成功通知] 支付成功消息发送失败，orderNo={}", orderNo);
+        OrderPaySuccessEvent payEvent = OrderPaySuccessEvent.builder()
+                .orderNo(order.getOrderNo())
+                .userId(order.getUserId())
+                .tradeNo(tradeNo)
+                .build();
+        try {
+            SendResult sendResult = orderPaySuccessProducer.sendMessage(payEvent);
+            if (sendResult == null || sendResult.getSendStatus() == null
+                    || !"SEND_OK".equals(sendResult.getSendStatus().name())) {
+                throw new ServiceException("支付成功出票消息投递失败，等待 MQ 重试");
+            }
+        } catch (Exception ex) {
+            log.error("[支付成功通知] 支付成功出票消息发送失败，orderNo={}", order.getOrderNo(), ex);
+            if (ex instanceof ServiceException serviceException) {
+                throw serviceException;
+            }
+            throw new ServiceException("支付成功出票消息投递失败，等待 MQ 重试");
         }
-
-        log.info("[支付成功通知] 支付处理成功并已投递出票事件，orderNo={}", orderNo);
     }
 
     @Override
@@ -380,6 +386,9 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         List<OrderItemDO> items = orderItemMapper.selectList(Wrappers.lambdaQuery(OrderItemDO.class)
                 .eq(OrderItemDO::getOrderNo, requestParam.getOrderNo())
                 .eq(OrderItemDO::getUserId, order.getUserId()));
+        if (items.stream().anyMatch(item -> Integer.valueOf(1).equals(item.getIsChecked()))) {
+            throw new ClientException("已核销的电子票不能退票");
+        }
         OrderItemDO firstItem = CollUtil.getFirst(items);
         if (firstItem == null || firstItem.getEventId() == null) {
             throw new ClientException("订单缺少演出信息，无法计算退票规则");
@@ -571,6 +580,40 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     }
 
     @Override
+    public TicketVerifyStatsRespDTO getVerifyStats(Long eventId) {
+        Integer userType = UserContext.getUserType();
+        if (userType == null || (userType != USER_TYPE_SUPER_ADMIN && userType != USER_TYPE_VENUE_ADMIN)) {
+            throw new ClientException("当前用户无验票统计查看权限");
+        }
+
+        AdminOrderPageQueryReqDTO scopeRequest = new AdminOrderPageQueryReqDTO();
+        scopeRequest.setEventId(eventId);
+        List<Long> visibleEventIds = resolveAdminVisibleEventIds(userType, scopeRequest);
+        if (visibleEventIds != null && CollUtil.isEmpty(visibleEventIds)) {
+            return buildVerifyStats(0L, 0L);
+        }
+
+        Long totalCount = orderItemMapper.countPaidTickets(visibleEventIds, false);
+        Long checkedCount = orderItemMapper.countPaidTickets(visibleEventIds, true);
+        return buildVerifyStats(totalCount, checkedCount);
+    }
+
+    private TicketVerifyStatsRespDTO buildVerifyStats(Long totalCount, Long checkedCount) {
+        long total = totalCount == null ? 0L : totalCount;
+        long checked = checkedCount == null ? 0L : checkedCount;
+        TicketVerifyStatsRespDTO result = new TicketVerifyStatsRespDTO();
+        result.setTotalCount(total);
+        result.setCheckedCount(checked);
+        result.setUncheckedCount(Math.max(total - checked, 0L));
+        result.setCheckedRate(total == 0L
+                ? BigDecimal.ZERO
+                : BigDecimal.valueOf(checked)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(BigDecimal.valueOf(total), 2, java.math.RoundingMode.HALF_UP));
+        return result;
+    }
+
+    @Override
     public TicketVerifyRespDTO verifyTicket(String checkCode) {
         Integer userType = UserContext.getUserType();
         if (userType == null || (userType != USER_TYPE_SUPER_ADMIN && userType != USER_TYPE_VENUE_ADMIN)) {
@@ -581,21 +624,41 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             throw new ClientException("电子票码不能为空");
         }
 
-        OrderItemDO item = orderItemMapper.selectOne(Wrappers.lambdaQuery(OrderItemDO.class)
-                .eq(OrderItemDO::getCheckCode, normalizedCode));
+        Long ticketUserId = parseTicketUserId(normalizedCode);
+        var ticketQuery = Wrappers.lambdaQuery(OrderItemDO.class)
+                .eq(OrderItemDO::getCheckCode, normalizedCode);
+        if (ticketUserId != null) {
+            ticketQuery.eq(OrderItemDO::getUserId, ticketUserId);
+        }
+        OrderItemDO item = orderItemMapper.selectOne(ticketQuery);
         if (item == null) {
             throw new ClientException("无效电子票码");
         }
 
-        OrderDO order = getOrderByOrderNo(item.getOrderNo());
+        if (userType == USER_TYPE_VENUE_ADMIN) {
+            MerchantEventRespDTO event = loadEventDetail(item.getEventId(), new HashMap<>());
+            if (event == null || event.getVenueId() == null
+                    || !isVenueManagedByCurrentUser(event.getVenueId(), parseCurrentUserId(), new HashMap<>())) {
+                throw new ClientException("无权核验其他场馆的电子票");
+            }
+        }
+
+        OrderDO order = getOrderByNo(item.getOrderNo(), item.getUserId());
         if (order == null || !OrderStatusEnum.PAID.equals(OrderStatusEnum.fromCode(order.getStatus()))) {
             throw new ClientException("该电子票尚未支付或订单已失效");
         }
 
+        Date checkedAt = new Date();
+        Long checkedBy = parseCurrentUserId();
         int affected = orderItemMapper.update(null, Wrappers.lambdaUpdate(OrderItemDO.class)
                 .eq(OrderItemDO::getCheckCode, normalizedCode)
-                .eq(OrderItemDO::getIsChecked, 0)
-                .set(OrderItemDO::getIsChecked, 1));
+                .eq(OrderItemDO::getUserId, item.getUserId())
+                .and(wrapper -> wrapper.eq(OrderItemDO::getIsChecked, 0)
+                        .or()
+                        .isNull(OrderItemDO::getIsChecked))
+                .set(OrderItemDO::getIsChecked, 1)
+                .set(OrderItemDO::getCheckedAt, checkedAt)
+                .set(OrderItemDO::getCheckedBy, checkedBy));
         if (!SqlHelper.retBool(affected)) {
             throw new ClientException("该电子票已核验");
         }
@@ -607,9 +670,42 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         result.setSkuId(item.getSkuId());
         result.setVisitorId(item.getVisitorId());
         result.setStatus("已入场");
-        result.setCheckedAt(new Date());
+        result.setCheckedAt(checkedAt);
+        result.setCheckedBy(checkedBy);
         log.info("[现场验票] 核验成功，orderNo={}, checkCode={}", item.getOrderNo(), normalizedCode);
         return result;
+    }
+
+    @Override
+    public List<TicketVerifyRecordRespDTO> getRecentVerifyRecords(Long eventId) {
+        Integer userType = UserContext.getUserType();
+        if (userType == null || (userType != USER_TYPE_SUPER_ADMIN && userType != USER_TYPE_VENUE_ADMIN)) {
+            throw new ClientException("当前用户无验票权限");
+        }
+        AdminOrderPageQueryReqDTO scopeRequest = new AdminOrderPageQueryReqDTO();
+        scopeRequest.setEventId(eventId);
+        List<Long> visibleEventIds = resolveAdminVisibleEventIds(userType, scopeRequest);
+        if (visibleEventIds != null && visibleEventIds.isEmpty()) {
+            return List.of();
+        }
+        var query = Wrappers.lambdaQuery(OrderItemDO.class)
+                .eq(OrderItemDO::getIsChecked, 1)
+                .isNotNull(OrderItemDO::getCheckedAt)
+                .orderByDesc(OrderItemDO::getCheckedAt)
+                .last("LIMIT 10");
+        if (visibleEventIds != null) {
+            query.in(OrderItemDO::getEventId, visibleEventIds);
+        }
+        return orderItemMapper.selectList(query).stream().map(item -> {
+            TicketVerifyRecordRespDTO record = new TicketVerifyRecordRespDTO();
+            record.setId(item.getId());
+            record.setOrderNo(item.getOrderNo());
+            record.setCheckCode(item.getCheckCode());
+            record.setEventId(item.getEventId());
+            record.setCheckedAt(item.getCheckedAt());
+            record.setCheckedBy(item.getCheckedBy());
+            return record;
+        }).toList();
     }
     @Override
     public TicketOrderDetailRespDTO getOrderDetail(String orderNo) {
@@ -672,12 +768,6 @@ public class TicketOrderServiceImpl implements TicketOrderService {
         } catch (Exception redisEx) {
             log.error("[下单] Redis 库存与限购回滚失败，stockKey={}, userLimitKey={}, count={}",
                     stockKey, userLimitKey, count, redisEx);
-        }
-    }
-
-    public static void releaseSoldOutMark(Long skuId) {
-        if (skuId != null) {
-            SOLD_OUT_MAP.remove(skuId);
         }
     }
 
@@ -748,7 +838,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
                             .visitorId(visitorId)
                             .eventId(latestSku.getEventId())
                             .skuId(latestSku.getId())
-                            .checkCode(UUID.fastUUID().toString(true).toUpperCase())
+                            .checkCode(TicketCheckCodeUtil.generate(event.getUserId()))
                             .isChecked(0)
                             .build();
                     orderItemMapper.insert(item);
@@ -777,6 +867,17 @@ public class TicketOrderServiceImpl implements TicketOrderService {
     private OrderDO getOrderByOrderNo(String orderNo) {
         return orderMapper.selectOne(Wrappers.lambdaQuery(OrderDO.class)
                 .eq(OrderDO::getOrderNo, orderNo));
+    }
+
+    private Long parseTicketUserId(String checkCode) {
+        if (!checkCode.startsWith("T") || checkCode.length() != 32) {
+            return null;
+        }
+        try {
+            return Long.parseLong(checkCode.substring(1, 14), 36);
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private String requireUserId() {
@@ -990,7 +1091,7 @@ public class TicketOrderServiceImpl implements TicketOrderService {
             return;
         }
         List<Long> userIds = records.stream().map(AdminOrderPageQueryRespDTO::getUserId).distinct().toList();
-        Result<List<AdminUserSimpleRespDTO>> result = adminRemoteService.listSimpleUsersByIds(userIds);
+        Result<List<AdminUserSimpleRespDTO>> result = adminRemoteService.listSimpleUsersByIds(userIds, internalToken);
         if (result == null || result.isFail() || CollUtil.isEmpty(result.getData())) {
             records.forEach(each -> each.setUsername(String.valueOf(each.getUserId())));
             return;
