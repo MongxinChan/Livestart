@@ -32,9 +32,14 @@ public interface EventMapper extends BaseMapper<EventDO> {
             "(SELECT MIN(s2.selling_price) FROM t_ticket_sku s2 WHERE s2.event_id = e.id) AS min_price " +
             "FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "WHERE (e.status IS NULL OR e.status IN (1, 2, 3)) " +
+            "WHERE e.source_event_id IS NULL AND (e.status IS NULL OR e.status IN (1, 2, 3)) " +
             "<if test='keyword != null and keyword != \"\"'>" +
-            "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +
+            "  AND (e.title LIKE CONCAT('%', #{keyword}, '%') " +
+            "    OR v.name LIKE CONCAT('%', #{keyword}, '%') " +
+            "    OR EXISTS (SELECT 1 FROM t_event_performer ep2 " +
+            "      JOIN t_performer p2 ON p2.id = ep2.performer_id " +
+            "      WHERE ep2.event_id = e.id AND p2.status = 1 " +
+            "        AND p2.name LIKE CONCAT('%', #{keyword}, '%'))) " +
             "</if>" +
             "<if test='eventType != null'>" +
             "  AND e.event_type = #{eventType} " +
@@ -69,9 +74,14 @@ public interface EventMapper extends BaseMapper<EventDO> {
     @Select("<script>" +
             "SELECT COUNT(DISTINCT e.id) FROM t_event e " +
             "LEFT JOIN t_venue v ON e.venue_id = v.id " +
-            "WHERE (e.status IS NULL OR e.status IN (1, 2, 3)) " +
+            "WHERE e.source_event_id IS NULL AND (e.status IS NULL OR e.status IN (1, 2, 3)) " +
             "<if test='keyword != null and keyword != \"\"'>" +
-            "  AND e.title LIKE CONCAT('%', #{keyword}, '%') " +
+            "  AND (e.title LIKE CONCAT('%', #{keyword}, '%') " +
+            "    OR v.name LIKE CONCAT('%', #{keyword}, '%') " +
+            "    OR EXISTS (SELECT 1 FROM t_event_performer ep2 " +
+            "      JOIN t_performer p2 ON p2.id = ep2.performer_id " +
+            "      WHERE ep2.event_id = e.id AND p2.status = 1 " +
+            "        AND p2.name LIKE CONCAT('%', #{keyword}, '%'))) " +
             "</if>" +
             "<if test='eventType != null'>" +
             "  AND e.event_type = #{eventType} " +

@@ -51,13 +51,23 @@ public class EventDO {
      */
     private Integer status;
 
-    /** 关联场馆名称和城市，由搜索查询别名映射。 */
+    /**
+     * 关联场馆名称，由搜索查询别名映射。
+     */
     private String venueName;
+
+    /**
+     * 关联场馆城市，由搜索查询别名映射。
+     */
     private String venueCity;
 
-    /** 关联艺人名称，由搜索查询聚合。 */
+    /**
+     * 关联艺人名称，由搜索查询聚合。
+     */
     private String performerName;
 
-    /** 票档最低售价，由搜索查询聚合。 */
+    /**
+     * 票档最低售价，由搜索查询聚合。
+     */
     private BigDecimal minPrice;
 }

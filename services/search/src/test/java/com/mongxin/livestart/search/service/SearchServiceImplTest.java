@@ -125,7 +125,7 @@ class SearchServiceImplTest {
     }
 
     @Test
-    void searchEvents_withAllFilters_shouldPassAllParamsCorrectly() {
+    void searchEvents_withUnsupportedEventType_shouldRejectRequest() {
         EventSearchReqDTO req = new EventSearchReqDTO();
         req.setKeyword("音乐节");
         req.setEventType(2);
@@ -135,15 +135,9 @@ class SearchServiceImplTest {
         req.setPageNum(2);
         req.setPageSize(5);
 
-        when(eventMapper.searchEventsWithFilters(eq("音乐节"), eq(2), eq("上海"), eq(200), eq(800), eq(5), eq(5)))
-                .thenReturn(List.of(buildEvent(1L, "草莓音乐节", 2)));
-        when(eventMapper.countEventsWithFilters(eq("音乐节"), eq(2), eq("上海"), eq(200), eq(800))).thenReturn(6L);
-
-        IPage<EventSearchRespDTO> result = searchService.searchEvents(req);
-
-        assertEquals(1, result.getRecords().size());
-        assertEquals(6L, result.getTotal());
-        assertEquals(2L, result.getPages());
+        assertThrows(com.mongxin.livestart.framework.exception.ClientException.class,
+                () -> searchService.searchEvents(req));
+        verifyNoInteractions(eventMapper);
     }
 
     @Test
@@ -182,6 +176,7 @@ class SearchServiceImplTest {
     void searchEvents_shouldNotRecordHotSearchForBlankKeyword() {
         EventSearchReqDTO req = new EventSearchReqDTO();
         req.setKeyword("  ");
+        req.setCity("  ");
 
         when(eventMapper.searchEventsWithFilters(any(), any(), any(), any(), any(), anyInt(), anyInt()))
                 .thenReturn(Collections.emptyList());
@@ -190,6 +185,29 @@ class SearchServiceImplTest {
         searchService.searchEvents(req);
 
         verify(zSetOperations, never()).incrementScore(anyString(), anyString(), anyDouble());
+        verify(eventMapper).searchEventsWithFilters(
+                isNull(), isNull(), isNull(), isNull(), isNull(), eq(0), eq(10));
+    }
+
+    @Test
+    void searchEvents_withNegativePrice_shouldRejectRequest() {
+        EventSearchReqDTO req = new EventSearchReqDTO();
+        req.setMinPrice(-1);
+
+        assertThrows(com.mongxin.livestart.framework.exception.ClientException.class,
+                () -> searchService.searchEvents(req));
+        verifyNoInteractions(eventMapper);
+    }
+
+    @Test
+    void searchEvents_withReversedPriceRange_shouldRejectRequest() {
+        EventSearchReqDTO req = new EventSearchReqDTO();
+        req.setMinPrice(500);
+        req.setMaxPrice(100);
+
+        assertThrows(com.mongxin.livestart.framework.exception.ClientException.class,
+                () -> searchService.searchEvents(req));
+        verifyNoInteractions(eventMapper);
     }
 
     @Test

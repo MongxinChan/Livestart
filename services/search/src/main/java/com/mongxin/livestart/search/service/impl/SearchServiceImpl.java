@@ -14,6 +14,7 @@ import com.mongxin.livestart.search.dto.resp.EventSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.HotSearchRespDTO;
 import com.mongxin.livestart.search.dto.resp.PerformerSearchRespDTO;
 import com.mongxin.livestart.search.service.SearchService;
+import com.mongxin.livestart.framework.exception.ClientException;
 import cn.hutool.core.bean.BeanUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -47,9 +48,15 @@ public class SearchServiceImpl implements SearchService {
     @Override
     public IPage<EventSearchRespDTO> searchEvents(EventSearchReqDTO req) {
         log.info("[搜索] 检索演出，req={}", req);
+        if (req.getEventType() != null && req.getEventType() != 0 && req.getEventType() != 1) {
+            throw new ClientException("演出类型只能为 Livehouse 或演唱会");
+        }
+        validatePriceRange(req.getMinPrice(), req.getMaxPrice());
+        String keyword = normalizeFilter(req.getKeyword());
+        String city = normalizeFilter(req.getCity());
 
         // 记录热搜词
-        recordHotSearch(req.getKeyword());
+        recordHotSearch(keyword);
 
         // 分页计算
         int pageNum = req.getPageNum() != null ? Math.min(Math.max(req.getPageNum(), 1), MAX_PAGE_NUM) : 1;
@@ -58,9 +65,9 @@ public class SearchServiceImpl implements SearchService {
 
         // 调用自定义 SQL 查询
         List<EventDO> eventList = eventMapper.searchEventsWithFilters(
-                req.getKeyword(),
+                keyword,
                 req.getEventType(),
-                req.getCity(),
+                city,
                 req.getMinPrice(),
                 req.getMaxPrice(),
                 offset,
@@ -69,9 +76,9 @@ public class SearchServiceImpl implements SearchService {
 
         // 查询总数
         long total = eventMapper.countEventsWithFilters(
-                req.getKeyword(),
+                keyword,
                 req.getEventType(),
-                req.getCity(),
+                city,
                 req.getMinPrice(),
                 req.getMaxPrice()
         );
@@ -91,6 +98,19 @@ public class SearchServiceImpl implements SearchService {
         }
 
         return resultPage;
+    }
+
+    private void validatePriceRange(Integer minPrice, Integer maxPrice) {
+        if ((minPrice != null && minPrice < 0) || (maxPrice != null && maxPrice < 0)) {
+            throw new ClientException("价格不能为负数");
+        }
+        if (minPrice != null && maxPrice != null && minPrice > maxPrice) {
+            throw new ClientException("最低价格不能高于最高价格");
+        }
+    }
+
+    private String normalizeFilter(String value) {
+        return StrUtil.isBlank(value) ? null : value.trim();
     }
 
     @Override
@@ -206,7 +226,7 @@ public class SearchServiceImpl implements SearchService {
     private EventSearchRespDTO toEventSearchRespDTO(EventDO item) {
         EventSearchRespDTO dto = BeanUtil.copyProperties(item, EventSearchRespDTO.class);
         // 演出类型文本
-        dto.setType(item.getEventType() != null && item.getEventType() == 0 ? "Livehouse" : "演唱会");
+        dto.setType(resolveEventType(item.getEventType()));
         // 封面图（直接使用 posterUrl）
         dto.setCover(item.getPosterUrl());
         // 格式化演出时间
@@ -216,6 +236,13 @@ public class SearchServiceImpl implements SearchService {
         dto.setArtist(StrUtil.blankToDefault(item.getPerformerName(), ""));
         dto.setMinPrice(item.getMinPrice() == null ? java.math.BigDecimal.ZERO : item.getMinPrice());
         return dto;
+    }
+
+    private String resolveEventType(Integer eventType) {
+        if (eventType == null) {
+            return "未知类型";
+        }
+        return eventType == 0 ? "Livehouse" : eventType == 1 ? "演唱会" : "未知类型";
     }
 
     /**
