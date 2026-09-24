@@ -14,5 +14,5 @@ public interface OrderRemoteService {
     @GetMapping("/api/engine/internal/orders/{orderNo}/payable")
     Result<PayableOrderDTO> getPayableOrder(@PathVariable("orderNo") String orderNo,
                                             @RequestParam("userId") Long userId,
-                                            @RequestHeader("X-Internal-Token") String internalToken);
+                                            @RequestHeader("X-Livestart-Internal-Token") String internalToken);
 }

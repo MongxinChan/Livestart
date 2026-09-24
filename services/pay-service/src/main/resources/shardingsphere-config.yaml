@@ -1,16 +1,19 @@
+mode:
+  type: Standalone
+
 dataSources:
   ds_0:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: ${PAY_DB_0_URL:jdbc:mysql://127.0.0.1:3306/live_start_pay_0?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
-    username: ${PAY_DB_USERNAME:root}
-    password: ${PAY_DB_PASSWORD:123456}
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start_pay_0?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
   ds_1:
     dataSourceClassName: com.zaxxer.hikari.HikariDataSource
     driverClassName: com.mysql.cj.jdbc.Driver
-    jdbcUrl: ${PAY_DB_1_URL:jdbc:mysql://127.0.0.1:3306/live_start_pay_1?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai}
-    username: ${PAY_DB_USERNAME:root}
-    password: ${PAY_DB_PASSWORD:123456}
+    jdbcUrl: jdbc:mysql://127.0.0.1:3306/live_start_pay_1?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
 
 rules:
   - !SHARDING

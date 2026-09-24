@@ -27,7 +27,7 @@ public class RefundController {
     @PostMapping
     public Result<RefundCreateResponse> create(@Valid @RequestBody RefundCreateRequest request,
                                                @RequestHeader("userId") Long userId,
-                                               @RequestHeader("X-Internal-Token") String internalToken) {
+                                               @RequestHeader("X-Livestart-Internal-Token") String internalToken) {
         if (!payServiceProperties.getInternalToken().equals(internalToken)) {
             throw new ClientException("内部调用认证失败");
         }
@@ -36,7 +36,7 @@ public class RefundController {
 
     @GetMapping("/{orderNo}")
     public Result<RefundCreateResponse> query(@PathVariable String orderNo,
-                                               @RequestHeader("X-Internal-Token") String internalToken) {
+                                               @RequestHeader("X-Livestart-Internal-Token") String internalToken) {
         if (!payServiceProperties.getInternalToken().equals(internalToken)) {
             throw new ClientException("内部调用认证失败");
         }
