@@ -1,5 +1,5 @@
 import { handleMockRequest } from '@/composables/mockHandlers'
-import { apiState } from '@/composables/sessionState'
+import { apiState, clearSession } from '@/composables/sessionState'
 
 export { apiState } from '@/composables/sessionState'
 
@@ -37,6 +37,12 @@ export async function request<T = any>(url: string, options: RequestInit = {}): 
   const response = await fetch(fullUrl, { ...options, headers })
 
   if (!response.ok) {
+    if (response.status === 401) {
+      clearSession()
+      const redirect = `${window.location.pathname}${window.location.search}`
+      window.location.href = `/?auth=1&redirect=${encodeURIComponent(redirect)}`
+      throw new Error('登录态已失效，请重新登录')
+    }
     if (response.status === 429) {
       throw new Error('抢票请求过于频繁，请稍后再试 (HTTP 429)')
     }

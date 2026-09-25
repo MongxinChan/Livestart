@@ -15,12 +15,14 @@
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
     "ant-design-vue": "^4.2.6",
+    "axios": "^1.13.2",
+    "qrcode": "^1.5.4",
     "vue": "^3.5.13",
-    "vue-router": "^4.5.1",
-    "axios": "^1.13.2"
+    "vue-router": "^4.5.1"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",
+    "@types/qrcode": "^1.5.6",
     "@vitejs/plugin-vue": "^5.2.3",
     "typescript": "~5.6.3",
     "vite": "^6.0.0",

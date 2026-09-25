@@ -1,18 +1,24 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { BellOutlined, SearchOutlined, ShoppingOutlined } from '@ant-design/icons-vue'
-import { request } from '@/composables/infra/useRequest'
+import { BellOutlined, SearchOutlined, ShoppingOutlined, WalletOutlined } from '@ant-design/icons-vue'
+import { apiState, request } from '@/composables/infra/useRequest'
 import { requireAuth } from '@/composables/useAuth'
 import type { ViewId } from '@/types'
 
 export function useNav() {
   const router = useRouter()
 
-  const navOptions = [
-    { value: 'square', label: '演出广场', icon: SearchOutlined },
-    { value: 'orders', label: '电子票夹', icon: ShoppingOutlined },
-    { value: 'reminders', label: '我的提醒', icon: BellOutlined },
-  ]
+  const navOptions = computed(() => {
+    const options = [
+      { value: 'square', label: '演出广场', icon: SearchOutlined },
+      { value: 'orders', label: '电子票夹', icon: ShoppingOutlined },
+      { value: 'reminders', label: '我的提醒', icon: BellOutlined },
+    ]
+    if (Number(apiState.currentUser?.userType) === 2) {
+      options.push({ value: 'artist-wallet', label: '艺人钱包', icon: WalletOutlined })
+    }
+    return options
+  })
 
   function onNavChange(val: string | number) {
     const view = val as ViewId
@@ -39,6 +45,13 @@ export function useNav() {
         return
       }
       void router.push({ name: 'Profile' })
+      return
+    }
+    if (view === 'artist-wallet') {
+      if (!requireAuth()) {
+        return
+      }
+      void router.push({ name: 'ArtistWallet' })
     }
   }
 

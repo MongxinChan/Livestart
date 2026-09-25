@@ -14,6 +14,7 @@ export interface LiveEvent {
   date: string
   saleStartTime?: string
   stageId?: number | string
+  distributionEventId?: number | string
   stageNo?: number
   stageName?: string
   venue: string
@@ -46,6 +47,13 @@ export interface Order {
   status: OrderStatus
   statusDesc: string
   createTime: string
+  checkCode: string
+  isChecked: number
+}
+
+export interface TicketItem {
+  id: number | string
+  visitorId: number | string
   checkCode: string
   isChecked: number
 }
@@ -94,7 +102,7 @@ export interface LiveShard {
   revenue: number
 }
 
-export type ThemeId = 'cyberpunk-dark' | 'minimalist-light' | 'damai-crimson' | 'showstart-neon'
+export type ThemeId = 'cyberpunk-dark' | 'minimalist-light' | 'damai-crimson' | 'showstart-neon' | 'orangesoda-fizz'
 
 export interface ThemeOption {
   id: ThemeId
@@ -117,4 +125,4 @@ export interface TicketReminder {
   reminderMessage: string
 }
 
-export type ViewId = 'square' | 'cabin' | 'orders' | 'reminders' | 'profile'
+export type ViewId = 'square' | 'cabin' | 'orders' | 'reminders' | 'profile' | 'artist-wallet'

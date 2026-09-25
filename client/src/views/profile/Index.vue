@@ -100,6 +100,20 @@
         </a-form>
       </section>
     </div>
+
+    <section v-if="isFan" class="profile-panel earning-panel">
+      <div class="earning-panel__header">
+        <div>
+          <h2>绑定艺人推广关系</h2>
+          <p>绑定后，后续支付订单会归因到该艺人的推广渠道。</p>
+        </div>
+      </div>
+      <a-space direction="vertical" style="width: 100%">
+        <a-input v-model:value="inviteCode" placeholder="输入艺人推广码" />
+        <a-button type="primary" :loading="binding" @click="bindArtist">确认绑定</a-button>
+      </a-space>
+    </section>
+
   </section>
 </template>
 
@@ -113,6 +127,10 @@ import { persistSession } from '@/composables/sessionState'
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const uploading = ref(false)
 const saving = ref(false)
+const binding = ref(false)
+const inviteCode = ref('')
+
+const isFan = computed(() => Number(apiState.currentUser?.userType) === 1)
 
 const genderOptions = [
   { label: '保密', value: 0 },
@@ -250,6 +268,25 @@ async function saveProfile() {
   }
 }
 
+async function bindArtist() {
+  if (!inviteCode.value.trim()) {
+    message.warning('请输入艺人推广码')
+    return
+  }
+  binding.value = true
+  try {
+    await request('/api/live-start/distribution/v1/artist/bind', {
+      method: 'POST',
+      body: JSON.stringify({ inviteCode: inviteCode.value.trim() }),
+    })
+    message.success('艺人绑定成功')
+  } catch (err: any) {
+    message.error(err.message || '绑定失败')
+  } finally {
+    binding.value = false
+  }
+}
+
 hydrateForm()
 </script>
 
@@ -258,6 +295,30 @@ hydrateForm()
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+.earning-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.earning-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.earning-panel h2 {
+  margin: 0;
+  color: var(--ls-text-primary);
+  font-size: 18px;
+}
+
+.earning-panel p {
+  margin: 6px 0 0;
+  color: var(--ls-text-secondary);
 }
 
 .profile-header {

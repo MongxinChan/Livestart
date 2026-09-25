@@ -1,7 +1,7 @@
 import { ref, onMounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { request, apiState } from '@/composables/infra/useRequest'
-import type { Order } from '@/types'
+import type { Order, TicketItem } from '@/types'
 
 export function useMyTickets() {
   const orders = ref<Order[]>([])
@@ -9,7 +9,7 @@ export function useMyTickets() {
   async function fetchOrders() {
     try {
       const data = await request<{ records: Order[] }>('/api/live-start/engine/order/page?current=1&size=50')
-      orders.value = data.records
+      orders.value = (data.records || []).map((order) => ({ ...order }))
     } catch (err) {
       console.error('拉取订单失败', err)
     }
@@ -22,47 +22,50 @@ export function useMyTickets() {
 
   const showCheckout = ref(false)
   const payingOrder = ref<Order | null>(null)
-  const payMethod = ref('wx')
+  const isPaying = ref(false)
+  const showTicketDetails = ref(false)
+  const ticketDetailLoading = ref(false)
+  const ticketItems = ref<TicketItem[]>([])
+
+  async function openTicketDetails(order: Order) {
+    showTicketDetails.value = true
+    ticketDetailLoading.value = true
+    ticketItems.value = []
+    try {
+      const detail = await request<{ ticketItems: TicketItem[] }>(
+        `/api/live-start/engine/order/detail/${encodeURIComponent(order.orderNo)}`
+      )
+      ticketItems.value = detail.ticketItems || []
+    } catch (err: any) {
+      message.error(`加载电子票失败: ${err.message}`)
+    } finally {
+      ticketDetailLoading.value = false
+    }
+  }
 
   function openCheckoutModal(order: Order) {
     payingOrder.value = order
     showCheckout.value = true
   }
 
-  async function confirmMockPay() {
-    if (!payingOrder.value) return
-    try {
-      const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
-      const osc = audioCtx.createOscillator()
-      const gain = audioCtx.createGain()
-      osc.connect(gain)
-      gain.connect(audioCtx.destination)
-      osc.type = 'sine'
-      osc.frequency.setValueAtTime(1046.5, audioCtx.currentTime)
-      gain.gain.setValueAtTime(0.08, audioCtx.currentTime)
-      osc.start()
-      setTimeout(() => osc.stop(), 180)
-    } catch (_) {
-      // 忽略音频错误
-    }
-
-    if (payMethod.value === 'alipay' && !apiState.isMock) {
+  async function startPayment() {
+    if (!payingOrder.value || isPaying.value) return
+    isPaying.value = true
+    if (!apiState.isMock) {
       try {
         const payFormHtml = await request<string>(`/api/live-start/engine/order/pay/alipay?orderNo=${payingOrder.value.orderNo}`)
         const div = document.createElement('div')
         div.innerHTML = payFormHtml
-        document.body.appendChild(div)
         const form = div.querySelector('form')
-        if (form) {
-          form.submit()
-        } else {
-          message.error('支付宝表单解析失败')
-        }
-        return
+        if (!form) throw new Error('支付宝表单解析失败')
+        document.body.appendChild(form)
+        form.submit()
       } catch (err: any) {
         message.error(`发起支付宝支付失败: ${err.message}`)
-        return
+      } finally {
+        isPaying.value = false
       }
+      return
     }
 
     try {
@@ -79,6 +82,8 @@ export function useMyTickets() {
       void fetchOrders()
     } catch (err: any) {
       message.error(`支付对账失败: ${err.message}`)
+    } finally {
+      isPaying.value = false
     }
   }
 
@@ -117,11 +122,16 @@ export function useMyTickets() {
     orders,
     showCheckout,
     payingOrder,
-    payMethod,
+    isPaying,
+    showTicketDetails,
+    ticketDetailLoading,
+    ticketItems,
+    isMock: apiState.isMock,
     fetchOrders,
     orderStatusColor,
     openCheckoutModal,
-    confirmMockPay,
+    openTicketDetails,
+    startPayment,
     cancelOrder,
     refundOrder,
   }

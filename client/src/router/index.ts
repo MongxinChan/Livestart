@@ -52,6 +52,12 @@ const router = createRouter({
           component: () => import('@/views/profile/Index.vue'),
           meta: { title: '个人资料', navKey: 'profile', requiresAuth: true },
         },
+        {
+          path: 'artist-wallet',
+          name: 'ArtistWallet',
+          component: () => import('@/views/artist-wallet/Index.vue'),
+          meta: { title: '艺人钱包', navKey: 'artist-wallet', requiresAuth: true },
+        },
       ],
     },
   ],
@@ -65,6 +71,10 @@ router.beforeEach(async (to) => {
       name: 'Square',
       query: { auth: '1', redirect: to.fullPath },
     }
+  }
+
+  if (to.name === 'ArtistWallet' && Number(apiState.currentUser?.userType) !== 2) {
+    return { name: 'Profile' }
   }
 
   if (to.name === 'OrderCabin') {

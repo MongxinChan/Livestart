@@ -30,6 +30,7 @@ export function useTheme() {
   watchEffect(() => {
     const vars = customVars[activeTheme.value]
     const root = document.documentElement
+    root.dataset.lsTheme = activeTheme.value
 
     // 1. 同步自定义变量到全局 root
     Object.entries(vars).forEach(([key, value]) => {
@@ -39,6 +40,9 @@ export function useTheme() {
     // 2. 将核心的 Ant 变量也同步一份到全局 root，确保 teleport 到 body 的组件（如 Modal）能使用基础变量
     const token = themeConfigs[activeTheme.value].token || {}
     const antVars: Record<string, string | number | undefined> = {
+      '--ls-color-primary': token.colorPrimary,
+      '--ls-color-success': token.colorSuccess,
+      '--ls-text-primary': token.colorText || (activeTheme.value === 'minimalist-light' ? '#1f2937' : '#f5f5f5'),
       '--ant-color-primary': token.colorPrimary,
       '--ant-color-success': token.colorSuccess,
       '--ant-color-warning': token.colorWarning,

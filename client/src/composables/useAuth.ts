@@ -24,7 +24,7 @@ function startCountdown() {
 }
 
 async function sendVerificationCode() {
-  if (!authForm.phone || authForm.phone.length !== 11) {
+  if (!/^1[3-9]\d{9}$/.test(authForm.phone)) {
     message.warning('请输入正确的 11 位手机号')
     return
   }
@@ -37,7 +37,7 @@ async function sendVerificationCode() {
 
   try {
     await request(`/api/live-start/admin/v1/user/send-code?phone=${authForm.phone}`, { method: 'POST' })
-    message.success('验证码已发送，请查看后端控制台日志')
+    message.success('验证码已发送')
     startCountdown()
   } catch (err: any) {
     message.error(`发送验证码失败: ${err.message}`)
@@ -45,7 +45,7 @@ async function sendVerificationCode() {
 }
 
 async function handleAuthSubmit() {
-  if (!authForm.phone || authForm.phone.length !== 11) {
+  if (!/^1[3-9]\d{9}$/.test(authForm.phone)) {
     message.warning('请输入正确的 11 位手机号')
     return
   }
@@ -80,8 +80,11 @@ async function handleAuthSubmit() {
     }
 
     const data = await request<{ token: string }>(
-      `/api/live-start/admin/v1/user/login/code?phone=${authForm.phone}&code=${authForm.code}`,
-      { method: 'POST' }
+      '/api/live-start/admin/v1/user/login/code',
+      {
+        method: 'POST',
+        body: JSON.stringify({ phone: authForm.phone, code: authForm.code }),
+      }
     )
 
     apiState.token = data.token
@@ -90,8 +93,9 @@ async function handleAuthSubmit() {
     let userRes: any
     try {
       userRes = await request<any>('/api/live-start/admin/v1/user/me')
-    } catch {
-      userRes = await request<any>(`/api/live-start/admin/v1/user/${authForm.phone}`)
+    } catch (err) {
+      clearSession()
+      throw err
     }
     apiState.userId = String(userRes.id)
     apiState.currentUser = {
@@ -116,7 +120,7 @@ async function handleLogout() {
   if (!apiState.isMock && apiState.currentUser) {
     try {
       await request(
-        `/api/live-start/admin/v1/user/logout?phone=${apiState.currentUser.phone || ''}&token=${apiState.token || ''}`,
+        '/api/live-start/admin/v1/user/logout',
         { method: 'DELETE' }
       )
     } catch {

@@ -58,8 +58,9 @@
             <div class="ticket-right">
               <div v-if="order.status === 1 && order.isChecked" class="stamp-used">已入场</div>
               <template v-else-if="order.status === 1 && order.checkCode">
-                <QrcodeOutlined style="font-size: 36px; color: var(--ant-color-success); margin-bottom: 6px" />
+                <TicketQr :code="order.checkCode" />
                 <span
+                  class="ticket-code"
                   style="font-size: 11px; font-family: monospace; font-weight: 600; color: var(--ant-color-success)"
                 >
                   {{ order.checkCode }}
@@ -95,6 +96,9 @@
           <div
             style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(var(--ls-accent-rgb), 0.08)"
           >
+            <a-button v-if="order.status === 1 && order.count > 1" size="small" @click="openTicketDetails(order)">
+              查看全部 {{ order.count }} 张电子票
+            </a-button>
             <template v-if="order.status === 0">
               <a-button size="small" @click="cancelOrder(order.orderNo)">取消订单</a-button>
               <a-button size="small" type="primary" @click="openCheckoutModal(order)">
@@ -134,44 +138,25 @@
           </div>
         </a-card>
 
-        <a-radio-group v-model:value="payMethod" style="width: 100%; margin-bottom: 20px">
-          <a-row :gutter="16">
-            <a-col :span="12">
-              <a-radio-button
-                value="wx"
-                style="width: 100%; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px"
-              >
-                <WechatOutlined style="font-size: 22px; color: #09bb07" />
-                <span style="font-size: 12px">微信支付</span>
-              </a-radio-button>
-            </a-col>
-            <a-col :span="12">
-              <a-radio-button
-                value="alipay"
-                style="width: 100%; height: 60px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 10px"
-              >
-                <AlipayCircleOutlined style="font-size: 22px; color: #108ee9" />
-                <span style="font-size: 12px">支付宝</span>
-              </a-radio-button>
-            </a-col>
-          </a-row>
-        </a-radio-group>
-
-        <div style="text-align: center; margin-bottom: 20px">
-          <div
-            style="width: 140px; height: 140px; background: #fff; padding: 10px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center"
-          >
-            <QrcodeOutlined :style="{ fontSize: '100px', color: payMethod === 'wx' ? '#09bb07' : '#108ee9' }" />
-          </div>
-          <p style="font-size: 12px; color: var(--ls-text-secondary); margin-top: 8px">
-            <LoadingOutlined spin /> 等待扫码支付，安全对账连接已建立
-          </p>
-        </div>
-
-        <a-button type="primary" block size="large" @click="confirmMockPay">
-          确认模拟已扫码付款（触发出票回调）
+        <a-button type="primary" block size="large" :loading="isPaying" @click="startPayment">
+          <template v-if="!isPaying && !isMock" #icon><AlipayCircleOutlined /></template>
+          {{ isMock ? '模拟付款' : '前往支付宝支付' }}
         </a-button>
       </template>
+    </a-modal>
+
+    <a-modal v-model:open="showTicketDetails" title="电子票" :footer="null" :width="440" centered>
+      <a-spin :spinning="ticketDetailLoading">
+        <a-empty v-if="!ticketDetailLoading && ticketItems.length === 0" description="暂无电子票" />
+        <div v-for="(ticket, index) in ticketItems" :key="ticket.id" class="ticket-detail-row">
+          <span>第 {{ index + 1 }} 张 · {{ ticket.isChecked ? '已入场' : '待入场' }}</span>
+          <template v-if="ticket.checkCode && !ticket.isChecked">
+            <TicketQr :code="ticket.checkCode" />
+            <strong>{{ ticket.checkCode }}</strong>
+          </template>
+          <strong v-else>{{ ticket.isChecked ? '已核销' : '待出票' }}</strong>
+        </div>
+      </a-spin>
     </a-modal>
   </div>
 </template>
@@ -180,14 +165,13 @@
 import {
   SafetyCertificateOutlined,
   FileTextOutlined,
-  QrcodeOutlined,
   StopOutlined,
   WalletOutlined,
-  WechatOutlined,
   AlipayCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons-vue'
 import { useMyTickets } from '@/composables/order/useMyTickets'
+import TicketQr from './TicketQr.vue'
 
 defineEmits<{
   backToSquare: []
@@ -197,11 +181,31 @@ const {
   orders,
   showCheckout,
   payingOrder,
-  payMethod,
+  isPaying,
+  isMock,
+  showTicketDetails,
+  ticketDetailLoading,
+  ticketItems,
   orderStatusColor,
   openCheckoutModal,
-  confirmMockPay,
+  openTicketDetails,
+  startPayment,
   cancelOrder,
   refundOrder,
 } = useMyTickets()
 </script>
+
+<style scoped>
+.ticket-detail-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--ls-glass-border);
+}
+
+.ticket-detail-row strong {
+  overflow-wrap: anywhere;
+}
+.ticket-code { max-width: 100%; text-align: center; overflow-wrap: anywhere; }
+</style>

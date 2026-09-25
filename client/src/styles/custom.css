@@ -415,5 +415,46 @@ body {
   background: rgba(255, 255, 255, 0.02);
 }
 
+/* 橙汽水主题沿用参考控制台的紧凑面板与暖色边线。 */
+:root[data-ls-theme='orangesoda-fizz'] .glass-panel,
+:root[data-ls-theme='orangesoda-fizz'] .ticket-card,
+:root[data-ls-theme='orangesoda-fizz'] .my-tickets-view .ticket-card,
+:root[data-ls-theme='orangesoda-fizz'] .carousel-container,
+:root[data-ls-theme='orangesoda-fizz'] .ant-card {
+  border-radius: 8px !important;
+}
+
+:root[data-ls-theme='orangesoda-fizz'] .glass-panel,
+:root[data-ls-theme='orangesoda-fizz'] .my-tickets-view .ticket-card {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+:root[data-ls-theme='orangesoda-fizz'] .filters-panel {
+  background: #181614 !important;
+  border-color: #2b2724 !important;
+  border-radius: 8px !important;
+  box-shadow: var(--ls-glass-shadow);
+}
+
+:root[data-ls-theme='orangesoda-fizz'] .filter-tag {
+  background: #201d1a;
+  border-color: #3c3732;
+  border-radius: 6px;
+}
+
+:root[data-ls-theme='orangesoda-fizz'] .filter-tag:hover {
+  background: #2a2622;
+}
+
+:root[data-ls-theme='orangesoda-fizz'] .ant-segmented,
+:root[data-ls-theme='orangesoda-fizz'] .event-cover-wrap {
+  border-radius: 8px !important;
+}
+
+:root[data-ls-theme='orangesoda-fizz'] .carousel-overlay {
+  background: linear-gradient(to right, rgba(15, 13, 12, 0.93) 12%, rgba(15, 13, 12, 0.28) 58%, rgba(15, 13, 12, 0.86) 100%);
+}
+
 
 

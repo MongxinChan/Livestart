@@ -8,10 +8,11 @@ export const themeOptions: ThemeOption[] = [
   { id: 'minimalist-light', name: '高雅极简', icon: '☀️' },
   { id: 'damai-crimson', name: '大麦炽红', icon: '🔴' },
   { id: 'showstart-neon', name: '秀动荧光', icon: '🟢' },
+  { id: 'orangesoda-fizz', name: '橙汽水', icon: '🍊' },
 ]
 
 /**
- * 四套 Ant Design ConfigProvider 主题 Token
+ * Ant Design ConfigProvider 主题 Token
  * 每套主题 = Ant Design Algorithm + Token 覆写
  */
 export const themeConfigs: Record<ThemeId, ThemeConfig> = {
@@ -73,6 +74,25 @@ export const themeConfigs: Record<ThemeId, ThemeConfig> = {
       colorBorderSecondary: 'rgba(32, 227, 178, 0.18)',
       borderRadius: 12,
       fontFamily: "'Outfit', 'Inter', 'Noto Sans SC', sans-serif",
+    },
+  },
+  'orangesoda-fizz': {
+    algorithm: antTheme.darkAlgorithm,
+    token: {
+      colorPrimary: '#ff6d33',
+      colorSuccess: '#4fd197',
+      colorWarning: '#f2b453',
+      colorError: '#ff8a7f',
+      colorInfo: '#93a8ff',
+      colorText: '#f6f1ea',
+      colorTextSecondary: '#d6cfc4',
+      colorBgContainer: '#181614',
+      colorBgElevated: '#201d1a',
+      colorBgLayout: '#0f0d0c',
+      colorBorder: '#3c3732',
+      colorBorderSecondary: '#2b2724',
+      borderRadius: 8,
+      fontFamily: "'Inter', 'Noto Sans SC', sans-serif",
     },
   },
 }
@@ -147,5 +167,18 @@ export const customVars: Record<ThemeId, CustomThemeVars> = {
     '--ls-input-bg': 'rgba(15, 16, 22, 0.85)',
     '--ls-text-secondary': '#8797a8',
     '--ls-accent-rgb': '32, 227, 178',
+  },
+  'orangesoda-fizz': {
+    '--ls-bg-primary': '#0f0d0c',
+    '--ls-bg-card': '#181614',
+    '--ls-glass-bg': 'rgba(24, 22, 20, 0.92)',
+    '--ls-glass-border': '#2b2724',
+    '--ls-glass-shadow': '0 1px 2px rgba(0, 0, 0, 0.35), 0 12px 30px -12px rgba(0, 0, 0, 0.6)',
+    '--ls-neon-glow': '0 10px 28px -10px rgba(255, 109, 51, 0.55)',
+    '--ls-logo-gradient': 'linear-gradient(135deg, #ff9e57 0%, #ff6f33 50%, #e8470f 100%)',
+    '--ls-nav-bg': 'rgba(15, 13, 12, 0.96)',
+    '--ls-input-bg': '#201d1a',
+    '--ls-text-secondary': '#b8afa3',
+    '--ls-accent-rgb': '255, 109, 51',
   },
 }

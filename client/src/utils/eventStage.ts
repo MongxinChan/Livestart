@@ -55,7 +55,7 @@ export function resolveEventStageMeta(event: LiveEvent | null | undefined): Even
   }
 
   if (backendStatusText) {
-    const canGrab = backendStatusText.includes('抢票中') || backendStatusText.includes('开售')
+    const canGrab = backendStatusText.includes('抢票中')
     return {
       stageLabel,
       stageColor,

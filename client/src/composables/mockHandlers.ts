@@ -1,6 +1,21 @@
 import { apiState } from './sessionState'
 import { createSettlementResult, mockEvents, mockHotSearches, mockOrders, mockVisitors } from './mockData'
 
+const mockArtistWallet = {
+  artistId: 20099,
+  availableAmount: 1280.5,
+  frozenAmount: 200,
+  totalEarned: 3680.5,
+  totalWithdrawn: 2200,
+}
+const mockArtistCommissions = [
+  { id: 1, orderNo: 'MOCK-20260924001', ticketAmount: 680, taxAmount: 13.6, actualAmount: 54.4, status: 1, createTime: '2026-09-22T10:15:00' },
+  { id: 2, orderNo: 'MOCK-20260923002', ticketAmount: 520, taxAmount: 10.4, actualAmount: 41.6, status: 0, createTime: '2026-09-23T14:20:00' },
+]
+const mockArtistWithdrawals: Array<Record<string, unknown>> = [
+  { id: 1, amount: 200, status: 2, accountType: 'ALIPAY', accountNo: 'artist@example.com', accountName: '模拟艺人', createTime: '2026-09-20T09:00:00' },
+]
+
 function getMockEventPrices(event: (typeof mockEvents)[number]) {
   return event.skus.map((sku) => sku.price)
 }
@@ -30,8 +45,56 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
         return
       }
 
-      if (url.includes('/api/live-start/admin/v1/user/') && (!options.method || options.method === 'GET')) {
-        resolve(apiState.currentUser)
+      if (url.includes('/api/live-start/distribution/v1/artist/wallet')) {
+        resolve({ ...mockArtistWallet })
+        return
+      }
+
+      if (url.includes('/api/live-start/distribution/v1/artist/commission/page')) {
+        const params = new URLSearchParams(url.split('?')[1] || '')
+        const pageNo = Math.max(Number(params.get('pageNo') || 1), 1)
+        const pageSize = Math.max(Number(params.get('pageSize') || 8), 1)
+        const start = (pageNo - 1) * pageSize
+        resolve({ records: mockArtistCommissions.slice(start, start + pageSize), total: mockArtistCommissions.length, current: pageNo, size: pageSize })
+        return
+      }
+
+      if (url.includes('/api/live-start/distribution/v1/artist/withdrawals/') && url.endsWith('/cancel') && options.method === 'POST') {
+        const pathParts = url.split('/')
+        const id = Number(pathParts[pathParts.length - 2])
+        const record = mockArtistWithdrawals.find((item) => Number(item.id) === id)
+        if (!record || record.status !== 0) {
+          reject(new Error('当前提现申请不可取消'))
+          return
+        }
+        record.status = 4
+        mockArtistWallet.availableAmount += Number(record.amount || 0)
+        mockArtistWallet.frozenAmount -= Number(record.amount || 0)
+        resolve(true)
+        return
+      }
+
+      if (url.includes('/api/live-start/distribution/v1/artist/withdrawals') && options.method === 'POST') {
+        const reqData = JSON.parse((options.body as string) || '{}')
+        const amount = Number(reqData.amount || 0)
+        if (amount <= 0 || amount > mockArtistWallet.availableAmount) {
+          reject(new Error('可提现余额不足'))
+          return
+        }
+        const record = { id: Date.now(), amount, status: 0, accountType: reqData.accountType, accountNo: reqData.accountNo, accountName: reqData.accountName, createTime: new Date().toISOString() }
+        mockArtistWithdrawals.unshift(record)
+        mockArtistWallet.availableAmount -= amount
+        mockArtistWallet.frozenAmount += amount
+        resolve(record)
+        return
+      }
+
+      if (url.includes('/api/live-start/distribution/v1/artist/withdrawals')) {
+        const params = new URLSearchParams(url.split('?')[1] || '')
+        const pageNo = Math.max(Number(params.get('pageNo') || 1), 1)
+        const pageSize = Math.max(Number(params.get('pageSize') || 8), 1)
+        const start = (pageNo - 1) * pageSize
+        resolve({ records: mockArtistWithdrawals.slice(start, start + pageSize), total: mockArtistWithdrawals.length, current: pageNo, size: pageSize })
         return
       }
 
@@ -50,8 +113,10 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
           const city = params.get('city')?.trim() || ''
           const minPrice = params.get('minPrice')
           const maxPrice = params.get('maxPrice')
+          const pageNum = Math.max(Number(params.get('pageNum') || 1), 1)
+          const pageSize = Math.max(Number(params.get('pageSize') || 10), 1)
 
-          const typeToText: Record<string, string> = { '0': 'Livehouse', '1': '演唱会', '2': '音乐节' }
+          const typeToText: Record<string, string> = { '0': 'Livehouse', '1': '演唱会' }
 
           const filtered = mockEvents.filter((event) => {
             if (keyword && !event.title.includes(keyword)) return false
@@ -59,12 +124,20 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
             if (city && !(event.city || '').includes(city)) return false
 
             const prices = getMockEventPrices(event)
-            if (minPrice !== null && minPrice !== '' && !prices.some((price) => price >= Number(minPrice))) return false
-            if (maxPrice !== null && maxPrice !== '' && !prices.some((price) => price <= Number(maxPrice))) return false
+            if (!prices.some((price) =>
+              (minPrice === null || minPrice === '' || price >= Number(minPrice))
+              && (maxPrice === null || maxPrice === '' || price <= Number(maxPrice)))) return false
             return true
           })
 
-          resolve({ records: filtered, total: filtered.length, size: filtered.length, current: 1, pages: 1 })
+          const start = (pageNum - 1) * pageSize
+          resolve({
+            records: filtered.slice(start, start + pageSize),
+            total: filtered.length,
+            size: pageSize,
+            current: pageNum,
+            pages: Math.ceil(filtered.length / pageSize),
+          })
           return
         }
 
@@ -142,6 +215,25 @@ export async function handleMockRequest(url: string, options: RequestInit = {}) 
           isChecked: 0,
         })
         resolve(orderNo)
+        return
+      }
+
+      if (url.includes('/api/live-start/engine/order/detail/')) {
+        const orderNo = decodeURIComponent(url.substring(url.lastIndexOf('/') + 1))
+        const order = mockOrders.find((item) => item.orderNo === orderNo)
+        if (!order) {
+          reject(new Error('订单不存在'))
+          return
+        }
+        resolve({
+          orderNo,
+          ticketItems: Array.from({ length: order.count }, (_, index) => ({
+            id: `${orderNo}-${index + 1}`,
+            visitorId: index + 1,
+            checkCode: index === 0 ? order.checkCode : `${order.checkCode}-${index + 1}`,
+            isChecked: index === 0 ? order.isChecked : 0,
+          })),
+        })
         return
       }
 

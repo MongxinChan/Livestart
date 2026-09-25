@@ -10,6 +10,8 @@ export interface CurrentUser {
   username?: string
   realName?: string
   phone?: string
+  /** 用户类型：1乐迷，2艺人，3场地管理员，4超级管理员。 */
+  userType?: number
   avatar?: string
   mail?: string
   signature?: string

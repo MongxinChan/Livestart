@@ -59,30 +59,10 @@ export function formatEventPriceRange(event: LiveEvent) {
   return `¥${minPrice} - ¥${maxPrice}`
 }
 
-function matchesPriceRange(event: LiveEvent, priceRange?: PriceRangeOption) {
-  if (!priceRange || (priceRange.minPrice == null && priceRange.maxPrice == null)) {
-    return true
-  }
-
-  const prices = getEventPrices(event)
-  if (prices.length === 0) {
-    return false
-  }
-
-  return prices.some((price) => {
-    if (priceRange.minPrice != null && price < priceRange.minPrice) {
-      return false
-    }
-    if (priceRange.maxPrice != null && price > priceRange.maxPrice) {
-      return false
-    }
-    return true
-  })
-}
-
 export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): void }) {
+  let latestFetchId = 0
   const route = useRoute()
-  const searchQuery = ref('')
+  const searchQuery = ref(typeof route.query.keyword === 'string' ? route.query.keyword : '')
   const activeCategory = ref('全部')
   const activeCity = ref('全国')
   const activePriceLabel = ref<string>('不限')
@@ -90,45 +70,27 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
   const pageSize = ref(12)
   const loading = ref(false)
   const events = ref<LiveEvent[]>([])
+  const totalEvents = ref(0)
   const hotSearches = ref<HotSearch[]>([])
 
   const citiesList = ['全国', '北京', '上海', '杭州', '广州', '深圳', '成都', '武汉', '西安']
-  const categoriesList = ['全部', '演唱会', 'Livehouse', '音乐节']
+  const categoriesList = ['全部', '演唱会', 'Livehouse']
   const priceRanges = PRICE_RANGES
 
-  const carouselSlides: CarouselSlide[] = [
-    {
-      title: '周杰伦嘉年华世界巡回演唱会',
-      desc: '首页会实时展示当前演出是一开、二开、待开售还是已经开演。',
-      tag: '超热演出',
-      image: 'https://images.unsplash.com/photo-1540039155733-5bb30b53aa14?auto=format&fit=crop&q=80&w=1200',
-      eventId: 102,
-    },
-    {
-      title: '万能青年旅店巡回 Livehouse 上海站',
-      desc: 'Livehouse 场景同样支持阶段展示和开售提醒预约。',
-      tag: 'Livehouse 推荐',
-      image: 'https://images.unsplash.com/photo-1506157786151-b8491531f063?auto=format&fit=crop&q=80&w=1200',
-      eventId: 101,
-    },
-    {
-      title: '重塑雕像的权利特别专场',
-      desc: '在演出广场就能直接看清当前售票阶段和可抢状态。',
-      tag: '先锋现场',
-      image: 'https://images.unsplash.com/photo-1514525253161-7a46d19cd819?auto=format&fit=crop&q=80&w=1200',
-      eventId: 103,
-    },
-  ]
+  const carouselSlides = computed<CarouselSlide[]>(() => events.value
+    .filter((event) => event.cover)
+    .slice(0, 3)
+    .map((event) => ({
+      title: event.title,
+      desc: [event.artist, event.venue, event.date].filter(Boolean).join(' · '),
+      tag: event.type,
+      image: event.cover,
+      eventId: event.id,
+    })))
 
   const recommendCards = computed<RecommendCard[]>(() => {
-    const hotEventIds = ['102', '101']
-    return hotEventIds
-      .map((eventId, index) => {
-        const event = events.value.find((item) => String(item.id) === eventId)
-        if (!event) {
-          return null
-        }
-
+    return events.value.slice(0, 2)
+      .map((event, index) => {
         const stageMeta = resolveEventStageMeta(event)
         return {
           eventId: String(event.id),
@@ -142,53 +104,12 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
           statusColor: stageMeta.canGrab ? 'success' : 'processing',
         }
       })
-      .filter((card): card is RecommendCard => card !== null)
   })
 
-  const filteredEvents = computed(() => {
-    const keyword = searchQuery.value.trim().toLowerCase()
-    const priceRange = priceRanges.find((item) => item.label === activePriceLabel.value)
-
-    return events.value.filter((event) => {
-      if (activeCategory.value !== '全部' && event.type !== activeCategory.value) {
-        return false
-      }
-
-      if (activeCity.value !== '全国' && event.city !== activeCity.value) {
-        return false
-      }
-
-      if (!matchesPriceRange(event, priceRange)) {
-        return false
-      }
-
-      if (!keyword) {
-        return true
-      }
-
-      const stageMeta = resolveEventStageMeta(event)
-      const haystack = [
-        event.title,
-        event.artist,
-        event.venue,
-        event.city,
-        event.type,
-        stageMeta.statusText,
-      ]
-        .filter(Boolean)
-        .join(' ')
-        .toLowerCase()
-
-      return haystack.includes(keyword)
-    })
-  })
-
-  const pagedEvents = computed(() => {
-    const start = (page.value - 1) * pageSize.value
-    return filteredEvents.value.slice(start, start + pageSize.value)
-  })
+  const pagedEvents = computed(() => events.value)
 
   async function fetchEvents() {
+    const fetchId = ++latestFetchId
     loading.value = true
     try {
       const priceRange = priceRanges.find((item) => item.label === activePriceLabel.value)
@@ -196,20 +117,23 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
         ? 0
         : activeCategory.value === '演唱会'
           ? 1
-          : activeCategory.value === '音乐节'
-            ? 2
-            : null
-      const params = new URLSearchParams({ pageNum: '1', pageSize: '100' })
+          : null
+      const params = new URLSearchParams({
+        pageNum: String(page.value),
+        pageSize: String(pageSize.value),
+      })
       if (searchQuery.value.trim()) params.set('keyword', searchQuery.value.trim())
       if (eventType !== null) params.set('eventType', String(eventType))
       if (activeCity.value !== '全国') params.set('city', activeCity.value)
       if (priceRange?.minPrice != null) params.set('minPrice', String(priceRange.minPrice))
       if (priceRange?.maxPrice != null) params.set('maxPrice', String(priceRange.maxPrice))
 
-      const result = await request<{ records?: Array<Partial<LiveEvent>> }>(
+      const result = await request<{ records?: Array<Partial<LiveEvent>>; total?: number }>(
         `/api/live-start/search/event?${params.toString()}`
       )
+      if (fetchId !== latestFetchId) return
       const records = Array.isArray(result) ? result : result.records || []
+      totalEvents.value = Array.isArray(result) ? result.length : Number(result.total || 0)
       events.value = records.map((event) => ({
         id: event.id || '',
         title: event.title || '',
@@ -228,10 +152,14 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
         started: event.started,
       }))
     } catch (err) {
+      if (fetchId !== latestFetchId) return
       console.error('拉取演出失败', err)
       events.value = []
+      totalEvents.value = 0
     } finally {
-      loading.value = false
+      if (fetchId === latestFetchId) {
+        loading.value = false
+      }
     }
   }
 
@@ -270,8 +198,9 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     () => route.query.keyword,
     (keyword) => {
       searchQuery.value = typeof keyword === 'string' ? keyword : ''
-    },
-    { immediate: true }
+      page.value = 1
+      void fetchEvents()
+    }
   )
 
   function clickHotWord(word: string) {
@@ -284,6 +213,7 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     if (nextPageSize != null) {
       pageSize.value = nextPageSize
     }
+    void fetchEvents()
   }
 
   function ensureAuthenticatedAction() {
@@ -311,13 +241,13 @@ export function useEventSquare(emit: { (e: 'selectEvent', event: LiveEvent): voi
     pageSize,
     loading,
     events,
+    totalEvents,
     hotSearches,
     citiesList,
     categoriesList,
     priceRanges,
     carouselSlides,
     recommendCards,
-    filteredEvents,
     pagedEvents,
     fetchEvents,
     fetchHotSearches,
