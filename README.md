@@ -42,3 +42,43 @@ LiveStart 是专门为演唱会、Livehouse 演出设计的在线抢票引擎。
 项目目前**没有**提供整套微服务的一键 Compose 编排；前端、网关和各业务服务仍建议按本地开发方式分别启动。
 
 如需具体启动方法、依赖要求和访问地址，请查看 `client/README.md` 中新增的 `Docker 说明` 章节。
+
+## 数据库初始化
+
+全新环境只需要执行整合入口 [`sql/00_livestart_full_schema.sql`](./sql/00_livestart_full_schema.sql)。该脚本会按依赖顺序重建 `live_start`、用户/订单/座位分片库、`xxl_job` 和默认单库支付库 `live_start_pay`，只能用于全新环境，禁止对已有数据的数据库执行。
+
+```text
+00_livestart_full_schema.sql
+```
+
+毕业设计默认使用整合脚本内的 `live_start_pay` 单库支付模式。需要支付分片和演示种子数据时，再执行 `02_livestart_optional_extras.sql`。
+
+三个入口脚本由原有结构脚本按依赖顺序合并生成，避免初始化和升级逻辑分散在多个文件中。
+
+脚本职责如下：
+
+| 场景 | 执行脚本 |
+| --- | --- |
+| 全新环境 | `00_livestart_full_schema.sql` |
+| 旧库迁移与增量修复 | `01_livestart_existing_db_upgrade.sql` |
+| 支付分库分表与测试数据 | `02_livestart_optional_extras.sql`（按需执行） |
+
+已有库升级时执行 `01_livestart_existing_db_upgrade.sql`。该文件会按顺序创建分片迁移存储过程，并补齐核销索引、核销记录、分销关联、结算通知和艺人钱包结构。
+然后以 `FALSE` 参数查看迁移计划，再停写、备份并以 `TRUE` 参数执行：
+
+```sql
+CALL live_start.sp_migrate_order_shards_hash16_to_hash32(FALSE);
+CALL live_start.sp_migrate_user_ticket_shards(FALSE);
+CALL live_start.sp_migrate_user_shards(FALSE);
+```
+
+`02_livestart_optional_extras.sql` 同时包含支付分片结构和测试种子数据；默认单库支付环境不需要执行它。
+
+数据库初始化或升级后可运行 `tools/verify_livestart_database.ps1` 做只读结构与分片检查。
+
+## 本地验证码演示
+
+当前手机号登录使用模拟短信，不调用收费短信服务。本地运行 `admin` 服务时设置
+`LIVESTART_SMS_MOCK_LOG_ENABLED=true`，验证码会输出到服务日志；也可设置
+`LIVESTART_SMS_MOCK_CODE=888888` 使用固定演示验证码。不要在公开环境使用固定验证码。
+生产环境未配置真实短信通道时，发送验证码接口会明确返回失败。
