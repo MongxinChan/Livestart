@@ -144,7 +144,7 @@ function startCountdown() {
 }
 
 async function sendVerificationCode() {
-  if (!loginForm.phone || loginForm.phone.length !== 11) {
+  if (!/^1[3-9]\d{9}$/.test(loginForm.phone)) {
     message.warning('请输入正确的 11 位手机号')
     return
   }
@@ -152,7 +152,7 @@ async function sendVerificationCode() {
   sendingCode.value = true
   try {
     await http.post(`/api/live-start/admin/v1/user/send-code?phone=${loginForm.phone}`)
-    message.success('验证码已发送，请查看后端控制台日志')
+    message.success('验证码已发送')
     startCountdown()
   } catch {
     // http 拦截器已处理错误提示
@@ -194,8 +194,7 @@ async function persistSession(token: string, phone: string, payload: LoginRespon
     router.push('/dashboard')
   } catch (err) {
     // /me 调用失败时保守处理：清掉 session，避免半登录态
-    // console.error('[Login] /me 接口调用失败', err)
-    // clearAdminSession('login-me-failed')
+    clearAdminSession('login-me-failed')
     message.error('登录校验失败，请稍后重试')
   }
 }
@@ -228,7 +227,7 @@ async function handleMockLogin() {
 }
 
 async function handleLogin() {
-  if (!loginForm.phone || loginForm.phone.length !== 11) {
+  if (!/^1[3-9]\d{9}$/.test(loginForm.phone)) {
     message.warning('请输入正确的 11 位手机号')
     return
   }
@@ -241,7 +240,8 @@ async function handleLogin() {
 
   try {
     const data = await http.post<any, LoginResponse>(
-      `/api/live-start/admin/v1/user/login/code?phone=${loginForm.phone}&code=${loginForm.code}`
+      '/api/live-start/admin/v1/user/login/code',
+      { phone: loginForm.phone, code: loginForm.code }
     )
 
     if (data?.token) {

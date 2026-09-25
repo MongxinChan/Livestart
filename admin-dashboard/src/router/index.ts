@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
-import { getAdminToken, getCurrentUserType, UserRole, type UserRoleValue } from '@/api/http'
+import { ADMIN_DASHBOARD_ALLOWED_ROLES, clearAdminSession, getAdminToken, getCurrentUserType, UserRole, type UserRoleValue } from '@/api/http'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -98,50 +98,29 @@ const router = createRouter({
   routes,
 })
 
-router.beforeEach((to, from) => {
+router.beforeEach((to) => {
   document.title = `${to.meta.title || 'Livestart'} - 管理后台`
 
   const token = getAdminToken()
+  const userType = getCurrentUserType()
   const requiresAuth = to.matched.some((record) => record.meta.requiresAuth)
 
-  console.log('[Router Guard]', {
-    to: to.path,
-    from: from.path,
-    hasToken: !!token,
-    requiresAuth,
-    allowRoles: to.meta.allowRoles,
-    currentUserType: getCurrentUserType(),
-  })
+  if (token && (!userType || !ADMIN_DASHBOARD_ALLOWED_ROLES.includes(userType))) {
+    clearAdminSession('invalid-role')
+    return to.path === '/login' ? true : '/login'
+  }
 
   if (to.path === '/login' && token) {
-    console.log('[Router Guard] 已登录用户访问登录页，重定向到 /dashboard')
     return '/dashboard'
   }
 
   if (requiresAuth && !token) {
-    console.log('[Router Guard] 未登录用户访问需要认证的页面，重定向到 /login')
     return '/login'
   }
 
-  // 角色守卫：路由 meta.allowRoles 限定时校验
   if (token && to.meta.allowRoles && to.meta.allowRoles.length > 0) {
-    const userType = getCurrentUserType()
-    if (!userType) {
-      // userType 未加载：这通常意味着 /me 接口还没调用或调用失败
-      // 清理 token 并要求重新登录
-      console.error('[Router Guard] userType 未加载，清理 session 并跳转登录页')
-      return '/login'
-    }
-    if (!to.meta.allowRoles.includes(userType)) {
-      // userType 不匹配：用户角色不符合要求
-      console.error('[Router Guard] 用户角色不符合要求', {
-        userType,
-        requiredRoles: to.meta.allowRoles,
-      })
-      // 这里不应该重定向到 /dashboard，因为 /dashboard 也有角色限制
-      // 应该显示无权限页面或跳转到第一个有权限的页面
-      // 暂时跳转到登录页，让用户重新登录
-      return '/login'
+    if (!to.meta.allowRoles.includes(userType!)) {
+      return '/dashboard'
     }
   }
 

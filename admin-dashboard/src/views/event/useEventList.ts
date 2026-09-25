@@ -127,6 +127,8 @@ export function useEventList() {
   const formVisible = ref(false)
   const submitting = ref(false)
   const editingId = ref<number | null>(null)
+  const originalStartTime = ref('')
+  const originalStageTimes = ref<string[]>([])
   const formData = reactive({
     title: '',
     eventType: 0,
@@ -153,6 +155,8 @@ export function useEventList() {
 
   function resetForm() {
     editingId.value = null
+    originalStartTime.value = ''
+    originalStageTimes.value = []
     formData.title = ''
     formData.eventType = 0
     formData.venueId = null
@@ -191,6 +195,8 @@ export function useEventList() {
       formData.performerId = detail.performerId || null
       formData.ticketStage = detail.ticketStage || 1
       formData.saleStages = normalizeSaleStages(detail.saleStages, detail.ticketStage)
+      originalStartTime.value = detail.startTime
+      originalStageTimes.value = formData.saleStages.map((stage) => stage.saleStartTime)
       formData.styleIds = (detail as any).styleIds || []
     } else {
       resetForm()
@@ -210,7 +216,8 @@ export function useEventList() {
       return false
     }
 
-    const hasPastTime = formData.saleStages.some((item) => isBeforeNow(item.saleStartTime))
+    const hasPastTime = formData.saleStages.some((item) =>
+      isBeforeNow(item.saleStartTime) && !originalStageTimes.value.includes(item.saleStartTime))
     if (hasPastTime) {
       message.warning('开售时间不得早于当前时间')
       return false
@@ -251,7 +258,7 @@ export function useEventList() {
       message.warning('请填写必填项')
       return
     }
-    if (isBeforeNow(formData.startTime)) {
+    if (isBeforeNow(formData.startTime) && formData.startTime !== originalStartTime.value) {
       message.warning('演出时间不得早于当前时间')
       return
     }

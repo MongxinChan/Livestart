@@ -26,7 +26,7 @@
 
     <a-card title="快捷操作" :bordered="false" style="margin-top: 24px">
       <a-row :gutter="16">
-        <a-col v-for="shortcut in shortcuts" :key="shortcut.label" :span="6">
+        <a-col v-for="shortcut in shortcuts" :key="shortcut.label" :xs="12" :sm="8" :lg="6">
           <a-button
             type="dashed"
             block
@@ -88,46 +88,35 @@ import {
 import { eventApi } from '@/api/event'
 import { orderApi } from '@/api/order'
 import { userApi } from '@/api/user'
+import { isSuperAdmin } from '@/api/http'
 
 const eventTotal = ref(0)
 const orderTotal = ref(0)
 const userTotal = ref(0)
 
 async function fetchStats() {
-  try {
-    const [eventRes, orderRes, userRes] = await Promise.allSettled([
-      eventApi.page({ current: 1, size: 1 }),
-      orderApi.page({ current: 1, size: 1 }),
-      userApi.page({ current: 1, size: 1 }),
-    ])
-
-    if (eventRes.status === 'fulfilled' && eventRes.value) {
-      eventTotal.value = eventRes.value.total || 0
-    }
-    if (orderRes.status === 'fulfilled' && orderRes.value) {
-      orderTotal.value = orderRes.value.total || 0
-    }
-    if (userRes.status === 'fulfilled' && userRes.value) {
-      userTotal.value = userRes.value.total || 0
-    }
-  } catch {
-    // Keep dashboard usable even when the API is unavailable.
-  }
+  await Promise.allSettled([
+    eventApi.page({ current: 1, size: 1 }).then((res) => { eventTotal.value = res?.total || 0 }),
+    orderApi.page({ current: 1, size: 1 }).then((res) => { orderTotal.value = res?.total || 0 }),
+    ...(isSuperAdmin()
+      ? [userApi.page({ current: 1, size: 1 }).then((res) => { userTotal.value = res?.total || 0 })]
+      : []),
+  ])
 }
 
 const stats = computed(() => [
   { title: '演出总数', value: eventTotal.value, icon: VideoCameraOutlined, color: '#1677ff', suffix: '场', desc: '包含在售、预售和下架演出' },
   { title: '累计订单', value: orderTotal.value, icon: ShoppingCartOutlined, color: '#52c41a', suffix: '笔', desc: '包含全部订单状态' },
-  { title: '注册用户', value: userTotal.value, icon: UserOutlined, color: '#722ed1', suffix: '人', desc: '平台总用户数' },
+  ...(isSuperAdmin() ? [{ title: '注册用户', value: userTotal.value, icon: UserOutlined, color: '#722ed1', suffix: '人', desc: '平台总用户数' }] : []),
   { title: '系统状态', value: eventTotal.value > 0 ? '运行中' : '就绪', icon: DollarOutlined, color: '#fa8c16', suffix: '', desc: '微服务当前健康状态' },
 ])
 
-const shortcuts = [
+const shortcuts = computed(() => [
   { label: '创建演出', path: '/event', icon: PlusOutlined },
   { label: '订单管理', path: '/order', icon: UnorderedListOutlined },
   { label: '结算报表', path: '/settlement', icon: BarChartOutlined },
-  { label: '用户管理', path: '/user', icon: TeamOutlined },
-]
+  ...(isSuperAdmin() ? [{ label: '用户管理', path: '/user', icon: TeamOutlined }] : []),
+])
 
 onMounted(fetchStats)
 </script>

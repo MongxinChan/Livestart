@@ -6,4 +6,12 @@ export const orderApi = {
     http.get<any, PageResult<any>>('/api/live-start/engine/order/admin/page', { params }),
   verify: (checkCode: string) =>
     http.post<any, any>('/api/live-start/engine/order/verify', { checkCode }),
+  verifyStats: (eventId?: number) =>
+    http.get<any, any>('/api/live-start/engine/order/verify/stats', {
+      params: eventId == null ? undefined : { eventId },
+    }),
+  verifyRecords: (eventId?: number) =>
+    http.get<any, any>('/api/live-start/engine/order/verify/records', {
+      params: eventId == null ? undefined : { eventId },
+    }),
 }
