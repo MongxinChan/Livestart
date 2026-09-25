@@ -472,7 +472,7 @@ public class SettlementServiceImpl implements SettlementService {
         }
         String inSql = venueIds.stream().map(v -> "?").collect(Collectors.joining(","));
         return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM t_event WHERE venue_id IN (" + inSql + ") ORDER BY id DESC",
+                "SELECT id FROM t_event WHERE source_event_id IS NULL AND venue_id IN (" + inSql + ") ORDER BY id DESC",
                 Long.class,
                 venueIds.toArray()
         ));
@@ -496,7 +496,7 @@ public class SettlementServiceImpl implements SettlementService {
 
     private Set<Long> queryAllEventIds() {
         return new LinkedHashSet<>(jdbcTemplate.queryForList(
-                "SELECT id FROM t_event ORDER BY id DESC",
+                "SELECT id FROM t_event WHERE source_event_id IS NULL ORDER BY id DESC",
                 Long.class
         ));
     }
@@ -530,7 +530,7 @@ public class SettlementServiceImpl implements SettlementService {
 
     private void ensureEventExists(Long eventId) {
         Integer count = jdbcTemplate.queryForObject(
-                "SELECT COUNT(1) FROM t_event WHERE id = ?",
+                "SELECT COUNT(1) FROM t_event WHERE id = ? AND source_event_id IS NULL",
                 Integer.class,
                 eventId
         );
