@@ -7,7 +7,8 @@ param(
     [string]$UsersCsvPath = "",
     [int]$TgThreads = 100,
     [int]$TgRampTime = 1,
-    [int]$TgLoops = 400,
+    [ValidateRange(0, 1000000)]
+    [int]$TgLoops = 0,
     [int]$UserType = 1,
     [string]$JMeterHeap = "-Xms256m -Xmx512m -XX:MaxMetaspaceSize=256m",
     [string]$JmxPath = "",
@@ -136,12 +137,49 @@ function Assert-CsvShape($path) {
         throw "[FAIL] CSV header mismatch. Expected '$expected', got '$header': $path"
     }
 
-    $dataRows = @(Get-Content -LiteralPath $path -TotalCount 2)
-    if ($dataRows.Count -lt 2) {
+    $records = @(Import-Csv -LiteralPath $path)
+    if ($records.Count -eq 0) {
         throw "[FAIL] CSV has header but no data rows: $path"
     }
 
-    Write-Host "[OK] CSV shape: $path" -ForegroundColor Green
+    $dataRowCount = $records.Count
+    $invalidRows = @($records | Where-Object {
+        [string]::IsNullOrWhiteSpace($_.phone) -or
+        [string]::IsNullOrWhiteSpace($_.userId) -or
+        [string]::IsNullOrWhiteSpace($_.username) -or
+        [string]::IsNullOrWhiteSpace($_.visitorId) -or
+        [string]::IsNullOrWhiteSpace($_.skuId) -or
+        $_.userId -notmatch '^\d+$' -or
+        $_.visitorId -notmatch '^\d+$' -or
+        $_.skuId -notmatch '^\d+$'
+    })
+    if ($invalidRows.Count -gt 0) {
+        throw "[FAIL] CSV contains $($invalidRows.Count) invalid data rows: $path"
+    }
+    $duplicateUserRows = @($records | Group-Object userId | Where-Object Count -gt 1)
+    if ($duplicateUserRows.Count -gt 0) {
+        throw "[FAIL] CSV contains duplicate userId groups ($($duplicateUserRows.Count)): $path"
+    }
+    Write-Host "[OK] CSV shape: $path (data rows=$dataRowCount; each row used once)" -ForegroundColor Green
+    return $dataRowCount
+}
+
+function Assert-TcpPort {
+    param([string]$HostName, [int]$Port, [string]$Label)
+
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $task = $client.ConnectAsync($HostName, $Port)
+        if (-not $task.Wait(2000) -or -not $client.Connected) {
+            throw "[FAIL] $Label is unreachable: ${HostName}:${Port}"
+        }
+        Write-Host "[OK] $Label ${HostName}:${Port}" -ForegroundColor Green
+    } catch {
+        if ($_.Exception.Message.StartsWith('[FAIL]')) { throw }
+        throw "[FAIL] $Label is unreachable: ${HostName}:${Port}"
+    } finally {
+        $client.Dispose()
+    }
 }
 
 function Invoke-CheckedProcess($filePath, $arguments) {
@@ -164,7 +202,20 @@ Write-Section "Step 1 - Check Seckill MQ JMeter Assets"
 Assert-PathExists $JMeterBin "JMeter executable"
 Assert-PathExists $JmxPath "Seckill MQ JMX"
 Assert-PathExists $UsersCsvPath "Users CSV"
-Assert-CsvShape $UsersCsvPath
+$csvRowCount = Assert-CsvShape $UsersCsvPath
+Assert-TcpPort -HostName $TargetHost -Port $EnginePort -Label "Engine API"
+if ($TgThreads -lt 1) {
+    throw "[FAIL] TgThreads must be greater than zero"
+}
+$autoLoops = $TgLoops -eq 0
+if ($TgLoops -eq 0) {
+    $TgLoops = [Math]::Max(1, [int][Math]::Ceiling($csvRowCount / [double]$TgThreads))
+    Write-Host "[OK] Auto loops: $TgLoops (threads=$TgThreads, csv rows=$csvRowCount)" -ForegroundColor Green
+}
+$plannedSamples = [Math]::Min($TgThreads, $csvRowCount) * $TgLoops
+if (-not $autoLoops -and $plannedSamples -gt $csvRowCount) {
+    Write-Warning "Planned samples ($plannedSamples) exceed CSV rows ($csvRowCount). JMX stops when CSV is exhausted; use -TgLoops 0 for automatic sizing."
+}
 
 $javaVersion = & $javaInfo.Java -version 2>&1 | Select-Object -First 1
 Write-Host "[OK] Java: $($javaInfo.Java)" -ForegroundColor Green
@@ -212,7 +263,12 @@ $runArgs = @(
     "-JTG_THREADS=$TgThreads",
     "-JTG_RAMP_TIME=$TgRampTime",
     "-JTG_LOOPS=$TgLoops",
-    "-JUSER_TYPE=$UserType"
+    "-JUSER_TYPE=$UserType",
+    "-Jjmeter.save.saveservice.response_data=false",
+    "-Jjmeter.save.saveservice.response_data.on_error=true",
+    "-Jjmeter.save.saveservice.samplerData=false",
+    "-Jjmeter.save.saveservice.requestHeaders=false",
+    "-Jjmeter.save.saveservice.responseHeaders=false"
 )
 Invoke-CheckedProcess $JMeterBin $runArgs
 
@@ -221,6 +277,11 @@ $rows = @(Import-Csv -LiteralPath $rawResultFile)
 $mainRows = @($rows | Where-Object { $_.label -eq "Seckill Create Order By MQ" })
 if ($mainRows.Count -eq 0) {
     throw "[FAIL] No parent transaction rows found in raw JTL: $rawResultFile"
+}
+$successfulMainRows = @($mainRows | Where-Object { $_.success -eq "true" })
+if ($successfulMainRows.Count -eq 0) {
+    $failureSummary = ($mainRows | Group-Object responseCode | Sort-Object Count -Descending | Select-Object -First 3 | ForEach-Object { "$($_.Name)=$($_.Count)" }) -join ", "
+    throw "[FAIL] All parent transactions failed. $failureSummary. Raw JTL: $rawResultFile"
 }
 
 $rawLines = Get-Content -LiteralPath $rawResultFile

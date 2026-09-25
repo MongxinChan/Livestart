@@ -1,24 +1,47 @@
 param(
+    [ValidateRange(1, 100000)]
     [int]$UserCount = 1000,
-    [int]$VisitorsPerUser = 2,
+    [ValidateRange(1, 10)]
+    [int]$VisitorsPerUser = 1,
+    [ValidateRange(1, 32)]
+    [int]$Parallelism = 8,
+    [ValidateRange(5, 300)]
+    [int]$RequestTimeoutSec = 30,
     [string]$AdminBaseUrl = "http://127.0.0.1:8002",
-    [string]$Password = "LiveStart123",
+    [string]$SmsCode = "888888",
     [string]$PhonePrefix = "1879000",
     [string]$FixedIdCard = "445121200404047420",
-    [string]$BulkCsvPath = "D:\02_Workspace\Projects\Livestart\jmeter\users_bulk_registered_1000.csv",
-    [string]$Scenario3CsvPath = "D:\02_Workspace\Projects\Livestart\jmeter\users_scenario3_registered_1000.csv",
+    [string]$BulkCsvPath = "",
+    [string]$Scenario3CsvPath = "",
     [string]$MySqlExe = "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe",
     [string]$MySqlHost = "127.0.0.1",
+    [ValidateRange(1, 65535)]
     [int]$MySqlPort = 3306,
     [string]$MySqlUser = "root",
-    [string]$MySqlPassword = "123456",
+    [string]$MySqlPassword = $env:LIVESTART_DB_PASSWORD,
+    [ValidateRange(1, 1000)]
     [int]$SkuPoolSize = 12,
+    [ValidateRange(1, 999999)]
     [int]$StartIndex = 1,
-    [switch]$ForceSendCodeLogin,
-    [switch]$ContinueOnUserError
+    [switch]$ContinueOnUserError,
+    [switch]$ShowRows
 )
 
 $ErrorActionPreference = "Stop"
+
+$projectRoot = Split-Path -Parent $PSScriptRoot
+if ($PhonePrefix -notmatch '^\d+$') {
+    throw "[FAIL] PhonePrefix must contain digits only"
+}
+if (($PhonePrefix.Length + ([Math]::Max($StartIndex + $UserCount - 1, 1)).ToString().Length) -gt 11) {
+    throw "[FAIL] Generated phone numbers exceed 11 digits. Adjust PhonePrefix, StartIndex, or UserCount."
+}
+if ([string]::IsNullOrWhiteSpace($BulkCsvPath)) {
+    $BulkCsvPath = Join-Path $projectRoot "jmeter\users_bulk_registered_${UserCount}.csv"
+}
+if ([string]::IsNullOrWhiteSpace($Scenario3CsvPath)) {
+    $Scenario3CsvPath = Join-Path $projectRoot "jmeter\users_scenario3_registered_${UserCount}.csv"
+}
 
 function Write-Section($message) {
     Write-Host ""
@@ -44,7 +67,7 @@ function Invoke-MySqlQuery {
         "--host=$MySqlHost",
         "--port=$MySqlPort",
         "-u$MySqlUser",
-        "-p$MySqlPassword",
+        "--password=$MySqlPassword",
         "-D", $Database,
         "-N",
         "-e", $Query
@@ -60,41 +83,31 @@ function New-Phone([int]$index) {
     return "{0}{1:D4}" -f $PhonePrefix, $index
 }
 
-function New-Username([int]$index) {
-    return "reg_user_{0:D4}" -f $index
-}
+function Assert-TcpPort {
+    param([string]$HostName, [int]$Port, [string]$Label)
 
-function New-RealName([int]$index) {
-    return "Registered User {0:D4}" -f $index
-}
-
-function Invoke-JsonPost {
-    param(
-        [string]$Url,
-        [object]$Body,
-        [hashtable]$Headers = @{}
-    )
-
-    $jsonBody = $Body | ConvertTo-Json -Depth 6 -Compress
-    return Invoke-RestMethod -Method Post -Uri $Url -Headers $Headers -Body $jsonBody -ContentType "application/json; charset=UTF-8"
-}
-
-function Get-ErrorResponseText {
-    param(
-        [System.Management.Automation.ErrorRecord]$ErrorRecord
-    )
-
-    if ($null -eq $ErrorRecord) {
-        return $null
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $task = $client.ConnectAsync($HostName, $Port)
+        if (-not $task.Wait(2000) -or -not $client.Connected) {
+            throw "[FAIL] $Label is unreachable: ${HostName}:${Port}"
+        }
+        Write-Host "[OK] $Label ${HostName}:${Port}" -ForegroundColor Green
+    } catch {
+        if ($_.Exception.Message.StartsWith('[FAIL]')) { throw }
+        throw "[FAIL] $Label is unreachable: ${HostName}:${Port}"
+    } finally {
+        $client.Dispose()
     }
-    if ($ErrorRecord.Exception.Response) {
-        $reader = New-Object System.IO.StreamReader($ErrorRecord.Exception.Response.GetResponseStream())
-        return $reader.ReadToEnd()
-    }
-    return $ErrorRecord.ToString()
 }
 
 Write-Section "Step 1 - Load Active SKU Pool"
+if (-not (Test-Path -LiteralPath $MySqlExe)) {
+    throw "[FAIL] MySQL executable not found: $MySqlExe"
+}
+Assert-TcpPort -HostName $MySqlHost -Port $MySqlPort -Label "MySQL"
+$adminUri = [Uri]$AdminBaseUrl
+Assert-TcpPort -HostName $adminUri.Host -Port $adminUri.Port -Label "Admin API"
 $skuQuery = @"
 SELECT s.id
 FROM t_ticket_sku s
@@ -110,65 +123,70 @@ if (-not $skuRows -or $skuRows.Count -eq 0) {
 }
 $skuPool = @($skuRows | ForEach-Object { [Int64]($_ -split "\s+")[0] })
 
-Write-Section "Step 2 - Register Users Through Real API"
+Write-Section "Step 2 - Login Or Register Users Through Verification Code API"
 Ensure-ParentDirectory $BulkCsvPath
 Ensure-ParentDirectory $Scenario3CsvPath
 
 [System.IO.File]::WriteAllLines($BulkCsvPath, @("phone,userId,username,visitorId,skuId"), [System.Text.UTF8Encoding]::new($false))
 [System.IO.File]::WriteAllLines($Scenario3CsvPath, @("phone,userId,username,visitorId,skuId"), [System.Text.UTF8Encoding]::new($false))
 
-Write-Host "[INFO] UserCount=$UserCount StartIndex=$StartIndex VisitorsPerUser=$VisitorsPerUser" -ForegroundColor Cyan
+Write-Host "[INFO] UserCount=$UserCount StartIndex=$StartIndex VisitorsPerUser=$VisitorsPerUser Parallelism=$Parallelism" -ForegroundColor Cyan
 Write-Host "[INFO] BulkCsvPath=$BulkCsvPath" -ForegroundColor Cyan
 Write-Host "[INFO] Scenario3CsvPath=$Scenario3CsvPath" -ForegroundColor Cyan
 
-$successCount = 0
-$failedUsers = New-Object System.Collections.Generic.List[string]
 $endIndex = $StartIndex + $UserCount - 1
 
-for ($index = $StartIndex; $index -le $endIndex; $index++) {
-    $phone = New-Phone $index
+$seedOneUser = {
+    $ErrorActionPreference = "Stop"
+    $index = [int]$_
+
+    function Invoke-JsonPostInParallel {
+        param([string]$Url, [object]$Body, [hashtable]$Headers = @{})
+        $jsonBody = $Body | ConvertTo-Json -Depth 6 -Compress
+        return Invoke-RestMethod -Method Post -Uri $Url -Headers $Headers -Body $jsonBody -ContentType "application/json; charset=UTF-8" -TimeoutSec $using:RequestTimeoutSec
+    }
 
     try {
-        $username = New-Username $index
-        $realName = New-RealName $index
+        $phone = "$using:PhonePrefix$('{0:D4}' -f $index)"
+        $realName = "Registered User {0:D4}" -f $index
+        $seedClientIp = "192.0.2.{0}" -f (($index % 254) + 1)
+        $sendCodeHeaders = @{ "X-Livestart-Client-IP" = $seedClientIp }
 
-        $registerBody = [ordered]@{
-            username = $username
-            password = $Password
-            realName = $realName
+        Invoke-RestMethod -Method Post -Uri "$using:AdminBaseUrl/api/live-start/admin/v1/user/send-code?phone=$phone" -Headers $sendCodeHeaders -TimeoutSec $using:RequestTimeoutSec | Out-Null
+        $loginResp = Invoke-JsonPostInParallel -Url "$using:AdminBaseUrl/api/live-start/admin/v1/user/login/code" -Body ([ordered]@{ phone = $phone; code = $using:SmsCode })
+        if (-not [string]::Equals([string]$loginResp.code, "0")) {
+            throw "login/code failed: code=$($loginResp.code) message=$($loginResp.message)"
+        }
+
+        # UserController exposes /me, not /user/{phone}. Resolve the sharding key from the global phone map,
+        # then send identity headers so the direct admin service can load the user profile.
+        $mappingArgs = @(
+            "--host=$using:MySqlHost",
+            "--port=$using:MySqlPort",
+            "-u$using:MySqlUser",
+            "--password=$using:MySqlPassword",
+            "-D", "live_start",
+            "-N",
+            "-e", "SELECT user_id FROM t_user_phone_mapping WHERE phone='$phone' LIMIT 1"
+        )
+        $mappingRows = @(& $using:MySqlExe @mappingArgs)
+        if ($LASTEXITCODE -ne 0) {
+            throw "phone mapping query failed"
+        }
+        if ($mappingRows.Count -eq 0) {
+            throw "phone mapping not found after login"
+        }
+        $mappedUserId = [Int64](($mappingRows[0] -split "\s+")[0])
+        $meHeaders = @{
+            userId = $mappedUserId.ToString()
             phone = $phone
-            idCard = $FixedIdCard
         }
-
-        try {
-            $registerResp = Invoke-JsonPost -Url "$AdminBaseUrl/api/live-start/admin/v1/user" -Body $registerBody
-        } catch {
-            if (-not $ForceSendCodeLogin) {
-                $detail = Get-ErrorResponseText $_
-                throw "[FAIL] register user failed for phone=$phone detail=$detail"
-            }
-        }
-
-        $token = $null
-        if ($registerResp -and [string]::Equals([string]$registerResp.code, "0")) {
-            $token = $registerResp.data.token
-        }
-
-        if (-not $token) {
-            Invoke-RestMethod -Method Post -Uri "$AdminBaseUrl/api/live-start/admin/v1/user/send-code?phone=$phone" | Out-Null
-            $loginResp = Invoke-RestMethod -Method Post -Uri "$AdminBaseUrl/api/live-start/admin/v1/user/login/code?phone=$phone&code=888888"
-            if (-not [string]::Equals([string]$loginResp.code, "0")) {
-                throw "[FAIL] login/code failed for phone=$phone code=$($loginResp.code) message=$($loginResp.message)"
-            }
-        }
-
-        $meResp = Invoke-RestMethod -Method Get -Uri "$AdminBaseUrl/api/live-start/admin/v1/user/$phone"
+        $meResp = Invoke-RestMethod -Method Get -Uri "$using:AdminBaseUrl/api/live-start/admin/v1/user/me" -Headers $meHeaders -TimeoutSec $using:RequestTimeoutSec
         if (-not [string]::Equals([string]$meResp.code, "0")) {
-            throw "[FAIL] query user by phone failed for phone=$phone"
+            throw "query user by phone failed"
         }
         $userId = [Int64]$meResp.data.id
         $currentUsername = [string]$meResp.data.username
-
         $headers = @{
             userId = $userId.ToString()
             username = $currentUsername
@@ -176,46 +194,67 @@ for ($index = $StartIndex; $index -le $endIndex; $index++) {
             userType = "1"
         }
 
-        $visitorIds = New-Object System.Collections.Generic.List[Int64]
-        for ($visitorIndex = 1; $visitorIndex -le $VisitorsPerUser; $visitorIndex++) {
+        for ($visitorIndex = 1; $visitorIndex -le $using:VisitorsPerUser; $visitorIndex++) {
             $visitorBody = [ordered]@{
                 realName = "{0} Visitor {1}" -f $realName, $visitorIndex
                 cardType = 1
-                cardNo = $FixedIdCard
+                cardNo = $using:FixedIdCard
                 mobile = $phone
             }
-
             try {
-                Invoke-JsonPost -Url "$AdminBaseUrl/api/live-start/admin/v1/visitor" -Body $visitorBody -Headers $headers | Out-Null
+                Invoke-JsonPostInParallel -Url "$using:AdminBaseUrl/api/live-start/admin/v1/visitor" -Body $visitorBody -Headers $headers | Out-Null
             } catch {
-                # Duplicate visitor identity per user is allowed here; existing visitors are read below.
+                # 重复观演人继续读取已有记录。
             }
         }
 
-        $visitorListResp = Invoke-RestMethod -Method Get -Uri "$AdminBaseUrl/api/live-start/admin/v1/visitor/list" -Headers $headers
+        $visitorListResp = Invoke-RestMethod -Method Get -Uri "$using:AdminBaseUrl/api/live-start/admin/v1/visitor/list" -Headers $headers -TimeoutSec $using:RequestTimeoutSec
         if (-not [string]::Equals([string]$visitorListResp.code, "0")) {
-            throw "[FAIL] query visitor list failed for phone=$phone"
+            throw "query visitor list failed"
         }
-        foreach ($visitor in @($visitorListResp.data)) {
-            $visitorIds.Add([Int64]$visitor.id)
-        }
-        if ($visitorIds.Count -eq 0) {
-            throw "[FAIL] no visitor created for phone=$phone"
+        $visitor = @($visitorListResp.data) | Select-Object -First 1
+        if ($null -eq $visitor) {
+            throw "no visitor created"
         }
 
-        $skuId = $skuPool[($index - $StartIndex) % $skuPool.Count]
-        $csvLine = "{0},{1},{2},{3},{4}" -f $phone, $userId, $currentUsername, $visitorIds[0], $skuId
-        Add-Content -LiteralPath $BulkCsvPath -Value $csvLine -Encoding UTF8
-        Add-Content -LiteralPath $Scenario3CsvPath -Value $csvLine -Encoding UTF8
-        $successCount++
-        Write-Host "[OK] registered phone=$phone userId=$userId visitorId=$($visitorIds[0]) skuId=$skuId" -ForegroundColor Green
-    } catch {
-        $message = $_ | Out-String
-        $failedUsers.Add("$phone`t$message")
-        Write-Host "[FAIL] phone=$phone $message" -ForegroundColor Red
-        if (-not $ContinueOnUserError) {
-            throw
+        $skuValues = $using:skuPool
+        $skuId = $skuValues[($index - $using:StartIndex) % $skuValues.Count]
+        [pscustomobject]@{
+            Index = $index
+            Success = $true
+            Line = "{0},{1},{2},{3},{4}" -f $phone, $userId, $currentUsername, ([Int64]$visitor.id), $skuId
+            Error = $null
         }
+    } catch {
+        [pscustomobject]@{
+            Index = $index
+            Success = $false
+            Line = $null
+            Error = $_.Exception.Message
+        }
+    }
+}
+
+$results = @($StartIndex..$endIndex | ForEach-Object -Parallel $seedOneUser -ThrottleLimit $Parallelism)
+$successRows = @($results | Where-Object Success | Sort-Object Index | ForEach-Object Line)
+$failedUsers = @($results | Where-Object { -not $_.Success } | Sort-Object Index | ForEach-Object { "$(New-Phone $_.Index)`t$($_.Error)" })
+$successCount = $successRows.Count
+
+$outputLines = @("phone,userId,username,visitorId,skuId") + $successRows
+[System.IO.File]::WriteAllLines($BulkCsvPath, $outputLines, [System.Text.UTF8Encoding]::new($false))
+[System.IO.File]::WriteAllLines($Scenario3CsvPath, $outputLines, [System.Text.UTF8Encoding]::new($false))
+
+if ($ShowRows) {
+    foreach ($row in $results | Sort-Object Index) {
+        if ($row.Success) {
+            Write-Host "[OK] $($row.Line)" -ForegroundColor Green
+        } else {
+            Write-Host "[FAIL] $(New-Phone $row.Index) $($row.Error)" -ForegroundColor Red
+        }
+    }
+} else {
+    foreach ($row in $results | Where-Object { -not $_.Success } | Sort-Object Index) {
+        Write-Host "[FAIL] $(New-Phone $row.Index) $($row.Error)" -ForegroundColor Red
     }
 }
 
@@ -228,4 +267,7 @@ if ($failedUsers.Count -gt 0) {
     $failedPath = Join-Path (Split-Path -Parent $Scenario3CsvPath) "users_seed_failed.txt"
     Set-Content -LiteralPath $failedPath -Value $failedUsers -Encoding UTF8
     Write-Host "Failed users: $($failedUsers.Count), details: $failedPath" -ForegroundColor Yellow
+}
+if ($failedUsers.Count -gt 0 -and -not $ContinueOnUserError) {
+    throw "[FAIL] $($failedUsers.Count) users failed. Use -ContinueOnUserError to keep partial CSV."
 }

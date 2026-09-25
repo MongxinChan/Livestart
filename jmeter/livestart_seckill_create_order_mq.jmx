@@ -35,7 +35,7 @@
           </elementProp>
           <elementProp name="TG_LOOPS" elementType="Argument">
             <stringProp name="Argument.name">TG_LOOPS</stringProp>
-            <stringProp name="Argument.value">${__P(TG_LOOPS,400)}</stringProp>
+            <stringProp name="Argument.value">${__P(TG_LOOPS,1)}</stringProp>
             <stringProp name="Argument.metadata">=</stringProp>
           </elementProp>
         </collectionProp>
@@ -50,7 +50,7 @@
         <boolProp name="ignoreFirstLine">true</boolProp>
         <boolProp name="quotedData">false</boolProp>
         <boolProp name="recycle">false</boolProp>
-        <stringProp name="shareMode">group</stringProp>
+        <stringProp name="shareMode">shareMode.group</stringProp>
         <boolProp name="stopThread">true</boolProp>
         <stringProp name="variableNames">phone,userId,username,visitorId,skuId</stringProp>
       </CSVDataSet>
@@ -189,7 +189,7 @@
             </hashTree>
           </hashTree>
         </hashTree>
-        <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="Aggregate Report" enabled="true">
+        <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="Aggregate Report" enabled="false">
           <boolProp name="ResultCollector.error_logging">false</boolProp>
           <objProp>
             <name>saveConfig</name>
@@ -206,7 +206,7 @@
               <encoding>false</encoding>
               <assertions>true</assertions>
               <subresults>false</subresults>
-              <responseData>true</responseData>
+              <responseData>false</responseData>
               <samplerData>true</samplerData>
               <xml>false</xml>
               <fieldNames>true</fieldNames>

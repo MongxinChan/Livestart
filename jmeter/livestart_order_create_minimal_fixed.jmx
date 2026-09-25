@@ -277,7 +277,7 @@ if (success) {
 }]]></stringProp>
         </JSR223Sampler>
         <hashTree/>
-        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Pay Callback" enabled="true">
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Pay Callback (sandbox only)" enabled="false">
           <stringProp name="cacheKey">minimal-fixed-pay-callback</stringProp>
           <stringProp name="filename"></stringProp>
           <stringProp name="parameters"></stringProp>
@@ -320,7 +320,7 @@ prev.setDataType(org.apache.jmeter.samplers.SampleResult.TEXT)
 conn.disconnect()]]></stringProp>
         </JSR223Sampler>
         <hashTree/>
-        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Verify Paid Detail" enabled="true">
+        <JSR223Sampler guiclass="TestBeanGUI" testclass="JSR223Sampler" testname="JSR223 - Verify Paid Detail (sandbox only)" enabled="false">
           <stringProp name="cacheKey">minimal-fixed-verify-paid-detail</stringProp>
           <stringProp name="filename"></stringProp>
           <stringProp name="parameters"></stringProp>
@@ -418,7 +418,7 @@ prev.setDataType(org.apache.jmeter.samplers.SampleResult.TEXT)]]></stringProp>
           <hashTree/>
         </hashTree>
       </hashTree>
-      <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告" enabled="true">
+      <ResultCollector guiclass="StatVisualizer" testclass="ResultCollector" testname="聚合报告" enabled="false">
         <boolProp name="ResultCollector.error_logging">false</boolProp>
         <objProp>
           <name>saveConfig</name>
