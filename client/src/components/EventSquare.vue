@@ -1,232 +1,150 @@
 <template>
-  <div class="event-square">
-    <div v-if="carouselSlides.length" class="carousel-container" style="margin-bottom: 28px">
-      <a-carousel autoplay :dots="true" :autoplay-speed="5000" effect="fade">
-        <div v-for="(slide, idx) in carouselSlides" :key="idx" class="carousel-slide-wrap">
-          <div class="carousel-slide-bg" :style="{ backgroundImage: `url(${slide.image})` }">
-            <div class="carousel-overlay">
-              <div style="max-width: 500px">
-                <a-tag color="error" style="margin-bottom: 12px; font-weight: 600; border-radius: 6px; padding: 2px 10px">
-                  {{ slide.tag }}
-                </a-tag>
-                <h2
-                  style="font-size: 1.7rem; font-weight: 800; color: #fff; margin-bottom: 10px; line-height: 1.35; text-shadow: 0 4px 10px rgba(0,0,0,0.8); font-family: 'Outfit', sans-serif"
-                >
-                  {{ slide.title }}
-                </h2>
-                <p style="color: rgba(255,255,255,0.72); font-size: 0.83rem; margin-bottom: 18px; line-height: 1.45">
-                  {{ slide.desc }}
-                </p>
-                <a-button type="primary" @click="clickBannerLink(normalizeEventId(slide.eventId))">
-                  <template #icon><ThunderboltOutlined /></template>
-                  立即查看
-                </a-button>
-              </div>
+  <div class="square-page">
+    <section class="square-hero">
+      <div class="square-hero-copy">
+        <div class="square-eyebrow">LIVESTART / LIVE EVENTS</div>
+        <h1>把下一场现场，<span>放进日程。</span></h1>
+        <p>发现城市里的演出，提前锁定喜欢的艺人和舞台。</p>
+        <a-input-search
+          v-model:value="searchQuery"
+          class="square-hero-search"
+          size="large"
+          placeholder="搜索演出、艺人、场馆"
+          enter-button="搜索"
+          @search="handleSearch"
+        />
+        <div v-if="hotSearches.length" class="square-hotwords">
+          <span>大家都在搜</span>
+          <button v-for="hot in hotSearches.slice(0, 5)" :key="hot.keyword" @click="clickHotWord(hot.keyword)">
+            {{ hot.keyword }}
+          </button>
+        </div>
+      </div>
+      <div class="square-hero-media" v-if="carouselSlides.length">
+        <a-carousel autoplay :dots="false" :autoplay-speed="5000" effect="fade">
+          <div v-for="slide in carouselSlides" :key="slide.eventId" class="square-hero-slide">
+            <img :src="slide.image" :alt="slide.title" />
+            <div class="square-hero-slide-copy">
+              <a-tag color="orange">{{ slide.tag }}</a-tag>
+              <strong>{{ slide.title }}</strong>
+              <span>{{ slide.desc }}</span>
+              <a-button type="primary" size="small" @click="clickBannerLink(normalizeEventId(slide.eventId))">
+                查看演出
+              </a-button>
             </div>
           </div>
-        </div>
-      </a-carousel>
-    </div>
-
-    <a-card class="glass-panel" style="margin-bottom: 28px; text-align: center" :bordered="false">
-      <h2 style="font-size: 1.6rem; font-weight: 800; margin-bottom: 6px">
-        搜索你关注的 <span class="text-gradient">明星 / 演出</span>
-      </h2>
-      <p style="color: var(--ls-text-secondary); margin-bottom: 18px; font-size: 0.86rem">
-        首页会直接展示演出当前是待开售、可抢票还是已经开演，减少无效点击。
-      </p>
-      <a-input-search
-        v-model:value="searchQuery"
-        placeholder="搜索演出、艺人、Livehouse、场馆..."
-        size="large"
-        enter-button="搜索"
-        style="max-width: 540px"
-        @search="handleSearch"
-      />
-      <div style="display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px">
-        <span style="font-size: 12px; font-weight: 600; color: var(--ls-text-secondary); margin-right: 4px">实时热搜:</span>
-        <a-tag
-          v-for="(hot, idx) in hotSearches"
-          :key="idx"
-          class="glow-card"
-          style="cursor: pointer; border-radius: 16px"
-          @click="clickHotWord(hot.keyword)"
-        >
-          <span style="font-weight: bold; margin-right: 3px">#{{ idx + 1 }}</span>
-          {{ hot.keyword }}
-          <span style="opacity: 0.6; font-size: 11px; margin-left: 4px">({{ hot.score }})</span>
-        </a-tag>
+        </a-carousel>
       </div>
-    </a-card>
+    </section>
 
-    <div v-if="!searchQuery && recommendCards.length" style="margin-bottom: 28px">
-      <h3 style="font-size: 1.1rem; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px">
-        <FireOutlined style="color: var(--ant-color-primary)" />
-        热门推荐
-      </h3>
-      <a-row :gutter="[20, 20]">
-        <a-col :xs="24" :md="12" v-for="rec in recommendCards" :key="rec.eventId">
-          <a-card hoverable class="glow-card" :bordered="false" @click="clickBannerLink(normalizeEventId(rec.eventId))">
-            <div style="display: flex; gap: 16px; align-items: center">
-              <img :src="rec.cover" :alt="rec.title" style="width: 80px; height: 110px; object-fit: cover; border-radius: 10px" />
-              <div style="flex: 1; display: flex; flex-direction: column; gap: 5px">
-                <a-tag :color="rec.tagColor" style="width: fit-content; font-size: 11px">{{ rec.tag }}</a-tag>
-                <h4 style="font-size: 0.88rem; font-weight: 700; margin: 0; line-height: 1.35">{{ rec.title }}</h4>
-                <span style="font-size: 12px; color: var(--ls-text-secondary)">{{ rec.venue }}</span>
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px">
-                  <span style="font-weight: 700; font-size: 0.88rem">￥ {{ rec.priceRange }}</span>
-                  <a-tag :color="rec.statusColor">{{ rec.status }}</a-tag>
-                </div>
-              </div>
+    <section v-if="!searchQuery && recommendCards.length" class="featured-section">
+      <div class="section-heading">
+        <div>
+          <span class="section-kicker">EDITOR'S PICKS</span>
+          <h2>本周值得去现场</h2>
+        </div>
+        <span>精选 {{ recommendCards.length }} 场</span>
+      </div>
+      <div class="featured-grid">
+        <button
+          v-for="rec in recommendCards"
+          :key="rec.eventId"
+          class="featured-card"
+          @click="clickBannerLink(normalizeEventId(rec.eventId))"
+        >
+          <img :src="rec.cover" :alt="rec.title" />
+          <span class="featured-card-overlay" />
+          <div class="featured-card-copy">
+            <a-tag :color="rec.tagColor">{{ rec.tag }}</a-tag>
+            <strong>{{ rec.title }}</strong>
+            <span>{{ rec.venue }}</span>
+            <div><b>¥ {{ rec.priceRange }}</b><em>{{ rec.status }}</em></div>
+          </div>
+        </button>
+      </div>
+    </section>
+
+    <section class="catalog-section">
+      <div class="section-heading catalog-heading">
+        <div>
+          <span class="section-kicker">ALL EVENTS</span>
+          <h2>{{ searchQuery ? `搜索“${searchQuery}”` : '全部演出' }}</h2>
+        </div>
+        <span v-if="!loading">{{ totalEvents }} 场演出</span>
+      </div>
+
+      <div class="filters-panel catalog-filters">
+        <div class="filter-row">
+          <span class="filter-label">城市</span>
+          <div class="filter-options">
+            <button v-for="city in citiesList" :key="city" :class="['filter-tag', { active: activeCity === city }]" @click="activeCity = city">
+              {{ city }}
+            </button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">类型</span>
+          <div class="filter-options">
+            <button v-for="category in categoriesList" :key="category" :class="['filter-tag', { active: activeCategory === category }]" @click="activeCategory = category">
+              {{ category }}
+            </button>
+          </div>
+        </div>
+        <div class="filter-row">
+          <span class="filter-label">价格</span>
+          <div class="filter-options">
+            <button v-for="price in priceRanges" :key="price.label" :class="['filter-tag', { active: activePriceLabel === price.label }]" @click="activePriceLabel = price.label">
+              {{ price.label }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <a-row v-if="loading" :gutter="[20, 20]">
+        <a-col v-for="i in 8" :key="i" :xs="24" :sm="12" :lg="8" :xl="6">
+          <a-card :bordered="false" class="event-card event-card-skeleton"><a-skeleton active :paragraph="{ rows: 4 }" /></a-card>
+        </a-col>
+      </a-row>
+
+      <a-row v-else-if="pagedEvents.length" :gutter="[20, 20]">
+        <a-col v-for="event in pagedEvents" :key="event.id" :xs="24" :sm="12" :lg="8" :xl="6">
+          <a-card :bordered="false" class="event-card" :body-style="{ padding: 0 }" @click="handleSelectEvent(event)">
+            <div class="event-card-cover">
+              <img :src="event.cover" :alt="event.title" />
+              <a-tag class="event-card-type" color="orange">{{ event.type }}</a-tag>
+              <a-tag class="event-card-stage" :color="resolveEventStageMeta(event).stageColor">{{ resolveEventStageMeta(event).stageLabel }}</a-tag>
+              <button class="event-card-favorite" aria-label="预约提醒" :disabled="isReminderButtonDisabled(event)" @click.stop="handleReminderClick(event)">
+                {{ getReminderButtonText(event) === '预约开售提醒' ? '＋' : '✓' }}
+              </button>
+            </div>
+            <div class="event-card-body">
+              <h3>{{ event.title }}</h3>
+              <p v-if="event.artist">{{ event.artist }}</p>
+              <div class="event-card-meta"><span>{{ event.date }}</span><span>{{ event.venue }}<template v-if="event.city"> · {{ event.city }}</template></span></div>
+              <div class="event-card-footer"><strong>{{ formatEventPriceRange(event) }}</strong><a-button type="primary" size="small" @click.stop="handleSelectEvent(event)">{{ resolveEventStageMeta(event).canGrab ? '立即购票' : '查看详情' }}</a-button></div>
             </div>
           </a-card>
         </a-col>
       </a-row>
-    </div>
 
-    <div
-      class="filters-panel"
-      style="margin-bottom: 24px; padding: 18px 24px; background: rgba(255,255,255,0.01); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px"
-    >
-      <div class="filter-row" style="margin-bottom: 14px; display: flex; align-items: center; gap: 16px">
-        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">城市:</span>
-        <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
-          <span
-            v-for="c in citiesList"
-            :key="c"
-            :class="['filter-tag', { active: activeCity === c }]"
-            @click="activeCity = c"
-          >
-            {{ c }}
-          </span>
-        </div>
-      </div>
-      <div class="filter-row" style="margin-bottom: 14px; display: flex; align-items: center; gap: 16px">
-        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">分类:</span>
-        <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
-          <span
-            v-for="cat in categoriesList"
-            :key="cat"
-            :class="['filter-tag', { active: activeCategory === cat }]"
-            @click="activeCategory = cat"
-          >
-            {{ cat }}
-          </span>
-        </div>
-      </div>
-      <div class="filter-row" style="display: flex; align-items: center; gap: 16px">
-        <span class="filter-label" style="font-size: 13px; font-weight: 700; color: var(--ls-text-secondary); min-width: 50px">价格:</span>
-        <div class="filter-options" style="display: flex; flex-wrap: wrap; gap: 8px">
-          <span
-            v-for="p in priceRanges"
-            :key="p.label"
-            :class="['filter-tag', { active: activePriceLabel === p.label }]"
-            @click="activePriceLabel = p.label"
-          >
-            {{ p.label }}
-          </span>
-        </div>
-      </div>
-    </div>
+      <a-empty v-else description="暂时没有匹配的演出" class="catalog-empty" />
 
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px; flex-wrap: wrap">
-      <span style="font-size: 13px; color: var(--ls-text-secondary)">
-        已为你找到 <span style="font-weight: 700; color: var(--ls-color-primary)">{{ totalEvents }}</span> 场演出
-      </span>
-      <span style="font-size: 12px; color: var(--ls-text-secondary)">
-        第 {{ page }} 页 / 每页 {{ pageSize }} 条
-      </span>
-    </div>
-
-    <a-row v-if="loading" :gutter="[24, 24]">
-      <a-col :xs="24" :sm="12" :lg="8" :xl="6" v-for="i in 4" :key="i">
-        <a-card :bordered="false">
-          <a-skeleton active :paragraph="{ rows: 4 }" />
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <a-row v-else :gutter="[24, 24]">
-      <a-col :xs="24" :sm="12" :lg="8" :xl="6" v-for="event in pagedEvents" :key="event.id">
-        <a-card hoverable class="glow-card" :bordered="false" :body-style="{ padding: '14px' }">
-          <div class="event-cover-wrap" style="height: 180px; margin-bottom: 12px; position: relative">
-            <img :src="event.cover" :alt="event.title" style="width: 100%; height: 100%; object-fit: cover; border-radius: 10px" />
-            <a-tag
-              :color="event.type === '演唱会' ? 'magenta' : 'cyan'"
-              style="position: absolute; top: 10px; left: 10px; border-radius: 6px"
-            >
-              {{ event.type }}
-            </a-tag>
-            <a-tag
-              :color="resolveEventStageMeta(event).stageColor"
-              style="position: absolute; top: 10px; right: 10px; border-radius: 6px"
-            >
-              {{ resolveEventStageMeta(event).stageLabel }}
-            </a-tag>
-          </div>
-
-          <h3
-            style="font-size: 0.9rem; font-weight: 700; line-height: 1.4; height: 42px; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; margin-bottom: 8px"
-          >
-            {{ event.title }}
-          </h3>
-          <div style="font-size: 12px; color: var(--ls-text-secondary); display: flex; flex-direction: column; gap: 3px; margin-bottom: 12px">
-            <span><CalendarOutlined /> {{ event.date }}</span>
-            <span><EnvironmentOutlined /> {{ event.venue }}<template v-if="event.city"> · {{ event.city }}</template></span>
-            <span v-if="event.artist"><UserOutlined /> {{ event.artist }}</span>
-            <span style="font-weight: 600; color: var(--ant-color-primary)">{{ resolveEventStageMeta(event).statusText }}</span>
-            <span v-if="resolveEventStageMeta(event).timeText">{{ resolveEventStageMeta(event).timeText }}</span>
-          </div>
-
-          <a-divider style="margin: 10px 0" />
-          <div style="display: flex; justify-content: space-between; align-items: center">
-            <div>
-              <span style="font-size: 11px; color: var(--ls-text-secondary)">票价区间</span>
-              <div style="font-size: 1rem; font-weight: 800">{{ formatEventPriceRange(event) }}</div>
-            </div>
-            <a-button type="primary" size="small" :disabled="!resolveEventStageMeta(event).canGrab" @click.stop="handleSelectEvent(event)">
-              <template #icon><ThunderboltOutlined /></template>
-              {{ resolveEventStageMeta(event).canGrab ? '立即抢票' : '查看阶段' }}
-            </a-button>
-          </div>
-          <div style="margin-top: 10px">
-            <a-button
-              block
-              size="small"
-              ghost
-              :disabled="isReminderButtonDisabled(event)"
-              :loading="reminderLoadingId === String(event.id)"
-              @click.stop="handleReminderClick(event)"
-            >
-              {{ getReminderButtonText(event) }}
-            </a-button>
-          </div>
-        </a-card>
-      </a-col>
-    </a-row>
-
-    <div v-if="!loading && totalEvents > 0" style="display: flex; justify-content: center; margin-top: 28px">
       <a-pagination
+        v-if="!loading && totalEvents > pageSize"
+        class="catalog-pagination"
         :current="page"
         :page-size="pageSize"
         :total="totalEvents"
         :show-size-changer="false"
         @change="changePage"
       />
-    </div>
+    </section>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 import { message } from 'ant-design-vue'
-import {
-  CalendarOutlined,
-  EnvironmentOutlined,
-  FireOutlined,
-  ThunderboltOutlined,
-  UserOutlined,
-} from '@ant-design/icons-vue'
 import { formatEventPriceRange, useEventSquare } from '@/composables/event/useEventSquare'
 import { useReminderRegistry } from '@/composables/reminder/useReminderRegistry'
 import { resolveEventStageMeta } from '@/utils/eventStage'
@@ -322,9 +240,6 @@ async function handleReminderClick(event: LiveEvent) {
 }
 
 function handleSelectEvent(event: LiveEvent) {
-  if (!ensureAuthenticatedAction()) {
-    return
-  }
   emit('selectEvent', event)
 }
 

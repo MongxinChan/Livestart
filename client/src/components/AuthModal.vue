@@ -1,15 +1,16 @@
 <template>
-  <a-modal v-model:open="showAuthModal" :footer="null" :width="380" centered destroy-on-close>
+  <a-modal v-model:open="showAuthModal" wrap-class-name="auth-modal" :footer="null" :width="420" centered destroy-on-close>
     <template #title>
       <span style="font-weight: 800; font-size: 1.1rem">
         <UserOutlined style="margin-right: 8px; color: var(--ls-color-primary)" />
-        快捷验证登录与自动注册
+        手机验证码登录
       </span>
     </template>
 
-    <a-typography-paragraph type="secondary" style="font-size: 12px; margin-bottom: 18px">
-      已支持手机验证码快捷登录。未注册手机号将自动在后台进行隐式自动注册及社交资料建档。
-    </a-typography-paragraph>
+    <div class="auth-intro">
+      <span class="auth-intro-kicker">WELCOME TO LIVESTART</span>
+      <p>使用手机号完成验证。新用户会自动创建账号。</p>
+    </div>
 
     <a-form layout="vertical" @submit.prevent="handleAuthSubmit">
       <a-form-item label="手机号">

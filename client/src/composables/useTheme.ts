@@ -3,7 +3,7 @@ import { themeConfigs, themeOptions, customVars } from '../styles/themes'
 import type { ThemeId } from '../types'
 
 export function useTheme() {
-  const activeTheme = ref<ThemeId>('cyberpunk-dark')
+  const activeTheme = ref<ThemeId>('orangesoda-fizz')
 
   const currentAntTheme = computed(() => ({
     ...themeConfigs[activeTheme.value],

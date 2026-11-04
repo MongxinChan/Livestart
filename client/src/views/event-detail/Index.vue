@@ -1,86 +1,46 @@
 <template>
   <a-spin :spinning="loading">
-    <div v-if="event" class="event-detail">
-      <a-card class="glass-panel" :bordered="false">
-        <a-button type="link" @click="goBackToSquare" style="padding: 0; margin-bottom: 20px; font-weight: 600">
-          返回演出广场
-        </a-button>
+    <div v-if="event" class="event-detail-page">
+      <button class="detail-back" @click="goBackToSquare">← 返回演出广场</button>
+      <section class="detail-hero">
+        <div class="detail-cover"><img :src="event.cover" :alt="event.title" /></div>
+        <div class="detail-summary">
+          <div class="detail-tags"><a-tag color="orange">{{ event.type }}</a-tag><a-tag :color="eventStageMeta.stageColor">{{ eventStageMeta.stageLabel }}</a-tag></div>
+          <h1>{{ event.title }}</h1>
+          <p v-if="event.artist" class="detail-artist">{{ event.artist }}</p>
+          <div class="detail-meta-list"><span>时间　{{ event.date }}</span><span>场馆　{{ event.venue }}<template v-if="event.city"> · {{ event.city }}</template></span></div>
+          <a-alert type="info" show-icon :message="eventStageMeta.statusText" :description="eventStageMeta.timeText || '查看票档，选择合适的座位和观演人。'" />
+          <div class="detail-action-bar">
+            <div><small>起售价</small><strong>{{ formatEventPriceRange(event) }}</strong></div>
+            <a-button type="primary" size="large" :disabled="!eventStageMeta.canGrab" @click="enterCabin">{{ eventStageMeta.canGrab ? '立即购票' : eventStageMeta.hasStarted ? '演出已开演' : '暂未开售' }}</a-button>
+          </div>
+        </div>
+      </section>
 
-        <a-row :gutter="[28, 24]">
-          <a-col :xs="24" :md="10">
-            <img
-              :src="event.cover"
-              :alt="event.title"
-              style="width: 100%; height: 360px; object-fit: cover; border-radius: 16px"
-            />
-          </a-col>
-          <a-col :xs="24" :md="14">
-            <a-space direction="vertical" size="middle" style="width: 100%">
-              <div>
-                <a-space wrap>
-                  <a-tag :color="event.type === '演唱会' ? 'magenta' : 'cyan'">{{ event.type }}</a-tag>
-                  <a-tag :color="eventStageMeta.stageColor">{{ eventStageMeta.stageLabel }}</a-tag>
-                </a-space>
-                <h1 style="font-size: 1.8rem; font-weight: 800; margin: 16px 0 10px">{{ event.title }}</h1>
-                <p style="font-size: 14px; color: var(--ant-text-secondary); line-height: 1.8">
-                  {{ event.artist }} · {{ event.date }} · {{ event.venue }}
-                  <template v-if="event.city"> · {{ event.city }}</template>
-                </p>
-              </div>
-
-              <a-alert
-                type="info"
-                show-icon
-                :message="eventStageMeta.statusText"
-                :description="eventStageMeta.timeText || '当前可在详情页查看票档信息，并从这里进入抢票流程。'"
-              />
-
-              <a-card size="small" :bordered="false" style="background: rgba(255,255,255,0.03)">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
-                  <span style="font-weight: 700">票档预览</span>
-                  <span style="font-size: 12px; color: var(--ls-text-secondary)">
-                    票价区间 {{ formatEventPriceRange(event) }}
-                  </span>
-                </div>
-                <a-space direction="vertical" style="width: 100%">
-                  <div
-                    v-for="sku in event.skus"
-                    :key="sku.id"
-                    style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06)"
-                  >
-                    <span>{{ sku.name }}</span>
-                    <a-space>
-                      <a-tag :color="sku.stock > 0 ? 'success' : 'error'">{{ sku.stock > 0 ? `余票 ${sku.stock}` : '已售罄' }}</a-tag>
-                      <span style="font-weight: 700">¥{{ sku.price }}</span>
-                    </a-space>
-                  </div>
-                </a-space>
-              </a-card>
-
-              <a-space wrap>
-                <a-button type="primary" size="large" :disabled="!eventStageMeta.canGrab" @click="enterCabin">
-                  进入票仓
-                </a-button>
-                <a-button size="large" @click="goBackToSquare">继续逛广场</a-button>
-              </a-space>
-            </a-space>
-          </a-col>
-        </a-row>
-      </a-card>
+      <section class="detail-content-grid">
+        <a-card class="detail-panel" :bordered="false">
+          <template #title>票档信息</template>
+          <div class="sku-list">
+            <div v-for="sku in event.skus" :key="sku.id" class="sku-row">
+              <div><strong>{{ sku.name }}</strong><span>{{ sku.stock > 0 ? `余票 ${sku.stock} 张` : '已售罄' }}</span></div>
+              <div><b>¥{{ sku.price }}</b><a-tag :color="sku.stock > 0 ? 'success' : 'error'">{{ sku.stock > 0 ? '可购买' : '售罄' }}</a-tag></div>
+            </div>
+          </div>
+        </a-card>
+        <a-card class="detail-panel" :bordered="false">
+          <template #title>购票须知</template>
+          <ul class="detail-notice"><li>实名制购票，观演人信息需与入场证件一致。</li><li>每个账号每个票档限购 6 张。</li><li>订单支付、退票规则以当前场次页面提示为准。</li></ul>
+        </a-card>
+      </section>
     </div>
 
-    <a-result
-      v-else-if="!loading"
-      status="404"
-      title="演出不存在"
-      sub-title="没有找到对应的演出详情，可能已经下架或链接有误。"
-    >
-      <template #extra>
-        <a-button type="primary" @click="goBackToSquare">返回演出广场</a-button>
-      </template>
+    <a-result v-else-if="!loading" status="404" title="演出不存在" sub-title="没有找到对应的演出详情，可能已经下架或链接有误。">
+      <template #extra><a-button type="primary" @click="goBackToSquare">返回演出广场</a-button></template>
     </a-result>
   </a-spin>
 </template>
+
+
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'

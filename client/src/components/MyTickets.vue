@@ -13,14 +13,24 @@
         </a-button>
       </template>
 
+      <div v-if="orders.length" class="ticket-filter-bar">
+        <a-segmented v-model:value="statusFilter" :options="statusOptions" />
+        <span>共 {{ visibleOrders.length }} 笔</span>
+      </div>
+
       <a-empty
         v-if="orders.length === 0"
         description="您目前还没有购票订单，去演出广场挑选一场喜欢的演出吧。"
       />
 
+      <a-empty
+        v-else-if="visibleOrders.length === 0"
+        description="该分类暂无订单"
+      />
+
       <div v-else style="display: flex; flex-direction: column; gap: 20px">
         <a-card
-          v-for="order in orders"
+          v-for="order in visibleOrders"
           :key="order.orderNo"
           size="small"
           :bordered="true"
@@ -170,6 +180,7 @@ import {
   AlipayCircleOutlined,
   LoadingOutlined,
 } from '@ant-design/icons-vue'
+import { computed, ref } from 'vue'
 import { useMyTickets } from '@/composables/order/useMyTickets'
 import TicketQr from './TicketQr.vue'
 
@@ -193,6 +204,22 @@ const {
   cancelOrder,
   refundOrder,
 } = useMyTickets()
+
+const statusFilter = ref<'all' | 'pending' | 'active' | 'closed'>('all')
+const statusOptions = [
+  { label: '全部', value: 'all' },
+  { label: '待支付', value: 'pending' },
+  { label: '待使用', value: 'active' },
+  { label: '已结束', value: 'closed' },
+]
+const visibleOrders = computed(() => {
+  if (statusFilter.value === 'all') return orders.value
+  return orders.value.filter((order) => {
+    if (statusFilter.value === 'pending') return order.status === 0
+    if (statusFilter.value === 'active') return order.status === 1
+    return order.status === 2 || order.status === 3
+  })
+})
 </script>
 
 <style scoped>
@@ -208,4 +235,6 @@ const {
   overflow-wrap: anywhere;
 }
 .ticket-code { max-width: 100%; text-align: center; overflow-wrap: anywhere; }
+.ticket-filter-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 20px; color: var(--ls-text-secondary); font-size: 12px; }
+.ticket-filter-bar .ant-segmented { background: var(--ls-input-bg); }
 </style>

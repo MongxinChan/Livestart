@@ -8,8 +8,6 @@
         :nav-search-visible="navSearchVisible"
         :nav-search-query="navSearchQuery"
         :nav-suggest="navSuggest"
-        :active-theme="activeTheme"
-        :theme-options="themeOptions"
         :current-user="apiState.currentUser"
         @click-logo="navigateTo('square')"
         @nav-change="onNavChange"
@@ -17,7 +15,6 @@
         @search-input="onNavSearchInput"
         @search-select="onNavSearchSelect"
         @search-blur="onNavSearchBlur"
-        @theme-change="onThemeChange"
         @open-profile="openProfile"
         @open-visitor-modal="showVisitorModal = true"
         @open-auth-modal="showAuthModal = true"
@@ -51,11 +48,8 @@ const route = useRoute()
 const router = useRouter()
 
 const {
-  activeTheme,
   currentAntTheme,
-  themeOptions,
   rootStyle,
-  onThemeChange,
   navOptions,
   onNavChange,
   showAuthModal,
@@ -107,10 +101,10 @@ watch(
 
 <style scoped>
 .ls-content {
-  max-width: 1300px;
+  max-width: 1440px;
   width: 100%;
-  margin: 28px auto;
-  padding: 0 20px;
+  margin: 0 auto;
+  padding: 28px 32px 56px;
 }
 
 .ls-fade-enter-active,

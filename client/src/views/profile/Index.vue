@@ -8,6 +8,12 @@
       <a-tag color="processing">{{ apiState.currentUser?.phone || '未绑定手机' }}</a-tag>
     </div>
 
+    <div class="profile-stat-grid">
+      <div class="profile-stat-card"><span>登录方式</span><strong>手机号验证码</strong></div>
+      <div class="profile-stat-card"><span>账户状态</span><strong class="profile-stat-card__success">正常使用</strong></div>
+      <div class="profile-stat-card"><span>资料完成度</span><strong>{{ form.realName && form.username ? '已完善' : '待完善' }}</strong></div>
+    </div>
+
     <div class="profile-grid">
       <section class="profile-panel profile-panel--identity">
         <div class="avatar-block">
@@ -352,10 +358,16 @@ hydrateForm()
 .profile-panel {
   border: 1px solid var(--ls-glass-border);
   border-radius: 8px;
-  background: var(--ls-card-bg);
-  box-shadow: var(--ls-card-shadow);
+  background: var(--ls-bg-card);
+  box-shadow: var(--ls-glass-shadow);
   padding: 22px;
 }
+
+.profile-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.profile-stat-card { display: flex; flex-direction: column; gap: 7px; padding: 15px 16px; border: 1px solid var(--ls-glass-border); border-radius: 8px; background: var(--ls-bg-card); }
+.profile-stat-card span { color: var(--ls-text-secondary); font-size: 11px; }
+.profile-stat-card strong { color: var(--ls-text-primary); font-size: 14px; }
+.profile-stat-card__success { color: var(--ant-color-success) !important; }
 
 .profile-panel--identity {
   display: flex;
@@ -433,5 +445,7 @@ hydrateForm()
   .profile-grid {
     grid-template-columns: 1fr;
   }
+
+  .profile-stat-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -6,6 +6,12 @@
         返回演出广场
       </a-button>
 
+      <div class="cabin-heading">
+        <span>ORDER CHECKOUT</span>
+        <h1>选择票档，锁定你的现场</h1>
+        <p>先确认票档和观演人，再提交购票请求。</p>
+      </div>
+
       <a-row :gutter="[36, 24]">
         <a-col :xs="24" :md="8">
           <div style="border-radius: 14px; overflow: hidden; border: 1px solid rgba(var(--ls-accent-rgb), 0.15); box-shadow: var(--ls-neon-glow); margin-bottom: 16px">
@@ -106,7 +112,7 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px dashed rgba(var(--ls-accent-rgb), 0.15)">
               <span style="font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 6px">
                 <ThunderboltOutlined style="color: var(--ls-color-primary)" />
-                开启高并发压测演示模式
+                高级压测模式（可选）
               </span>
               <a-switch v-model:checked="showStressPanel" :disabled="grabStatus !== 'idle' || stressRunning" />
             </div>
@@ -269,6 +275,10 @@
         </a-col>
       </a-row>
     </a-card>
+
+    <a-result v-else status="404" title="票仓暂不可用" sub-title="演出信息加载失败，请返回演出广场重试。">
+      <template #extra><a-button type="primary" @click="$emit('backToSquare')">返回演出广场</a-button></template>
+    </a-result>
 
     <VisitorManagerModal v-model:open="showVisitorManager" @change="fetchVisitors" />
   </div>

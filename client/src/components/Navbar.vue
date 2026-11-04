@@ -56,25 +56,6 @@
           </a-tooltip>
         </div>
 
-        <a-tooltip title="切换主题" placement="bottom">
-          <a-dropdown :trigger="['click']">
-            <button class="ls-icon-btn">
-              <BgColorsOutlined />
-            </button>
-            <template #overlay>
-              <a-menu @click="$emit('themeChange', $event)">
-                <a-menu-item v-for="t in themeOptions" :key="t.id">
-                  <a-space>
-                    <span>{{ t.icon }}</span>
-                    <span>{{ t.name }}</span>
-                    <CheckOutlined v-if="activeTheme === t.id" style="color: var(--ls-color-primary)" />
-                  </a-space>
-                </a-menu-item>
-              </a-menu>
-            </template>
-          </a-dropdown>
-        </a-tooltip>
-
         <template v-if="currentUser">
           <a-dropdown :trigger="['click']">
             <div class="ls-user-trigger">
@@ -118,8 +99,6 @@
 <script setup lang="ts">
 import {
   ThunderboltOutlined,
-  BgColorsOutlined,
-  CheckOutlined,
   TeamOutlined,
   UserOutlined,
   LogoutOutlined,
@@ -137,8 +116,6 @@ defineProps<{
   navSearchVisible: boolean
   navSearchQuery: string
   navSuggest: Array<string>
-  activeTheme: string
-  themeOptions: Array<{ id: string; name: string; icon: string }>
   currentUser: any
 }>()
 
@@ -148,7 +125,6 @@ const emit = defineEmits<{
   (e: 'toggleSearch'): void
   (e: 'searchInput', keyword: string): void
   (e: 'searchSelect', keyword: string): void
-  (e: 'themeChange', themeEvent: any): void
   (e: 'openProfile'): void
   (e: 'openVisitorModal'): void
   (e: 'openAuthModal'): void
